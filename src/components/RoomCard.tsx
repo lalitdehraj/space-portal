@@ -1,14 +1,12 @@
-// src/components/RoomCard.tsx
+import { Room1 } from "@/types";
 
-import { Room } from "@/types";
+interface RoomCardProps {
+  room: Room1;
+  isExpanded?: boolean;
+  onClick?: (room: Room1) => void;
+}
 
-interface RoomCardProps  {
-  room: Room;
-  isExpanded ? : boolean ;
-  onClick?: (room: Room) => void;
-};
-
-const getOccupancyStatus = (room: Room): "low" | "medium" | "high" => {
+const getOccupancyStatus = (room: Room1): "low" | "medium" | "high" => {
   const occupancyRate = room.occupied / room.capacity;
   if (occupancyRate <= 0.1) return "low";
   if (occupancyRate > 0.8) return "high";
@@ -50,14 +48,16 @@ export default function RoomCard({
         onClick={() => onClick && onClick(room)}
         className={`hover:shadow-lg transition-shadow duration-300 rounded-lg border-t border-r border-b  border-l-4 shadow-sm py-4 px-3 ${
           classes.leftBorderColor
-        } ${isExpanded ? "ring-2 ring-blue-500" : "none"}`}
+        } ${isExpanded ? "ring-2 ring-orange-500 " : "none"}`}
       >
         <button
           className="flex w-full items-start justify-between"
-          title={`View details for ${room.name}`}
+          title={`View details for ${room.roomName}`}
         >
           <div className="flex flex-col items-start text-left">
-            <p className="text-sm font-semibold text-gray-900">{room.name}</p>
+            <p className="text-sm font-[540] text-gray-800 text-ellipsis">
+              {room.roomName}
+            </p>
             <p className="text-[10px] text-gray-500">
               Occupied: {room.occupied} / {room.capacity}
             </p>

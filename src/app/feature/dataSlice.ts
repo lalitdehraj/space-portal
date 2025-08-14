@@ -1,16 +1,20 @@
-import { Building, Floor,Room } from "@/types";
+import { Building1, Floor1,Room } from "@/types";
 import { createSlice } from "@reduxjs/toolkit";
 
 export interface DataState {
-    allBuildingsData:Building[]
-    selectedBuilding:Building|null
-    selectedFloor:Floor|null    
+    academicYear:string
+    academicSession:string
+    selectedBuilding:Building1|null
+    selectedFloor:string  
+    headerText:string 
     selectedRoom:Room|null
 }
 const initialState:DataState= {
-    allBuildingsData : [],
+    academicYear:"",
+    academicSession:"",
     selectedBuilding :null,
-    selectedFloor :null,
+    headerText:"Dashboard",
+    selectedFloor :"",
     selectedRoom :null
 }
 
@@ -18,14 +22,19 @@ export const dataSlice = createSlice({
     name: "dataState",
     initialState,
     reducers:{
-        setAllBuildingsData:(state,action)=>{
-            state.allBuildingsData = action.payload;
+        setAcademicYear:(state,action)=>{
+            state.academicYear = action.payload;
+        },
+        setAcademicSession:(state,action)=>{
+            state.academicSession = action.payload;
         },
         setSelectedBuilding:(state,action)=>{
             state.selectedBuilding = action.payload;
         },
         setSeletedFloor:(state,action)=>{
             state.selectedFloor = action.payload;
+        },setHeaderText:(state,action)=>{
+            state.headerText = action.payload;
         },
         setSelectedRoom:(state,action)=>{
             state.selectedRoom = action.payload;
@@ -33,6 +42,6 @@ export const dataSlice = createSlice({
     }
 })
 
-export const {setAllBuildingsData,setSelectedBuilding,setSeletedFloor,setSelectedRoom} = dataSlice.actions;
+export const {setSelectedBuilding,setSeletedFloor,setSelectedRoom,setAcademicYear,setAcademicSession,setHeaderText} = dataSlice.actions;
 
 export default dataSlice.reducer;

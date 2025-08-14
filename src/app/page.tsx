@@ -1,7 +1,56 @@
-export default function Page() {
-  return <div>Default Page</div>;
-}
+"use client";
+import { useState, useEffect } from "react";
 
+export default function Page() {
+  const [jobId, setJobId] = useState<string | null>(null);
+  const [ready, setReady] = useState(false);
+  const [polling, setPolling] = useState(false);
+
+  const startJob = async () => {
+    const res = await fetch("/api/start-job", {
+      method: "POST",
+      body: JSON.stringify({ fileKey: "AB2-data" }),
+      headers: { "Content-Type": "application/json" },
+    });
+
+    const data = await res.json();
+    setJobId(data.jobId);
+    setReady(false);
+
+    if (data.alreadyExists) {
+      window.open(data.downloadUrl, "_blank");
+      setReady(true);
+    } else {
+      setPolling(true);
+    }
+  };
+
+  useEffect(() => {
+    console.log("console", polling, jobId);
+    if (!polling || !jobId) return;
+
+    const interval = setInterval(async () => {
+      const res = await fetch(`/api/job-status?jobId=${jobId}`);
+      const data = await res.json();
+
+      if (data.ready) {
+        setReady(true);
+        setPolling(false);
+        window.open(data.downloadUrl, "_blank");
+      }
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, [polling, jobId]);
+
+  return (
+    <div>
+      <button onClick={startJob}>Create/Reuse File</button>
+      {ready && <p>✅ File ready for download</p>}
+      {!ready && polling && <p>⏳ Processing...</p>}
+    </div>
+  );
+}
 
 // const authenticationAPI = (Email: string) => {
 //   isVerified: "true|false";
@@ -103,4 +152,3 @@ export default function Page() {
 //     ],
 //   };
 // };
-

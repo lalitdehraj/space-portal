@@ -5,8 +5,10 @@ import React, { FC } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { X } from "lucide-react";
+import { useDispatch } from "react-redux";
+import { setHeaderText } from "@/app/feature/dataSlice";
+import { useRouter } from "next/navigation";
 
-// Define a type for a navigation link for better type safety and consistency
 type NavLink = {
   title: string;
   href: string;
@@ -14,11 +16,10 @@ type NavLink = {
   alt: string;
 };
 
-// Define the navigation links in a structured data array
 const navLinks: NavLink[] = [
   {
     title: "Dashboard",
-    href: "/dashboard",
+    href: "/space-portal/dashboard",
     iconSrc: "/images/element-4.svg",
     alt: "Dashboard icon",
   },
@@ -27,7 +28,7 @@ const navLinks: NavLink[] = [
 const spaceManagementLinks: NavLink[] = [
   {
     title: "Building - Floor - Rooms",
-    href: "/buildings",
+    href: "/space-portal/buildings",
     iconSrc: "/images/menu-board.svg",
     alt: "Building icon",
   },
@@ -36,7 +37,7 @@ const spaceManagementLinks: NavLink[] = [
 const maintenanceLinks: NavLink[] = [
   {
     title: "Request Approval",
-    href: "/requests",
+    href: "/space-portal/requests",
     iconSrc: "/images/dollar-square.svg",
     alt: "Maintenance icon",
   },
@@ -45,7 +46,7 @@ const maintenanceLinks: NavLink[] = [
 const reportsLinks: NavLink[] = [
   {
     title: "Space Utilization Reports",
-    href: "#",
+    href: "/space-portal/reports",
     iconSrc: "/images/dollar-square.svg",
     alt: "Reports icon",
   },
@@ -55,7 +56,6 @@ interface SideNavProps {
   onClose: () => void;
 }
 
-// NavItem component for rendering a single link. It uses the NavLink type.
 const NavItem: FC<NavLink & { onClose: () => void }> = ({
   href,
   iconSrc,
@@ -64,10 +64,12 @@ const NavItem: FC<NavLink & { onClose: () => void }> = ({
   onClose,
 }) => {
   const pathname = usePathname();
-  const isActive = pathname.includes(href);
+  const isActive = pathname === href || pathname.includes(href);
 
+  const dispatcher = useDispatch();
   return (
     <Link
+      onClickCapture={() => dispatcher(setHeaderText(title))}
       href={href}
       className={`ml-10 flex items-center rounded p-2 text-sm transition-colors duration-200 hover:bg-gray-200 ${
         isActive
@@ -83,10 +85,14 @@ const NavItem: FC<NavLink & { onClose: () => void }> = ({
 };
 
 const SideNav: FC<SideNavProps> = ({ onClose }) => {
+  const router = useRouter();
   return (
     <aside className="flex h-full w-64 flex-col bg-gray-50 shadow-lg">
       <div className="flex items-center justify-between p-4 md:justify-center">
         <img
+          onClick={() => {
+            router.push("/space-portal/dashboard");
+          }}
           src="/images/manipal-complete-logo.png"
           alt="Manipal University Jaipur Logo"
           className="h-[52px] w-[160px] mt-6 mb-6 object-contain"

@@ -1,12 +1,10 @@
-// src/components/BuildingCard.tsx
 import Image from "next/image";
-import { Building } from "@/types";
+import { Building1 } from "@/types";
 import React, { SVGProps } from "react";
 
-
 type BuildingCardProps = {
-  building: Building;
-  onClick?: (building: Building) => void;
+  building: Building1;
+  onClick?: (building: Building1) => void;
 };
 
 const FloorIcon = (props: SVGProps<SVGSVGElement>) => (
@@ -38,13 +36,15 @@ const RoomIcon = (props: SVGProps<SVGSVGElement>) => (
 );
 
 const BuildingCard = ({ building, onClick }: BuildingCardProps) => {
-  // Determine the background color based on occupancy rate
+  let occupancyRate = Math.floor(
+    (building.occupied / building.totalOccupancy) * 100
+  );
   const occupancyBgClass =
-    building.occupancyRate <= 10
-      ? "bg-green-700/50" // Example: Low occupancy (green)
-      : building.occupancyRate >= 80
-      ? "bg-red-700/50" // Example: High occupancy (red)
-      : "bg-yellow-500/50"; // Example: Medium occupancy (yellow)
+    occupancyRate <= 10
+      ? "bg-green-700/50"
+      : occupancyRate >= 80
+      ? "bg-red-700/50"
+      : "bg-yellow-500/50";
 
   return (
     <button
@@ -54,7 +54,7 @@ const BuildingCard = ({ building, onClick }: BuildingCardProps) => {
       <Image
         src={building.image}
         alt={building.name}
-        width={400} // Set appropriate dimensions for optimization
+        width={400}
         height={200}
         className="h-48 w-full object-cover"
       />
@@ -77,7 +77,7 @@ const BuildingCard = ({ building, onClick }: BuildingCardProps) => {
           {/* Occupancy rate */}
           <div className="flex flex-col items-center">
             <span className="text-[10px]">Occupied</span>
-            <span className="text-lg font-bold">{building.occupancyRate}%</span>
+            <span className="text-lg font-bold">{occupancyRate}%</span>
           </div>
         </div>
       </div>

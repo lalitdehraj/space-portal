@@ -1,4 +1,3 @@
-
 export interface Room {
   id: string;
   name: string;
@@ -14,7 +13,7 @@ export interface Floor {
   totalRooms: number;
   occupancyRate: number;
   rooms: Room[];
-  layout: string; 
+  layout: string;
 }
 
 export interface Building {
@@ -35,11 +34,11 @@ export interface University {
   image: string;
 }
 
-interface Duration1{
-  startTime:string;
-  endTime:string;
-  session:string;
-  acadmenicYear:string;
+interface Duration1 {
+  startTime: string;
+  endTime: string;
+  session: string;
+  acadmenicYear: string;
 }
 interface University1 {
   id: string;
@@ -47,37 +46,121 @@ interface University1 {
   image: string;
 }
 
-interface Building1 {
+export interface Building1 {
   id: string;
   name: string;
   totalFloors: number;
   totalRooms: number;
-  totalOccupancy:number;
-  occupied:number;
+  totalOccupancy: number;
+  occupied: number;
   image: string;
+  floors: Floor1[];
 }
 
-interface Floor1 {
+export interface Floor1 {
   id: string;
   name: string;
   totalRoomsOnFloor: number;
-  roomOccupied:number;
+  roomOccupied: number;
   floorArea: string;
 }
 
-interface Room1 {
+export interface Room1 {
   id: string;
   roomName: string;
   capacity: number;
   occupied: number;
-  occupiedBy: string|null;
-  roomType:string;
-  floor:string;
-  status:string;
-  roomArea:string;
+  occupiedBy: string | null;
+  hasSubtype: boolean;
+  roomType: string;
+  floor: string;
+  status: string;
+  roomArea: string;
+  buildingId: string;
+  parentId?: string;
+}
+
+export interface Occupants {
+  occupantName?: string;
+  type?: string;
+  startTime?: string;
+  endTime?: string;
+}
+
+export interface SearchResult {
+  buildingId: string;
+  name: string;
+  type: string;
+  roomId?: string;
+}
+export interface GraphData {
+  time: string;
+  "Occupancy Rate": string;
+}
+export interface DashboardDataResponse {
+  totalBuildings: string;
+  totalFloors: string;
+  totalRooms: string;
+  totalFacilities: string;
+  avgOccupancy: string;
+  activeSessions: string;
+  maintenanceIssues: string;
+  utilizationRequests: string;
+  availabeFacilities: string;
+  graphData: GraphData[];
+}
+export interface RoomInfo {
+  id: string;
+  roomName: string;
+  capacity: number;
+  occupied: number;
+  occupants: Occupants[];
+  occupiedBy: string | null;
+  building: string;
+  hasSubtype: boolean;
+  roomType: string;
+  floor: string;
+  status: string;
+  roomArea: string;
 }
 
 export interface AcademicSessions {
-  academicYears:number[],
-  academicSessions:string[]
+  academicYears: string[];
+  academicSessions: string[];
+}
+
+export interface RoomRequestTable {
+  rooms: RoomRequest[];
+  curruntPage: string;
+  totalPages: string;
+  pageSize: string;
+}
+
+export interface RoomRequest {
+  requestID: string;
+  employeeName: string;
+  employeeDepartment: string;
+  requestedRoomType: string;
+  purpose: string;
+  priority: string;
+  requestDate: string;
+  requiredDate: string;
+  requiredTimeStart: string;
+  requiredTimeEnd: string;
+  rejectionReason?: string;
+  status: string;
+  allocatedRoomID: string | null;
+  approvedBy: string | null;
+  approvalDate: string | null;
+  recurrence: string;
+}
+
+export interface Report {
+  id: string;
+  fileUrl: string;
+  fileName: string;
+  createdAt: string;
+  size: string;
+  startDate: string;
+  endDate: string;
 }
