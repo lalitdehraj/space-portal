@@ -1,7 +1,13 @@
 "use client";
 import React, { useEffect, useState, useRef } from "react";
 import Pagination from "@/components/PageNumberIndicator";
-import { RoomRequestTable, RoomRequest, AcademicSessions } from "@/types";
+import {
+  RoomRequestTable,
+  RoomRequest,
+  AcademicSessions,
+  Building1,
+  Room1,
+} from "@/types";
 import { api, callApi } from "@/utils/apiIntercepter";
 import { URL_NOT_FOUND } from "@/constants";
 import { useSelector } from "react-redux";
@@ -551,6 +557,79 @@ function AddRequestForm({ onClose, requestData }: FormProps) {
   const [allocatedRoom, setAllocatedRoom] = useState("");
   const [approvedStatus, setApprovedStatus] = useState(initialStatus || "");
   const [rejectionReason, setRejectionReason] = useState("");
+  const acadmeicYear = useSelector(
+    (state: any) => state.dataState.academicYear
+  );
+  const acadmeicSession = useSelector(
+    (state: any) => state.dataState.academicSession
+  );
+  const [buildings, setBuildings] = useState<Building1[]>([]);
+  const [selectedBuildingId, setSelectedBuildingId] = useState<string>("");
+  const [rooms, setRooms] = useState<Room1[]>([]);
+  const [selectedRoomId, setSelectedRoomId] = useState<string>("");
+
+  useEffect(() => {
+    const fetchBuildings = async () => {
+      let response = await callApi<Building1[]>(
+        api.get(process.env.NEXT_PUBLIC_GET_BUILDING_LIST || URL_NOT_FOUND, {
+          params: {
+            acadmeicSession: acadmeicSession,
+            acadmeicYear: acadmeicYear,
+          },
+        })
+      );
+      if (response.success) {
+        setBuildings(response.data || []);
+      }
+    };
+    fetchBuildings();
+  }, [acadmeicSession, acadmeicYear]);
+
+  useEffect(() => {
+    const fetchRoomsForBuilding = async (buildingId: string) => {
+      const building = buildings.find((b) => b.id === buildingId);
+      if (!building) {
+        setRooms([]);
+        return;
+      }
+      const floorIds = building.floors?.map((f) => f.id) || [];
+      if (floorIds.length === 0) {
+        setRooms([]);
+        return;
+      }
+      const roomLists = await Promise.all(
+        floorIds.map(async (floorId) => {
+          const res = await callApi<Room1[]>(
+            api.get(process.env.NEXT_PUBLIC_GET_ROOMS_LIST || URL_NOT_FOUND, {
+              params: {
+                buildingId: buildingId,
+                floorId: floorId,
+                acadmeicSession: acadmeicSession,
+                acadmeicYear: acadmeicYear,
+              },
+            })
+          );
+          return res.data || [];
+        })
+      );
+      const merged = roomLists.flat();
+      setRooms(merged);
+    };
+    if (selectedBuildingId) {
+      fetchRoomsForBuilding(selectedBuildingId);
+      setSelectedRoomId("");
+    } else {
+      setRooms([]);
+      setSelectedRoomId("");
+    }
+  }, [selectedBuildingId, acadmeicSession, acadmeicYear, buildings]);
+
+  const [dateType, setDateType] = useState("academicSession");
+  const [timeType, setTimeType] = useState("fullDay");
+  const [customStartDate, setCustomStartDate] = useState("");
+  const [customEndDate, setCustomEndDate] = useState("");
+  const [customStartTime, setCustomStartTime] = useState("");
+  const [customEndTime, setCustomEndTime] = useState("");
 
   useEffect(() => {
     if (initialStatus) {
@@ -590,18 +669,20 @@ function AddRequestForm({ onClose, requestData }: FormProps) {
             </svg>
           </button>
 
-          <h2 className="font-semibold text-gray-700 mb-6">Request Details</h2>
+          <h2 className="font-semibold text-gray-700 mb-6">
+            {`Request No. ${requestID ? `${requestID}` : ""}`}
+          </h2>
 
           <div className="space-y-4">
-            <DetailRow label="Request No" value={requestID} />
+            {/* <DetailRow label="Request No" value={requestID} /> */}
             <DetailRow label="Requested By" value={employeeName} />
-            <DetailRow label="Department" value={employeeDepartment} />
+            {/* <DetailRow label="Department" value={employeeDepartment} /> */}
             <DetailRow label="Room Type" value={requestedRoomType} />
             <DetailRow label="Purpose" value={purpose} />
-            <DetailRow label="Priority" value={priority} />
-            <DetailRow label="Request Date" value={requestDate} />
-            <DetailRow label="Required Date" value={requiredDate} />
-            <DetailRow label="Time" value={requiredTimeStart} />
+            {/* <DetailRow label="Priority" value={priority} /> */}
+            {/* <DetailRow label="Request Date" value={requestDate} /> */}
+            {/* <DetailRow label="Required Date" value={requiredDate} /> */}
+            {/* <DetailRow label="Time" value={requiredTimeStart} /> */}
             <DetailRow label="Recurrence" value={recurrence} />
 
             <div className="flex justify-between items-center">
@@ -638,22 +719,179 @@ function AddRequestForm({ onClose, requestData }: FormProps) {
             {initialStatus === "Pending" && approvedStatus === "Approved" && (
               <div className="mt-8 pt-4 border-t-2 border-gray-200">
                 <div className="space-y-4">
-                  <div>
-                    <label
-                      htmlFor="allocatedRoom"
-                      className="block text-sm text-gray-700 mb-1"
-                    >
-                      Allocate Room
-                    </label>
-                    <input
-                      type="text"
-                      id="allocatedRoom"
-                      className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
-                      value={allocatedRoom}
-                      onChange={(e) => setAllocatedRoom(e.target.value)}
-                      placeholder="e.g., Room B-201"
-                      required
-                    />
+                  <div className="space-y-4 mb-6">
+                    <div className="flex flex-col md:flex-row md:space-x-4">
+                      <div className="md:w-1/2 w-full">
+                        <label className="block text-sm text-gray-700 mb-1">
+                          Building
+                        </label>
+                        <select
+                          className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
+                          value={selectedBuildingId}
+                          onChange={(e) =>
+                            setSelectedBuildingId(e.target.value)
+                          }
+                        >
+                          <option value="">Select building</option>
+                          {buildings.map((b) => (
+                            <option key={b.id} value={b.id}>
+                              {b.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="md:w-1/2 w-full mt-4 md:mt-0">
+                        <label className="block text-sm text-gray-700 mb-1">
+                          Room
+                        </label>
+                        <select
+                          className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
+                          value={selectedRoomId}
+                          onChange={(e) => setSelectedRoomId(e.target.value)}
+                          disabled={!selectedBuildingId}
+                        >
+                          <option value="">Select room</option>
+                          {rooms.map((r) => (
+                            <option key={r.id} value={r.id}>
+                              {r.roomName}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="space-y-2 mb-6 ">
+                    <label className="block text-sm text-gray-700 ">Date</label>
+                    {dateType !== "custom" ? (
+                      <div className="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-4 w-full">
+                        <div className="flex flex-col md:flex-row items-center space-y-4 md:space-y-0 md:space-x-4 w-1/2">
+                          <select
+                            className="block w-full mt-3 px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
+                            value={dateType}
+                            onChange={(e) => setDateType(e.target.value)}
+                          >
+                            <option value="day">Day</option>
+                            <option value="week">Week</option>
+                            <option value="month">Month</option>
+                            <option value="academicSession">
+                              Academic Session
+                            </option>
+                            <option value="custom">Custom Range</option>
+                          </select>
+                        </div>
+                        {(dateType === "day" ||
+                          dateType === "week" ||
+                          dateType === "month") && (
+                          <div className="w-full md:w-1/2">
+                            <label className="block text-xs text-gray-500">
+                              Start Date
+                            </label>
+                            <input
+                              type="date"
+                              className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
+                              value={customStartDate}
+                              onChange={(e) =>
+                                setCustomStartDate(e.target.value)
+                              }
+                            />
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="flex flex-col md:flex-row md:space-x-4">
+                        <div className="md:w-1/2 w-full">
+                          <label className="block text-sm text-gray-700 mb-1">
+                            Start Date
+                          </label>
+                          <input
+                            type="date"
+                            className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
+                            value={customStartDate}
+                            onChange={(e) => setCustomStartDate(e.target.value)}
+                          />
+                        </div>
+                        <div className="md:w-1/2 w-full mt-4 md:mt-0">
+                          <label className="block text-sm text-gray-700 mb-1">
+                            End Date
+                          </label>
+                          <input
+                            type="date"
+                            className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
+                            value={customEndDate}
+                            onChange={(e) => setCustomEndDate(e.target.value)}
+                          />
+                        </div>
+                        <div className="mt-3 md:mt-0 flex items-end">
+                          <button
+                            type="button"
+                            className="px-3 py-2 text-xs bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200"
+                            onClick={() => {
+                              setDateType("day");
+                              setCustomStartDate("");
+                              setCustomEndDate("");
+                            }}
+                          >
+                            Reset
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-2 mb-6">
+                    <label className="block text-sm text-gray-700">Time</label>
+                    {timeType !== "custom" ? (
+                      <div className="flex space-x-4">
+                        <select
+                          className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
+                          value={timeType}
+                          onChange={(e) => setTimeType(e.target.value)}
+                        >
+                          <option value="fullDay">Full Day</option>
+                          <option value="firstHalf">First Half</option>
+                          <option value="secondHalf">Second Half</option>
+                          <option value="custom">Custom Range</option>
+                        </select>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col md:flex-row md:space-x-4">
+                        <div className="md:w-1/2 w-full">
+                          <label className="block text-sm text-gray-700 mb-1">
+                            Start Time
+                          </label>
+                          <input
+                            type="time"
+                            className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
+                            value={customStartTime}
+                            onChange={(e) => setCustomStartTime(e.target.value)}
+                          />
+                        </div>
+                        <div className="md:w-1/2 w-full mt-4 md:mt-0">
+                          <label className="block text-sm text-gray-700 mb-1">
+                            End Time
+                          </label>
+                          <input
+                            type="time"
+                            className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
+                            value={customEndTime}
+                            onChange={(e) => setCustomEndTime(e.target.value)}
+                          />
+                        </div>
+                        <div className="mt-3 md:mt-0 flex items-end">
+                          <button
+                            type="button"
+                            className="px-3 py-2 text-xs bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200"
+                            onClick={() => {
+                              setTimeType("fullDay");
+                              setCustomStartTime("");
+                              setCustomEndTime("");
+                            }}
+                          >
+                            Reset
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

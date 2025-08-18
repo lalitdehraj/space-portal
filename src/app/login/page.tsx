@@ -3,10 +3,11 @@
 import React from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-// import { useSession, signIn, signOut } from "next-auth/react";
+import { signIn, signOut, useSession } from "next-auth/react";
 
 export default function LoginPage() {
   const router = useRouter();
+  const { data: session } = useSession();
 
   return (
     <div
@@ -37,7 +38,11 @@ export default function LoginPage() {
         <button
           type="button"
           className="flex w-full items-center justify-center rounded-md border border-gray-300 bg-white py-3 px-6 text-base font-semibold text-gray-700 transition duration-300 ease-in-out hover:bg-gray-100"
-          onClick={() => router.push("/dashboard")}
+          onClick={async () => {
+            await signIn("azure-ad", {
+              callbackUrl: "/space-portal/dashboard",
+            });
+          }}
         >
           <Image
             height={20}

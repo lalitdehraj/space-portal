@@ -19,9 +19,12 @@ import {
 import { api, callApi } from "@/utils/apiIntercepter";
 import { URL_NOT_FOUND } from "@/constants";
 import { useSelector } from "react-redux";
-import { DashboardDataResponse, GraphData } from "@/types";
+import { DashboardDataResponse } from "@/types";
+import { useSession } from "next-auth/react";
 
 export default function Dashboard() {
+  const { data: session, status } = useSession();
+
   const [data, setData] = useState<DashboardDataResponse | null>(null);
   const acadmeicYear = useSelector(
     (state: any) => state.dataState.academicYear

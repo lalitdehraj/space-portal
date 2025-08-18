@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import ReduxProvider from "@/components/ReduxProvider";
-import { Session } from "inspector/promises";
 import SessionProviderWrapper from "@/components/SessionProviderWrapper";
 
 const geistSans = Geist({
@@ -30,9 +29,9 @@ export default async function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        {/* <SessionProviderWrapper> */}
+        <SessionProviderWrapper>
           <ReduxProvider>{children}</ReduxProvider>
-        {/* </SessionProviderWrapper> */}
+        </SessionProviderWrapper>
       </body>
     </html>
   );

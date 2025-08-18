@@ -8,6 +8,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { setAcademicSession, setAcademicYear } from "@/app/feature/dataSlice";
 import { useRouter } from "next/navigation";
 import { encrypt } from "@/utils/encryption";
+import { signOut, useSession } from "next-auth/react";
 
 type SearchResults = {
   buildings: SearchResult[];
@@ -38,6 +39,7 @@ export default function Header() {
   }, []);
 
   const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const { data: session } = useSession();
 
   const filterRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -54,6 +56,22 @@ export default function Header() {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [filterRef]);
+  const profileRef = useRef<HTMLDivElement>(null);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  useEffect(() => {
+    const handleClickOutsideProfile = (event: MouseEvent) => {
+      if (
+        profileRef.current &&
+        !profileRef.current.contains(event.target as Node)
+      ) {
+        setIsProfileOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutsideProfile);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutsideProfile);
+    };
+  }, [profileRef]);
   const [searchText, setSearchText] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResults | null>(
     null
@@ -214,14 +232,32 @@ export default function Header() {
           />
         </button>
 
-        <div className="flex items-center space-x-2">
-          <Image
-            src="/images/avatar-svgrepo-com.svg"
-            alt="User Avatar"
-            width={32}
-            height={32}
-            className="h-8 w-8 rounded-full"
-          />
+        <div className="relative" ref={profileRef}>
+          <button
+            onClick={() => setIsProfileOpen((prev) => !prev)}
+            className="flex items-center space-x-2 focus:outline-none"
+            aria-haspopup="menu"
+            aria-expanded={isProfileOpen}
+            title="User menu"
+          >
+            <Image
+              src="/images/avatar-svgrepo-com.svg"
+              alt="User Avatar"
+              width={32}
+              height={32}
+              className="h-8 w-8 rounded-full"
+            />
+          </button>
+          {isProfileOpen && (
+            <div className="absolute right-0 mt-2 w-40 bg-white border border-gray-200 rounded-lg shadow-lg z-20">
+              <button
+                onClick={() => signOut({ callbackUrl: "/login" })}
+                className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+              >
+                Sign out
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </header>
