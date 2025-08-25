@@ -87,8 +87,8 @@ const NavItem: FC<NavLink & { onClose: () => void }> = ({
 const SideNav: FC<SideNavProps> = ({ onClose }) => {
   const router = useRouter();
   return (
-    <aside className="flex h-full w-64 flex-col bg-gray-50 shadow-lg">
-      <div className="flex items-center justify-between p-4 md:justify-center">
+    <aside className="flex h-full w-full md:w-64 flex-col bg-gray-50 shadow-lg ">
+      <div className="flex items-center justify-between p-4 md:justify-center ">
         <img
           onClick={() => {
             router.push("/space-portal/dashboard");

@@ -119,10 +119,35 @@ export interface RoomInfo {
   building: string;
   hasSubtype: boolean;
   roomType: string;
+  parentId?: string;
   floor: string;
   status: string;
   roomArea: string;
 }
+
+export type SearchResults = {
+  buildings: SearchResult[];
+  rooms: SearchResult[];
+};
+
+export type AcademicYear = {
+  Code: string;
+  Description: string;
+};
+export type AcademicSession = {
+  Code: string;
+  "Academic Year": string;
+};
+
+export type UserProfile = {
+  userName: string;
+  userContact: string;
+  userDepartment: string;
+  userPosition: string;
+  activeSession: string;
+  activeYear: string;
+  userImage: string;
+};
 
 export interface AcademicSessions {
   academicYears: string[];
@@ -130,7 +155,7 @@ export interface AcademicSessions {
 }
 
 export interface RoomRequestTable {
-  rooms: RoomRequest[];
+  requests: RoomRequest[];
   curruntPage: string;
   totalPages: string;
   pageSize: string;
@@ -143,11 +168,13 @@ export interface RoomRequest {
   requestedRoomType: string;
   purpose: string;
   priority: string;
+  startDate: string;
+  endDate: string;
   requestDate: string;
-  requiredDate: string;
-  requiredTimeStart: string;
-  requiredTimeEnd: string;
-  rejectionReason?: string;
+  startTime: string;
+  endTime: string;
+  purposeDesc?: string;
+  description?: string;
   status: string;
   allocatedRoomID: string | null;
   approvedBy: string | null;

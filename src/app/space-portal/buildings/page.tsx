@@ -25,17 +25,17 @@ export default function Buildings() {
 
   useEffect(() => {
     const fetchBuildings = async () => {
-      let response = callApi<Building1[]>(
-        api.get(process.env.NEXT_PUBLIC_GET_BUILDING_LIST || URL_NOT_FOUND, {
-          params: {
-            acadmeicSession: acadmeicSession,
-            acadmeicYear: acadmeicYear,
-          },
-        })
+      const reqBody = {
+        acadSession: `${acadmeicSession}`,
+        acadYear: `${acadmeicYear}`,
+      };
+
+      const response = await callApi<Building1[]>(
+        process.env.NEXT_PUBLIC_GET_BUILDING_LIST || URL_NOT_FOUND,
+        reqBody
       );
-      let res = await response;
-      if (res.success) {
-        setAllBuildingsData(res.data || []);
+      if (response.success) {
+        setAllBuildingsData(response.data || []);
       }
     };
     fetchBuildings();

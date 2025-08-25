@@ -16,15 +16,12 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { api, callApi } from "@/utils/apiIntercepter";
+import { callApi } from "@/utils/apiIntercepter";
 import { URL_NOT_FOUND } from "@/constants";
 import { useSelector } from "react-redux";
-import { DashboardDataResponse } from "@/types";
-import { useSession } from "next-auth/react";
+import { Building1, DashboardDataResponse } from "@/types";
 
 export default function Dashboard() {
-  const { data: session, status } = useSession();
-
   const [data, setData] = useState<DashboardDataResponse | null>(null);
   const acadmeicYear = useSelector(
     (state: any) => state.dataState.academicYear
@@ -35,14 +32,14 @@ export default function Dashboard() {
   const [days, setDays] = useState("7");
   useEffect(() => {
     const fetchDashboardData = async () => {
+      const requestBody = {
+        noOfDays: days,
+        acadmeicSession: acadmeicSession,
+        acadmeicYear: acadmeicYear,
+      };
       let response = callApi<DashboardDataResponse>(
-        api.get(process.env.NEXT_PUBLIC_GET_DASHBOARD_DATA || URL_NOT_FOUND, {
-          params: {
-            noOfDays: days,
-            acadmeicSession: acadmeicSession,
-            acadmeicYear: acadmeicYear,
-          },
-        })
+        process.env.NEXT_PUBLIC_GET_DASHBOARD_DATA || URL_NOT_FOUND,
+        requestBody
       );
       let res = await response;
       setData(res.data || null);
@@ -50,22 +47,50 @@ export default function Dashboard() {
     fetchDashboardData();
   }, [days, acadmeicYear, acadmeicSession]);
 
+  const [allBuildingsData, setAllBuildingsData] = useState<Building1[]>([]);
+
+  useEffect(() => {
+    const fetchBuildings = async () => {
+      const reqBody = {
+        acadSession: `${acadmeicSession}`,
+        acadYear: `${acadmeicYear}`,
+      };
+      const response = await callApi<Building1[]>(
+        process.env.NEXT_PUBLIC_GET_BUILDING_LIST || URL_NOT_FOUND
+      );
+      console.log(response);
+      if (response.success) {
+        setAllBuildingsData(response.data || []);
+      }
+    };
+    fetchBuildings();
+  }, []);
+
   const kpiCards = [
     {
       title: "Total Buildings",
-      value: data?.totalBuildings,
+      value: allBuildingsData?.length,
       iconSrc: "/images/office-building-outline.svg",
       alt: "Building icon",
     },
     {
       title: "Total Floors",
-      value: data?.totalFloors,
+      value: allBuildingsData?.reduce((sum, b) => {
+        return sum + b.floors?.length;
+      }, 0),
       iconSrc: "/images/floor-plan.svg",
       alt: "Floor plan icon",
     },
     {
       title: "Total Rooms",
-      value: data?.totalRooms,
+      value: allBuildingsData.reduce((sum, b) => {
+        return (
+          sum +
+          b.floors.reduce((fsum, f) => {
+            return fsum + f.totalRoomsOnFloor;
+          }, 0)
+        );
+      }, 0),
       iconSrc: "/images/house-door.svg",
       alt: "Room icon",
     },
@@ -214,7 +239,7 @@ export default function Dashboard() {
     ];
 
     return (
-      <div className="bg-white p-6 rounded-lg w-full max-w-sm mx-auto border border-gray-200">
+      <div className="bg-white p-6 rounded-lg w-full mt-4 lg:mt-0 lg:ml-4 mx-auto border border-gray-200">
         <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -234,7 +259,7 @@ export default function Dashboard() {
           </svg>
           Summary Statistics
         </h2>
-        <div className="grid">
+        <div className="grid grid-flow-col lg:grid-flow-row">
           {stats.map((stat) => (
             <div key={stat.id} className="flex items-center p-4 rounded-md">
               <div className="flex-shrink-0 mr-4">{stat.icon}</div>
@@ -292,7 +317,7 @@ export default function Dashboard() {
                 Comparative analysis across all campus facilities
               </p>
             </div>
-            <div className="flex space-x-4">
+            <div className=" flex space-x-4 hidden ">
               <button
                 type="button"
                 className="flex items-center text-xs text-gray-800 transition-colors hover:text-gray-600"

@@ -14,12 +14,12 @@ interface ChildProps {
 const DashboardLayout = ({ children }: ChildProps) => {
   let headertext = useSelector((state: any) => state.dataState.headerText);
   const { isSideNavOpen, toggleSideNav } = useSideNavState();
-  
+
   return (
     <AuthGuard>
-      <div className="flex min-h-screen flex-col bg-gray-50 font-sans md:grid md:grid-cols-[256px_1fr]">
+      <div className="flex min-h-screen flex-col bg-gray-500 font-sans md:grid md:grid-cols-[256px_1fr] ">
         <div
-          className={`fixed inset-y-0 left-0 z-50 w-64 transform bg-gray-50 transition-transform duration-300 ease-in-out md:static md:translate-x-0 ${
+          className={`fixed inset-y-0 left-0 z-50 w-full transform bg-gray-500 transition-transform duration-300 ease-in-out md:static md:translate-x-0 ${
             isSideNavOpen ? "translate-x-0" : "-translate-x-full"
           }`}
         >
@@ -34,11 +34,11 @@ const DashboardLayout = ({ children }: ChildProps) => {
         )}
 
         <div className="flex flex-1 flex-col bg-white">
-          <div className="sticky top-0 z-30 flex w-full items-center justify-between border-b  p-4 shadow-sm md:hidden">
+          <div className="sticky top-0 z-30 flex w-full items-center justify-between border-b  p-4 shadow-sm md:hidden bg-white">
             <button onClick={toggleSideNav} className="text-gray-900">
               <Menu size={24} />
             </button>
-            <h1 className="text-xl font-bold text-gray-800">{headertext}</h1>
+            <h1 className="text-xl font-bold text-gray-800 ">{headertext}</h1>
             <div className="w-6" />
           </div>
 

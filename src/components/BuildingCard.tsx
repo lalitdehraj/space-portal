@@ -52,7 +52,7 @@ const BuildingCard = ({ building, onClick }: BuildingCardProps) => {
       className="relative rounded-lg shadow-md overflow-hidden transition-transform transform hover:scale-[1.02] cursor-pointer"
     >
       <Image
-        src={building.image}
+        src={building.image || "/images/main-building.jpg"}
         alt={building.name}
         width={400}
         height={200}

@@ -10,7 +10,7 @@ import { BuildingSVG } from "@/components/BuildingSvg";
 import { FloorSVG } from "@/components/FloorSvg";
 import { removeSpaces } from "@/utils";
 import { api, callApi } from "@/utils/apiIntercepter";
-import { URL_NOT_FOUND } from "@/constants";
+import { credentials, URL_NOT_FOUND } from "@/constants";
 import { encrypt, decrypt } from "@/utils/encryption";
 import {
   setSelectedBuilding,
@@ -35,44 +35,48 @@ export default function Buildings() {
   );
 
   useEffect(() => {
-    const fetchBuildings = async (buildingId: string) => {
-      let response = callApi<Building1[]>(
-        api.get(process.env.NEXT_PUBLIC_GET_BUILDING_LIST || URL_NOT_FOUND, {
-          params: {
-            acadmeicSession: acadmeicSession,
-            acadmeicYear: acadmeicYear,
-          },
-        })
+    const fetchBuildings = async () => {
+      const reqBody = {
+        acadSession: `${acadmeicSession}`,
+        acadYear: `${acadmeicYear}`,
+      };
+
+      const response = await callApi<Building1[]>(
+        process.env.NEXT_PUBLIC_GET_BUILDING_LIST || URL_NOT_FOUND,
+        reqBody
       );
-      let res = await response;
-      if (res.success) {
-        let building = res.data?.find((building) => building.id === buildingId);
+      if (response.success) {
+        let building = response.data?.find(
+          (building) => building.id === buildingId
+        );
         setSelectedBuilding(building);
       }
     };
-    fetchBuildings(buildingId);
+    fetchBuildings();
   }, [acadmeicSession, acadmeicYear]);
 
   if (selectedBuilding && !selectedFloor) {
-    setSelectedFloor(selectedBuilding?.floors[0]);
+    if (selectedBuilding?.floors.length > 0)
+      setSelectedFloor(selectedBuilding?.floors[0]);
   }
   useEffect(() => {
     const fetchRooms = async () => {
-      if (!selectedFloor) return;
-      let response = callApi<Room1[]>(
-        api.get(process.env.NEXT_PUBLIC_GET_ROOMS_LIST || URL_NOT_FOUND, {
-          params: {
-            buildingId: buildingId,
-            floorId: selectedFloor?.id,
-            acadmeicSession: acadmeicSession,
-            acadmeicYear: acadmeicYear,
-          },
-        })
+      const reqBody = {
+        buildingNo: `${buildingId}`,
+        floorID: `${selectedFloor?.id}`,
+        // acadSession: `${acadmeicSession}`,
+        // acadYear: `${acadmeicYear}`,
+      };
+
+      const response = await callApi<Room1[]>(
+        process.env.NEXT_PUBLIC_GET_ROOMS_LIST || URL_NOT_FOUND,
+        reqBody
       );
-      let res = await response;
-      setRoomsList(res.data || []);
+      if (response.success) {
+        setRoomsList(response.data || []);
+      }
     };
-    fetchRooms();
+    if (selectedFloor) fetchRooms();
   }, [acadmeicSession, acadmeicYear, selectedFloor]);
 
   const kpiCards = [
@@ -102,6 +106,10 @@ export default function Buildings() {
   let roomCategories = ["All Rooms"];
   roomCategories = [...roomCategories, ...allRoomsCategories];
   const [selectedRoomType, setSelectedRoomType] = useState<string>("All Rooms");
+  useEffect(() => {
+    if (!roomCategories.some((category) => category === selectedRoomType))
+      setSelectedRoomType("All Rooms");
+  }, [roomCategories]);
 
   const filteredRooms: Room1[] = roomsList.filter((room) => {
     return (
@@ -112,14 +120,14 @@ export default function Buildings() {
     );
   });
 
-  const fetchRoom = async (room: Room1) => {
+  const fetchSubrooms = async (room: Room1) => {
     if (!room) return;
+    const requestBody = {
+      roomId: room.id,
+    };
     let response = callApi<Room1[]>(
-      api.get(process.env.NEXT_PUBLIC_GET_SUBROOMS_LIST || URL_NOT_FOUND, {
-        params: {
-          roomId: room.id,
-        },
-      })
+      process.env.NEXT_PUBLIC_GET_SUBROOMS_LIST || URL_NOT_FOUND,
+      requestBody
     );
     let res = await response;
     setSubRooms(res.data || []);
@@ -132,7 +140,7 @@ export default function Buildings() {
   const handleRoomClick = (room: Room1) => {
     if (room.hasSubtype) {
       setSelectedRoom(room.id === selectedRoom?.id ? null : room);
-      fetchRoom(room);
+      fetchSubrooms(room);
     } else {
       router.push(
         `/space-portal/buildings/${encrypt(selectedBuilding?.id)}/${encrypt(

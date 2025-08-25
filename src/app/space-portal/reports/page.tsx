@@ -1,11 +1,22 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import Pagination from "@/components/PageNumberIndicator";
-import { api, callApi } from "@/utils/apiIntercepter";
+import { callApi } from "@/utils/apiIntercepter";
 import { URL_NOT_FOUND } from "@/constants";
 import { useSelector } from "react-redux";
-import { Report } from "@/types";
+import {
+  Building1,
+  Report,
+  AcademicSession,
+  AcademicYear,
+  Room1,
+} from "@/types";
 import { formatDate } from "@/utils";
+import { setAcademicYear } from "@/app/feature/dataSlice";
+import {
+  AcademicYearResponse,
+  AcademicSessionResponse,
+} from "@/components/Header";
 
 type ReportsResponse = {
   pageSize: number;
@@ -149,7 +160,6 @@ export default function UtilizationReport() {
   }
   useEffect(() => {
     const filteredList = filterData(reportsList, searchQuery);
-    console.log("filteredList: ", filteredList);
     const sortedList = sortData(
       filteredList,
       activeHeader as keyof Report,
@@ -158,18 +168,19 @@ export default function UtilizationReport() {
     setFilteredList(sortedList);
   }, [reportsList, activeHeader, sortState, searchQuery]);
 
+  const [generateReportVisible, setGenerateReportVisible] = useState(false);
   const [totalPages, setTotalPages] = useState(0);
   useEffect(() => {
     const fetchReports = async () => {
+      const requestBody = {
+        limit: pageSize,
+        offset: curruntPage,
+        acadmeicSession: acadmeicSession,
+        acadmeicYear: acadmeicYear,
+      };
       let response = await callApi<ReportsResponse>(
-        api.get(`${process.env.NEXT_PUBLIC_GET_REPORTS}` || URL_NOT_FOUND, {
-          params: {
-            limit: pageSize,
-            offset: curruntPage,
-            acadmeicSession: acadmeicSession,
-            acadmeicYear: acadmeicYear,
-          },
-        })
+        `${process.env.NEXT_PUBLIC_GET_REPORTS}` || URL_NOT_FOUND,
+        requestBody
       );
       let res = response;
       setTotalPages(res.data?.totalPages || 0);
@@ -208,6 +219,12 @@ export default function UtilizationReport() {
               onChange={(e) => setSearchQuery(e.target.value)}
               className="border border-gray-300 rounded-md py-1 px-2 text-sm focus:outline-none text-gray-700 focus:ring-1 focus:ring-orange-500"
             />
+            <button
+              className="flex h-fit items-center rounded-md bg-[#F26722] px-4 py-2 text-xs text-white shadow-md transition-all hover:bg-[#a5705a]"
+              onClick={() => setGenerateReportVisible(true)}
+            >
+              Generate Report
+            </button>
           </div>
         </div>
 
@@ -333,6 +350,333 @@ export default function UtilizationReport() {
           </div>
         </div>
       </div>
+      {generateReportVisible && (
+        <GenerateReportForm
+          onClosePressed={() => setGenerateReportVisible(false)}
+        />
+      )}
     </>
+  );
+}
+
+type FormProps = {
+  onClosePressed: () => void;
+};
+
+function GenerateReportForm({ onClosePressed }: FormProps) {
+  const [selectedBuildingId, setSelectedBuildingId] = useState<string>("");
+  const [timePeriod, setTimePeriod] = useState<string>("");
+  const [selectedRoomId, setSelectedRoomId] = useState<string>("");
+  const [selectedFloorId, setSelectedFloorId] = useState<string>("");
+  const [buildings, setBuildings] = useState<Building1[]>([]);
+  const [rooms, setRooms] = useState<Room1[]>([]);
+  const [reportType, setReportType] = useState("room");
+  const [academicYearsList, setAcademicYearsList] = useState<AcademicYear[]>();
+  const [academicSessionsList, setAcademicSessionsList] =
+    useState<AcademicSession[]>();
+  const [selectedYear, setSelectedYear] = useState("");
+  const [selectedSession, setSelectedSession] = useState("");
+  const [customStartDate, setCustomStartDate] = useState("");
+  const [customEndDate, setCustomEndDate] = useState("");
+  const acadmeicYear = useSelector(
+    (state: any) => state.dataState.academicYear
+  );
+  const acadmeicSession = useSelector(
+    (state: any) => state.dataState.academicSession
+  );
+
+  useEffect(() => {
+    const getAcadmicCalender = async () => {
+      const responseYear = await callApi<AcademicYearResponse>(
+        process.env.NEXT_PUBLIC_GET_ACADMIC_YEARS || URL_NOT_FOUND
+      );
+      if (responseYear.success) {
+        const acadYearsList = responseYear.data?.["Academic Year"]?.reverse();
+        setAcademicYearsList(acadYearsList);
+      }
+
+      let responseSession = await callApi<AcademicSessionResponse>(
+        process.env.NEXT_PUBLIC_GET_ACADMIC_SESSIONS || URL_NOT_FOUND
+      );
+
+      if (responseSession.success) {
+        setAcademicSessionsList(responseSession.data?.["Academic Session"]);
+      }
+    };
+    getAcadmicCalender();
+  }, []);
+  useEffect(() => {
+    const fetchBuildings = async () => {
+      const reqBody = {
+        acadSession: `${acadmeicSession}`,
+        acadYear: `${acadmeicYear}`,
+      };
+
+      const response = await callApi<Building1[]>(
+        process.env.NEXT_PUBLIC_GET_BUILDING_LIST || URL_NOT_FOUND,
+        reqBody
+      );
+      if (response.success) {
+        setBuildings(response.data || []);
+      }
+    };
+    fetchBuildings();
+  }, [acadmeicSession, acadmeicYear]);
+
+  useEffect(() => {
+    const fetchRoomsForBuilding = async (buildingId: string) => {
+      const building = buildings.find((b) => b.id === buildingId);
+      if (!building) {
+        setRooms([]);
+        return;
+      }
+      const floorIds = building.floors?.map((f) => f.id) || [];
+      if (floorIds.length === 0) {
+        setRooms([]);
+        return;
+      }
+      const reqBody = {
+        buildingNo: `${buildingId}`,
+        floorID: `${selectedFloorId}`,
+        // acadSession: `${acadmeicSession}`,
+        // acadYear: `${acadmeicYear}`,
+      };
+      const response = await callApi<Room1[]>(
+        process.env.NEXT_PUBLIC_GET_ROOMS_LIST || URL_NOT_FOUND,
+        reqBody
+      );
+      setRooms(response.data || []);
+    };
+    if (selectedBuildingId) {
+      fetchRoomsForBuilding(selectedBuildingId);
+      setSelectedRoomId("");
+    } else {
+      setRooms([]);
+      setSelectedRoomId("");
+    }
+  }, [
+    selectedBuildingId,
+    acadmeicSession,
+    acadmeicYear,
+    buildings,
+    selectedFloorId,
+  ]);
+  useEffect(() => {
+    setSelectedBuildingId("");
+    setSelectedFloorId("");
+    setSelectedRoomId("");
+  }, [reportType]);
+
+  const handleSubmit = () => {};
+  return (
+    <section className="fixed inset-0 z-50 h-screen w-screen bg-[#00000070] flex items-center justify-center text-gray-500">
+      <div className="relative w-full max-w-3xl bg-white rounded-xl shadow-2xl p-6 transform transition-all duration-300 ease-in-out scale-95 md:scale-100">
+        <div className="max-h-[80vh] bg-white pr-2">
+          <div className="flex justify-between items-center">
+            <span className="text-gray-900 font-[550] text-sm">
+              Generate Report
+            </span>
+          </div>
+
+          <div className="border-t-2 border-gray-200 mt-2 pt-2 space-y-2">
+            <div className="flex flex-col md:flex-row md:space-x-4">
+              <div className="w-full">
+                <label className="block text-sm text-gray-700 mb-1">
+                  Report type
+                </label>
+                <select
+                  className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
+                  value={reportType}
+                  onChange={(e) => {
+                    setReportType(e.target.value);
+                  }}
+                >
+                  <option value="room">Room Report</option>
+                  <option value="building">Building Report</option>
+                </select>{" "}
+              </div>
+            </div>
+            <div className="flex flex-col md:flex-row md:space-x-4">
+              <div className="w-full">
+                <label className="block text-sm text-gray-700 mb-1">
+                  Building
+                </label>
+                <select
+                  className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
+                  value={selectedBuildingId}
+                  onChange={(e) => setSelectedBuildingId(e.target.value)}
+                >
+                  <option value="">Select building</option>
+                  {buildings.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            {reportType === "room" && (
+              <div className="flex flex-col md:flex-row md:space-x-4">
+                <div className="md:w-1/2 w-full mt-4 md:mt-0">
+                  <label className="block text-sm text-gray-700 mb-1">
+                    Floor
+                  </label>
+                  <select
+                    className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
+                    value={selectedFloorId}
+                    onChange={(e) => setSelectedFloorId(e.target.value)}
+                    disabled={!selectedBuildingId}
+                  >
+                    <option value="">Select floor</option>
+                    {buildings.filter((b) => b.id === selectedBuildingId)
+                      .length > 0
+                      ? buildings
+                          .filter((b) => b.id === selectedBuildingId)[0]
+                          .floors.map((f) => (
+                            <option key={f.id} value={f.id}>
+                              {f.name}
+                            </option>
+                          ))
+                      : null}
+                  </select>
+                </div>
+                <div className="md:w-1/2 w-full mt-4 md:mt-0">
+                  <label className="block text-sm text-gray-700 mb-1">
+                    Room
+                  </label>
+                  <select
+                    className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
+                    value={selectedRoomId}
+                    onChange={(e) => setSelectedRoomId(e.target.value)}
+                    disabled={!selectedFloorId}
+                  >
+                    <option value="">Select room</option>
+                    {rooms.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.roomName}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
+            {timePeriod !== "custom" ? (
+              <div className="flex flex-col md:flex-row md:space-x-4">
+                <div className="md:w-1/2 w-full">
+                  <label className="block text-sm text-gray-700 mb-1">
+                    Period
+                  </label>
+                  <select
+                    className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
+                    value={timePeriod}
+                    onChange={(e) => setTimePeriod(e.target.value)}
+                  >
+                    <option value="">Select Duration</option>
+                    <option value={"active"}>Active Session</option>
+                    <option value={"year"}>Academic Year</option>
+                    <option value={"session"}>Academic Session</option>
+                    <option value={"last30"}>Last 30 Days</option>
+                    <option value={"last7"}>Last 7 Days</option>
+                    <option value={"custom"}>Custom Duration</option>
+                  </select>
+                </div>
+                {timePeriod === "year" && (
+                  <div className="md:w-1/2 w-full mt-4 md:mt-0">
+                    <label className="block text-sm text-gray-700 mb-1">
+                      Year
+                    </label>
+                    <select
+                      className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
+                      value={selectedYear}
+                      onChange={(e) => setSelectedYear(e.target.value)}
+                    >
+                      <option value="">Select year</option>
+                      {academicYearsList?.map((y) => (
+                        <option key={y.Code} value={y.Code}>
+                          {y.Description}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                {timePeriod === "session" && (
+                  <div className="md:w-1/2 w-full mt-4 md:mt-0">
+                    <label className="block text-sm text-gray-700 mb-1">
+                      Session
+                    </label>
+                    <select
+                      className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
+                      value={selectedSession}
+                      onChange={(e) => setSelectedSession(e.target.value)}
+                    >
+                      <option value="">Select session</option>
+                      {academicSessionsList?.map((y) => (
+                        <option key={y.Code} value={y.Code}>
+                          {y.Code}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex flex-col md:flex-row md:space-x-4">
+                <div className="md:w-1/2 w-full">
+                  <label className="block text-sm text-gray-700 mb-1">
+                    Start Date
+                  </label>
+                  <input
+                    type="date"
+                    className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
+                    value={customStartDate}
+                    onChange={(e) => setCustomStartDate(e.target.value)}
+                  />
+                </div>
+                <div className="md:w-1/2 w-full mt-4 md:mt-0">
+                  <label className="block text-sm text-gray-700 mb-1">
+                    End Date
+                  </label>
+                  <input
+                    type="date"
+                    className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
+                    value={customEndDate}
+                    onChange={(e) => setCustomEndDate(e.target.value)}
+                  />
+                </div>
+                <div className="mt-3 md:mt-0 flex items-end">
+                  <button
+                    type="button"
+                    className="px-3 py-2 text-xs bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200"
+                    onClick={() => {
+                      setTimePeriod("");
+                      setCustomStartDate("");
+                      setCustomEndDate("");
+                    }}
+                  >
+                    Reset
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+          <div className="flex justify-center space-x-6 mt-8 mb-2">
+            <button
+              type="button"
+              className="px-3 py-2 rounded-lg shadow-md transition duration-300 bg-gray-100 text-gray-500 hover:bg-gray-200"
+              onClick={onClosePressed}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="px-3 py-2 rounded-lg shadow-md transition duration-300 bg-orange-500 text-white hover:bg-orange-600"
+              onClick={handleSubmit}
+            >
+              Generate
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
   );
 }

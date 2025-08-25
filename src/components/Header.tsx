@@ -1,8 +1,8 @@
 "use client";
-import React, { useEffect, useRef, useState } from "react";
+import React, { cache, useEffect, useRef, useState } from "react";
 import Image from "next/image";
-import { api, callApi } from "@/utils/apiIntercepter";
-import { AcademicSessions, SearchResult } from "@/types";
+import { callApi } from "@/utils/apiIntercepter";
+import { SearchResult,AcademicSession,AcademicYear,SearchResults } from "@/types";
 import { URL_NOT_FOUND } from "@/constants";
 import { useDispatch, useSelector } from "react-redux";
 import { setAcademicSession, setAcademicYear } from "@/app/feature/dataSlice";
@@ -10,34 +10,63 @@ import { useRouter } from "next/navigation";
 import { encrypt } from "@/utils/encryption";
 import { signOut, useSession } from "next-auth/react";
 
-type SearchResults = {
-  buildings: SearchResult[];
-  rooms: SearchResult[];
+export type AcademicYearResponse = {
+  "Academic Year": AcademicYear[];
 };
-
+export type AcademicSessionResponse = {
+  "Academic Session": AcademicSession[];
+};
 export default function Header() {
   const router = useRouter();
   const dispatcher = useDispatch();
-  const [academic, setAcademic] = useState<AcademicSessions>();
+  const [academicYearsList, setAcademicYearsList] = useState<AcademicYear[]>();
+  const [academicSessionsList, setAcademicSessionsList] =
+    useState<AcademicSession[]>();
+
   useEffect(() => {
     const getAcadmicCalender = async () => {
-      let reponse = callApi<AcademicSessions>(
-        api.get(process.env.NEXT_PUBLIC_GET_ACADMIC_CALENDER || URL_NOT_FOUND)
+      const responseYear = await callApi<AcademicYearResponse>(
+        process.env.NEXT_PUBLIC_GET_ACADMIC_YEARS || URL_NOT_FOUND
       );
-      let res = await reponse;
-      if (res.success) {
-        setAcademic(res.data);
-        dispatcher(setAcademicSession(res.data?.academicSessions[0]));
+      if (responseYear.success) {
+        const acadYearsList = responseYear.data?.["Academic Year"]?.reverse();
+        setAcademicYearsList(acadYearsList);
         dispatcher(
-          setAcademicYear(
-            res.data?.academicYears[res.data?.academicYears.length - 1]
-          )
+          setAcademicYear(responseYear.data?.["Academic Year"]?.[0].Code)
         );
+      }
+
+      let responseSession = await callApi<AcademicSessionResponse>(
+        process.env.NEXT_PUBLIC_GET_ACADMIC_SESSIONS || URL_NOT_FOUND
+      );
+
+      if (responseSession.success) {
+        setAcademicSessionsList(responseSession.data?.["Academic Session"]);
       }
     };
     getAcadmicCalender();
   }, []);
 
+  const academicYear = useSelector(
+    (state: any) => state.dataState.academicYear
+  );
+  const [sessionsPerYear, setSessionsPerYear] = useState<string[]>();
+
+  useEffect(() => {
+    const filteredList = academicSessionsList?.filter(
+      (year) => year["Academic Year"] == academicYear
+    );
+    const unique = new Map<string, string[]>();
+    if (!filteredList) return;
+    for (const item of filteredList) {
+      if (unique.has(item.Code)) {
+        unique.get(item.Code)?.push(item.Code);
+      } else {
+        unique.set(item.Code, [item.Code]);
+      }
+    }
+    setSessionsPerYear(Array.from(unique.keys()) || []);
+  }, [academicYear]);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const { data: session } = useSession();
 
@@ -86,14 +115,12 @@ export default function Header() {
     const timerId = setTimeout(() => {
       const fetchSearchResults = async (text: string) => {
         const response = await callApi<SearchResults>(
-          api.get(process.env.NEXT_PUBLIC_GET_SEARCH || URL_NOT_FOUND, {
-            params: {
-              searchKey: text,
-            },
-          })
+          process.env.NEXT_PUBLIC_GET_SEARCH || URL_NOT_FOUND,
+          {
+            searchKey: text,
+          }
         );
         setSearchResults(response.data || null);
-        console.log("Result: ", JSON.stringify(response.data));
       };
 
       fetchSearchResults(searchText);
@@ -191,27 +218,33 @@ export default function Header() {
         )}
       </div>
 
-      <div className="flex items-center space-x-2 md:space-x-4">
+      <div className="flex items-center space-x-2 md:space-x-4 ">
         <select
           value={useSelector((state: any) => state.dataState.academicSession)}
-          className="hidden rounded-md px-2 py-2 text-xs text-gray-700 focus:outline-none md:block"
+          className={`hidden rounded-md px-2 py-2 text-xs text-gray-700 focus:outline-none ${
+            (sessionsPerYear?.length || 0) > 0 ? "md:block" : ""
+          }`}
           onChange={(event) => {
             dispatcher(setAcademicSession(event.target.value));
           }}
         >
-          {academic?.academicSessions.map((session) => (
-            <option key={session}>{session}</option>
+          {sessionsPerYear?.map((session) => (
+            <option key={session} value={session}>
+              {session}
+            </option>
           ))}
         </select>
         <select
-          value={useSelector((state: any) => state.dataState.academicYear)}
+          value={academicYear}
           className="hidden rounded-md  px-2 py-2 text-xs text-gray-700 focus:outline-none md:block"
           onChange={(event) => {
             dispatcher(setAcademicYear(event.target.value));
           }}
         >
-          {academic?.academicYears.map((year) => (
-            <option key={year}>{year}</option>
+          {academicYearsList?.map((year) => (
+            <option key={year.Code} value={year.Code}>
+              {year.Description}
+            </option>
           ))}
         </select>
 
@@ -250,6 +283,15 @@ export default function Header() {
           </button>
           {isProfileOpen && (
             <div className="absolute right-0 mt-2 w-40 bg-white border border-gray-200 rounded-lg shadow-lg z-20">
+              <button
+                onClick={() => {
+                  setIsProfileOpen(false);
+                  router.push("/space-portal/profile");
+                }}
+                className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+              >
+                Profile
+              </button>
               <button
                 onClick={() => signOut({ callbackUrl: "/login" })}
                 className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"

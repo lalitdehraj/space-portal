@@ -1,0 +1,211 @@
+"use client";
+import { useSession } from "next-auth/react";
+import React, { useEffect, useState } from "react";
+import {
+  Mail,
+  Phone,
+  Building2,
+  CalendarCheck,
+  Clock,
+  CheckCircle2,
+  AlertTriangle,
+  ArrowRightCircle,
+} from "lucide-react";
+import { callApi } from "@/utils/apiIntercepter";
+import { UserProfile } from "@/types";
+import { URL_NOT_FOUND } from "@/constants";
+
+// Dummy data to simulate API responses for the faculty member's profile
+const dummyFacultyData = {
+  allocatedSpaces: [
+    {
+      id: "A-201",
+      name: "Lab A-201",
+      building: "Mellon Hall",
+      purpose: "Research Lab",
+    },
+    {
+      id: "B-305",
+      name: "Office B-305",
+      building: "Bauer Hall",
+      purpose: "Private Office",
+    },
+    {
+      id: "C-110",
+      name: "Classroom C-110",
+      building: "Main Hall",
+      purpose: "Lecture",
+    },
+  ],
+  pendingRequests: [
+    {
+      id: "req-001",
+      type: "Room Change",
+      space: "Office B-305",
+      date: "2025-10-25",
+      status: "Pending",
+    },
+    {
+      id: "req-002",
+      type: "Equipment Setup",
+      space: "Lab A-201",
+      date: "2025-10-20",
+      status: "Approved",
+    },
+    {
+      id: "req-003",
+      type: "Meeting Room Booking",
+      space: "Conference Room 1",
+      date: "2025-11-01",
+      status: "Rejected",
+    },
+  ],
+};
+
+function ProfilePage() {
+  const { data } = useSession();
+  const userEmail = data?.user?.email;
+  const [user, setUser] = useState<UserProfile | null>(null);
+
+  useEffect(() => {
+    const fetchUser = async (email: string | null) => {
+      if (!email) return;
+      const requestBody = {
+        email: email,
+      };
+      const response = await callApi<UserProfile>(
+        process.env.NEXT_PUBLIC_GET_USER || URL_NOT_FOUND,
+        requestBody
+      );
+      if (response.success) {
+        setUser(response.data || null);
+        console.log(response);
+      }
+    };
+    fetchUser(userEmail || null);
+  }, []);
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case "Approved":
+        return <CheckCircle2 size={16} className="text-green-500" />;
+      case "Pending":
+        return <Clock size={16} className="text-yellow-500" />;
+      case "Rejected":
+        return <AlertTriangle size={16} className="text-red-500" />;
+      default:
+        return null;
+    }
+  };
+  const { allocatedSpaces, pendingRequests } = dummyFacultyData;
+  return (
+    <div className="w-full p-8 bg-white rounded-xl shadow-lg border border-gray-200">
+      {/* Profile Header Section */}
+      <div className="flex flex-col md:flex-row items-center md:items-start space-y-6 md:space-y-0 md:space-x-8 pb-8 border-b border-gray-200 mb-8">
+        <div className="relative w-40 h-40 rounded-full overflow-hidden border-4 border-white shadow-md">
+          <img
+            src={
+              user?.userImage ||
+              `https://placehold.co/150x150/E2E8F0/A0AEC0?text=${data?.user?.name}`
+            }
+            alt={`${data?.user?.name}'s profile`}
+            className="w-full h-full object-cover"
+          />
+        </div>
+        <div className="flex flex-col items-center md:items-start text-center md:text-left space-y-2">
+          <h1 className="text-3xl font-bold text-gray-800">
+            {data?.user?.name}
+          </h1>
+          <p className="text-lg text-orange-600 font-semibold">
+            {user?.userPosition}
+          </p>
+          <div className="flex flex-col space-y-2 pt-4 text-sm text-gray-600">
+            <div className="flex items-center space-x-2">
+              <Mail size={16} className="text-gray-500" />
+              <span>{data?.user?.email}</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Phone size={16} className="text-gray-500" />
+              <span>{user?.userContact}</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Building2 size={16} className="text-gray-500" />
+              <span>{user?.userDepartment} Department</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <CalendarCheck size={16} className="text-gray-500" />
+              <span>{`${user?.activeSession}, ${user?.activeYear}`}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 hidden">
+        {/* Allocated Spaces Section */}
+        <div className="space-y-4">
+          <h2 className="text-xl font-bold text-gray-800">Allocated Spaces</h2>
+          <ul className="space-y-4">
+            {allocatedSpaces.map((space) => (
+              <li
+                key={space.id}
+                className="p-4 bg-gray-50 rounded-lg border border-gray-200 shadow-sm flex items-center justify-between transition-transform duration-200 hover:scale-[1.01]"
+              >
+                <div className="flex flex-col">
+                  <span className="text-base font-semibold text-gray-800">
+                    {space.name}
+                  </span>
+                  <span className="text-sm text-gray-600">
+                    {space.building}
+                  </span>
+                </div>
+                <div className="px-3 py-1 text-xs font-medium text-white bg-blue-500 rounded-full">
+                  {space.purpose}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        {/* Pending Requests Section */}
+        <div className="space-y-4">
+          <h2 className="text-xl font-bold text-gray-800">Recent Requests</h2>
+          <ul className="space-y-4">
+            {pendingRequests.map((request) => (
+              <li
+                key={request.id}
+                className="p-4 bg-gray-50 rounded-lg border border-gray-200 shadow-sm flex items-center justify-between transition-transform duration-200 hover:scale-[1.01]"
+              >
+                <div className="flex items-center space-x-3">
+                  {getStatusIcon(request.status)}
+                  <div className="flex flex-col">
+                    <span className="text-base font-semibold text-gray-800">
+                      {request.type}
+                    </span>
+                    <span className="text-sm text-gray-600">
+                      {request.space}
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-2 text-sm text-gray-500">
+                  <CalendarCheck size={16} />
+                  <span>{request.date}</span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+
+      {/* Action Button */}
+      <div className="flex justify-end mt-8">
+        <button className="flex items-center space-x-2 px-6 py-3 bg-orange-500 text-white font-semibold rounded-lg shadow-md hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-opacity-50 transition-colors duration-200">
+          <span>Manage Spaces</span>
+          <ArrowRightCircle size={18} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+export default ProfilePage;

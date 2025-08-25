@@ -12,7 +12,7 @@ import {
 import { removeSpaces } from "@/utils";
 import { NextRequest, NextResponse } from "next/server";
 
-export async function GET(request: NextRequest) {
+export async function POST(request: NextRequest) {
   const response = NextResponse.json;
 
   console.log(`requested URL ${request.url}`);
@@ -20,15 +20,18 @@ export async function GET(request: NextRequest) {
 
   if (
     request.url.includes(
-      `${process.env.NEXT_PUBLIC_BASE_URL}${process.env.NEXT_PUBLIC_GET_ACADMIC_CALENDER}`
+      `${process.env.NEXT_PUBLIC_BASE_URL}${process.env.NEXT_PUBLIC_GET_ACADMIC_YEARS}`
     )
   )
-    return response(AcademicCalender);
+    return response({ "Academic Year": AcademicYears });
+
   if (
     request.url.includes(
-      `${process.env.NEXT_PUBLIC_BASE_URL}${process.env.NEXT_PUBLIC_GET_BUILDING_LIST}`
+      `${process.env.NEXT_PUBLIC_BASE_URL}${process.env.NEXT_PUBLIC_GET_ACADMIC_SESSIONS}`
     )
   )
+    return response({ "Academic Session": AcademicSession });
+  if (request.url.includes(`${process.env.NEXT_PUBLIC_GET_BUILDING_LIST}`))
     return response(BuildingsData);
   if (
     request.url.includes(
@@ -48,8 +51,9 @@ export async function GET(request: NextRequest) {
       `${process.env.NEXT_PUBLIC_BASE_URL}${process.env.NEXT_PUBLIC_GET_ROOMS_LIST}`
     )
   ) {
-    let buildingId = searchParams.get("buildingId");
-    let floorId = searchParams.get("floorId");
+    const body = await request.json();
+    let buildingId = body["buildingNo"];
+    let floorId = body["floorID"];
     return response(
       RoomsData.filter((room) => {
         return buildingId == room.buildingId && floorId == room.floor;
@@ -61,7 +65,8 @@ export async function GET(request: NextRequest) {
       `${process.env.NEXT_PUBLIC_BASE_URL}${process.env.NEXT_PUBLIC_GET_SUBROOMS_LIST}`
     )
   ) {
-    let roomId = searchParams.get("roomId");
+    const body = await request.json();
+    let roomId = body["roomId"];
     console.log("roomInfo:  ", roomId);
     return response(
       SubRoomsData.filter((room) => {
@@ -74,10 +79,11 @@ export async function GET(request: NextRequest) {
       `${process.env.NEXT_PUBLIC_BASE_URL}${process.env.NEXT_PUBLIC_GET_REQUEST_LIST}`
     )
   ) {
-    let limit = parseInt(searchParams.get("limit")!);
-    let offSet = parseInt(searchParams.get("offset")!);
+    const body = await request.json();
+    let limit = parseInt(body["limit"]!);
+    let offSet = parseInt(body["offset"]!);
     let startIndex = (offSet - 1) * limit;
-    let totalPage = Math.ceil(RequestData.rooms.length / limit);
+    let totalPage = Math.ceil(RequestData.requests.length / limit);
     let curruntPage = offSet;
     if (offSet > totalPage) curruntPage = totalPage;
 
@@ -85,7 +91,7 @@ export async function GET(request: NextRequest) {
       curruntPage: curruntPage,
       totalPages: totalPage,
       pageSize: limit,
-      rooms: RequestData.rooms.slice(startIndex, startIndex + limit),
+      requests: RequestData.requests.slice(startIndex, startIndex + limit),
     };
     return response(reqData);
   }
@@ -94,7 +100,8 @@ export async function GET(request: NextRequest) {
       `${process.env.NEXT_PUBLIC_BASE_URL}${process.env.NEXT_PUBLIC_GET_DASHBOARD_DATA}`
     )
   ) {
-    let days = searchParams.get("noOfDays");
+    const body = await request.json();
+    let days = body["noOfDays"];
     if (days === "7") return response(DashboardData7D);
     else return response(DashboardData30D);
   }
@@ -103,7 +110,8 @@ export async function GET(request: NextRequest) {
       `${process.env.NEXT_PUBLIC_BASE_URL}${process.env.NEXT_PUBLIC_GET_ROOM_INFO}`
     )
   ) {
-    let roomId = searchParams.get("roomId");
+    const body = await request.json();
+    let roomId = body["roomId"];
     let roomInfo = RoomInformation.filter((room) => room.id === roomId);
     return response(roomInfo[0] || RoomInformation[0]);
   }
@@ -112,7 +120,8 @@ export async function GET(request: NextRequest) {
       `${process.env.NEXT_PUBLIC_BASE_URL}${process.env.NEXT_PUBLIC_GET_SEARCH}`
     )
   ) {
-    let searchText = searchParams.get("searchKey");
+    const body = await request.json();
+    let searchText = body["searchKey"];
     let buildings = BuildingsData.filter((building) => {
       return removeSpaces(building.name)
         .toLowerCase()
@@ -144,12 +153,330 @@ export async function GET(request: NextRequest) {
       rooms: r,
     };
     return response(res);
+  }
+  if (
+    request.url.includes(
+      `${process.env.NEXT_PUBLIC_BASE_URL}${process.env.NEXT_PUBLIC_GET_USER}`
+    )
+  ) {
+    const user = {
+      userId: "Emp003",
+      userName: "Lalit Dehraj",
+      userContact: "9891135663",
+      userDepartment: "CSE",
+      userPosition: "Developer",
+      activeSession: "Jul-Dec",
+      activeYear: "2025-26",
+      userImage: "",
+    };
+    return response(user);
   } else return response({ error: "return from end" });
 }
-const AcademicCalender: AcademicSessions = {
-  academicSessions: ["Jan - Mar", "Apr - Jun", "Jul - Sept", "Oct - Dec"],
-  academicYears: ["2024", "2025"],
-};
+const AcademicYears = [
+  {
+    Code: "25-26",
+    Description: "2025-26",
+  },
+  {
+    Code: "24-25",
+    Description: "2024-25",
+  },
+  {
+    Code: "23-24",
+    Description: "2023-24",
+  },
+  {
+    Code: "22-23",
+    Description: "2022-23",
+  },
+  {
+    Code: "21-22",
+    Description: "2021-22",
+  },
+  {
+    Code: "20-21",
+    Description: "2020-21",
+  },
+  {
+    Code: "19-20",
+    Description: "2019-20",
+  },
+  {
+    Code: "18-19",
+    Description: "2018-19",
+  },
+  {
+    Code: "17-18",
+    Description: "2017-18",
+  },
+  {
+    Code: "16-17",
+    Description: "2016-17",
+  },
+  {
+    Code: "15-16",
+    Description: "2015-16",
+  },
+  {
+    Code: "14-15",
+    Description: "2014-15",
+  },
+  {
+    Code: "13-14",
+    Description: "2013-14",
+  },
+  {
+    Code: "12-13",
+    Description: "2012-13",
+  },
+  {
+    Code: "11-12",
+    Description: "2011-12",
+  },
+].reverse();
+const AcademicSession = [
+  {
+    Code: "AUG-NOV 2018",
+    "Academic Year": "18-19",
+  },
+  {
+    Code: "AUG-NOV 2019",
+    "Academic Year": "19-20",
+  },
+  {
+    Code: "AUG-NOV 2020",
+    "Academic Year": "20-21",
+  },
+  {
+    Code: "AUG-NOV 2021",
+    "Academic Year": "21-22",
+  },
+  {
+    Code: "AUG-NOV 2022",
+    "Academic Year": "22-23",
+  },
+  {
+    Code: "AUG-NOV 2023",
+    "Academic Year": "23-24",
+  },
+  {
+    Code: "FEB-APRIL 2019",
+    "Academic Year": "18-19",
+  },
+  {
+    Code: "FEB-APRIL 2020",
+    "Academic Year": "19-20",
+  },
+  {
+    Code: "FEB-APRIL 2021",
+    "Academic Year": "20-21",
+  },
+  {
+    Code: "FEB-APRIL 2022",
+    "Academic Year": "21-22",
+  },
+  {
+    Code: "FEB-APRIL 2023",
+    "Academic Year": "22-23",
+  },
+  {
+    Code: "FEB-APRIL 2024",
+    "Academic Year": "23-24",
+  },
+  {
+    Code: "JAN-MAY 2017",
+    "Academic Year": "16-17",
+  },
+  {
+    Code: "JAN-MAY 2018",
+    "Academic Year": "17-18",
+  },
+  {
+    Code: "JAN-MAY 2019",
+    "Academic Year": "18-19",
+  },
+  {
+    Code: "JAN-MAY 2020",
+    "Academic Year": "19-20",
+  },
+  {
+    Code: "JAN-MAY 2021",
+    "Academic Year": "20-21",
+  },
+  {
+    Code: "JAN-MAY 2022",
+    "Academic Year": "21-22",
+  },
+  {
+    Code: "JAN-MAY 2023",
+    "Academic Year": "22-23",
+  },
+  {
+    Code: "JAN-MAY 2024",
+    "Academic Year": "23-24",
+  },
+  {
+    Code: "JAN-MAY 2025",
+    "Academic Year": "24-25",
+  },
+  {
+    Code: "JUL 2018 - MAY 2019",
+    "Academic Year": "18-19",
+  },
+  {
+    Code: "JUL 2019 - MAY 2020",
+    "Academic Year": "19-20",
+  },
+  {
+    Code: "JUL 2020 - MAY 2021",
+    "Academic Year": "20-21",
+  },
+  {
+    Code: "JUL 2021 - MAY 2022",
+    "Academic Year": "21-22",
+  },
+  {
+    Code: "JUL 2022 - MAY 2023",
+    "Academic Year": "22-23",
+  },
+  {
+    Code: "JUL 2023 - MAY 2024",
+    "Academic Year": "23-24",
+  },
+  {
+    Code: "JUL 2024 - MAY 2025",
+    "Academic Year": "24-25",
+  },
+  {
+    Code: "JUL-NOV 2017",
+    "Academic Year": "17-18",
+  },
+  {
+    Code: "JUL-NOV 2018",
+    "Academic Year": "18-19",
+  },
+  {
+    Code: "JUL-NOV 2019",
+    "Academic Year": "19-20",
+  },
+  {
+    Code: "JUL-NOV 2020",
+    "Academic Year": "20-21",
+  },
+  {
+    Code: "JUL-NOV 2021",
+    "Academic Year": "21-22",
+  },
+  {
+    Code: "JUL-NOV 2022",
+    "Academic Year": "22-23",
+  },
+  {
+    Code: "JUL-NOV 2023",
+    "Academic Year": "23-24",
+  },
+  {
+    Code: "JUL-NOV 2024",
+    "Academic Year": "24-25",
+  },
+  {
+    Code: "NOV-FEB 2019",
+    "Academic Year": "18-19",
+  },
+  {
+    Code: "NOV-FEB 2020",
+    "Academic Year": "19-20",
+  },
+  {
+    Code: "NOV-FEB 2021",
+    "Academic Year": "20-21",
+  },
+  {
+    Code: "NOV-FEB 2022",
+    "Academic Year": "21-22",
+  },
+  {
+    Code: "NOV-FEB 2023",
+    "Academic Year": "22-23",
+  },
+  {
+    Code: "NOV-FEB 2024",
+    "Academic Year": "23-24",
+  },
+  {
+    Code: "SUMMER 2017",
+    "Academic Year": "16-17",
+  },
+  {
+    Code: "SUMMER 2018",
+    "Academic Year": "17-18",
+  },
+  {
+    Code: "SUMMER 2019",
+    "Academic Year": "18-19",
+  },
+  {
+    Code: "SUMMER 2020",
+    "Academic Year": "19-20",
+  },
+  {
+    Code: "SUMMER 2021",
+    "Academic Year": "20-21",
+  },
+  {
+    Code: "SUMMER 2022",
+    "Academic Year": "21-22",
+  },
+  {
+    Code: "SUMMER 2022-I",
+    "Academic Year": "21-22",
+  },
+  {
+    Code: "SUMMER 2022-II",
+    "Academic Year": "21-22",
+  },
+  {
+    Code: "SUMMER 2023",
+    "Academic Year": "22-23",
+  },
+  {
+    Code: "SUMMER 2024",
+    "Academic Year": "23-24",
+  },
+  {
+    Code: "SUMMER 2024-I",
+    "Academic Year": "23-24",
+  },
+  {
+    Code: "SUMMER 2025",
+    "Academic Year": "24-25",
+  },
+  {
+    Code: "WINTER 2019",
+    "Academic Year": "19-20",
+  },
+  {
+    Code: "WINTER 2021",
+    "Academic Year": "21-22",
+  },
+  {
+    Code: "WINTER 2022",
+    "Academic Year": "22-23",
+  },
+  {
+    Code: "WINTER 2023",
+    "Academic Year": "23-24",
+  },
+  {
+    Code: "WINTER 2024",
+    "Academic Year": "24-25",
+  },
+  {
+    Code: "WINTER 2024-I",
+    "Academic Year": "24-25",
+  },
+];
+
 const BuildingsData: Building1[] = [
   {
     id: "AB1",
@@ -1492,7 +1819,7 @@ const RequestData: RoomRequestTable = {
   curruntPage: "1",
   totalPages: "3",
   pageSize: "10",
-  rooms: [
+  requests: [
     {
       requestID: "REQ001",
       employeeName: "EMP001",
@@ -1501,14 +1828,18 @@ const RequestData: RoomRequestTable = {
       purpose: "Team Meeting - Q3 Planning",
       priority: "High",
       requestDate: "2024-07-25",
-      requiredDate: "2024-08-10",
-      requiredTimeStart: "09:00",
-      requiredTimeEnd: "11:00",
+      startDate: "2024-08-10",
+      purposeDesc: "This is the purpose for this meeting",
+      description:
+        "This request was approved because their are too many free rooms available",
+      startTime: "09:00",
+      endTime: "11:00",
       status: "Approved",
       allocatedRoomID: "CR005",
       approvedBy: "EMP005",
       approvalDate: "2024-07-26",
       recurrence: "None",
+      endDate: "2024-07-27",
     },
     {
       requestID: "REQ002",
@@ -1518,14 +1849,16 @@ const RequestData: RoomRequestTable = {
       purpose: "New Product Training",
       priority: "Medium",
       requestDate: "2024-07-28",
-      requiredDate: "2024-08-15",
-      requiredTimeStart: "13:00",
-      requiredTimeEnd: "17:00",
+      startDate: "2024-08-15",
+      purposeDesc: "This is the purpose for this meeting",
+      startTime: "13:00",
+      endTime: "17:00",
       status: "Pending",
       allocatedRoomID: null,
       approvedBy: null,
       approvalDate: null,
       recurrence: "Weekly",
+      endDate: "2024-07-27",
     },
     {
       requestID: "REQ003",
@@ -1535,14 +1868,16 @@ const RequestData: RoomRequestTable = {
       purpose: "Client Demo",
       priority: "High",
       requestDate: "2024-07-29",
-      requiredDate: "2024-08-05",
-      requiredTimeStart: "10:30",
-      requiredTimeEnd: "11:30",
+      startDate: "2024-08-05",
+      startTime: "10:30",
+      endTime: "11:30",
+      purposeDesc: "",
       status: "Approved",
       allocatedRoomID: "SMR002",
       approvedBy: "EMP006",
       approvalDate: "2024-07-30",
       recurrence: "None",
+      endDate: "2024-07-27",
     },
     {
       requestID: "REQ004",
@@ -1552,14 +1887,16 @@ const RequestData: RoomRequestTable = {
       purpose: "Sales Strategy Session",
       priority: "Medium",
       requestDate: "2024-07-30",
-      requiredDate: "2024-08-20",
-      requiredTimeStart: "09:00",
-      requiredTimeEnd: "12:00",
+      startDate: "2024-08-20",
+      purposeDesc: "",
+      startTime: "09:00",
+      endTime: "12:00",
       status: "Approved",
       allocatedRoomID: "CR001",
       approvedBy: "EMP005",
       approvalDate: "2024-07-31",
       recurrence: "Monthly",
+      endDate: "2024-07-27",
     },
     {
       requestID: "REQ005",
@@ -1569,14 +1906,16 @@ const RequestData: RoomRequestTable = {
       purpose: "Candidate Interview",
       priority: "High",
       requestDate: "2024-08-01",
-      requiredDate: "2024-08-12",
-      requiredTimeStart: "10:00",
-      requiredTimeEnd: "10:45",
+      startDate: "2024-08-12",
+      startTime: "10:00",
+      endTime: "10:45",
+      purposeDesc: "",
       status: "Approved",
       allocatedRoomID: "IR003",
       approvedBy: "EMP005",
       approvalDate: "2024-08-01",
       recurrence: "None",
+      endDate: "2024-07-27",
     },
     {
       requestID: "REQ006",
@@ -1586,14 +1925,16 @@ const RequestData: RoomRequestTable = {
       purpose: "Board Meeting",
       priority: "Critical",
       requestDate: "2024-08-02",
-      requiredDate: "2024-09-01",
-      requiredTimeStart: "09:00",
-      requiredTimeEnd: "16:00",
+      startDate: "2024-09-01",
+      purposeDesc: "",
+      startTime: "09:00",
+      endTime: "16:00",
       status: "Pending",
       allocatedRoomID: null,
       approvedBy: null,
       approvalDate: null,
       recurrence: "Monthly",
+      endDate: "2024-07-27",
     },
     {
       requestID: "REQ007",
@@ -1603,14 +1944,18 @@ const RequestData: RoomRequestTable = {
       purpose: "Project Review",
       priority: "Medium",
       requestDate: "2024-08-03",
-      requiredDate: "2024-08-18",
-      requiredTimeStart: "14:00",
-      requiredTimeEnd: "15:30",
+      startDate: "2024-08-18",
+      purposeDesc: "This is the main purpose of meeting",
+      description:
+        "Meeting reject because thier is no project reviewer available",
+      startTime: "14:00",
+      endTime: "15:30",
       status: "Rejected",
       allocatedRoomID: null,
       approvedBy: "EMP005",
       approvalDate: "2024-08-04",
       recurrence: "None",
+      endDate: "2024-07-27",
     },
     {
       requestID: "REQ008",
@@ -1620,14 +1965,16 @@ const RequestData: RoomRequestTable = {
       purpose: "Experiment Setup",
       priority: "Low",
       requestDate: "2024-08-04",
-      requiredDate: "2024-08-25",
-      requiredTimeStart: "08:00",
-      requiredTimeEnd: "12:00",
+      startDate: "2024-08-25",
+      startTime: "08:00",
+      purposeDesc: "",
+      endTime: "12:00",
       status: "Approved",
       allocatedRoomID: "LAB001",
       approvedBy: "EMP006",
       approvalDate: "2024-08-05",
       recurrence: "None",
+      endDate: "2024-07-27",
     },
     {
       requestID: "REQ009",
@@ -1637,31 +1984,35 @@ const RequestData: RoomRequestTable = {
       purpose: "Customer Service Workshop",
       priority: "High",
       requestDate: "2024-08-05",
-      requiredDate: "2024-09-01",
-      requiredTimeStart: "09:00",
-      requiredTimeEnd: "17:00",
+      startDate: "2024-09-01",
+      startTime: "09:00",
+      endTime: "17:00",
+      purposeDesc: "",
       status: "Pending",
       allocatedRoomID: null,
       approvedBy: null,
       approvalDate: null,
       recurrence: "Quarterly",
+      endDate: "2024-07-27",
     },
     {
       requestID: "REQ010",
+      purposeDesc: "",
       employeeName: "EMP002",
       employeeDepartment: "Marketing",
       requestedRoomType: "Small Meeting Room",
       purpose: "Brainstorming Session",
       priority: "Medium",
       requestDate: "2024-08-06",
-      requiredDate: "2024-08-08",
-      requiredTimeStart: "14:00",
-      requiredTimeEnd: "15:00",
+      startDate: "2024-08-08",
+      startTime: "14:00",
+      endTime: "15:00",
       status: "Approved",
       allocatedRoomID: "SMR001",
       approvedBy: "EMP005",
       approvalDate: "2024-08-06",
       recurrence: "None",
+      endDate: "2024-07-27",
     },
     {
       requestID: "REQ011",
@@ -1671,14 +2022,16 @@ const RequestData: RoomRequestTable = {
       purpose: "Final Round Interview",
       priority: "High",
       requestDate: "2024-08-07",
-      requiredDate: "2024-08-14",
-      requiredTimeStart: "11:00",
-      requiredTimeEnd: "12:00",
+      startDate: "2024-08-14",
+      startTime: "11:00",
+      endTime: "12:00",
+      purposeDesc: "",
       status: "Approved",
       allocatedRoomID: "IR002",
       approvedBy: "EMP005",
       approvalDate: "2024-08-07",
       recurrence: "None",
+      endDate: "2024-07-27",
     },
     {
       requestID: "REQ012",
@@ -1688,14 +2041,16 @@ const RequestData: RoomRequestTable = {
       purpose: "Sprint Planning",
       priority: "High",
       requestDate: "2024-08-08",
-      requiredDate: "2024-08-16",
-      requiredTimeStart: "10:00",
-      requiredTimeEnd: "12:00",
+      startDate: "2024-08-16",
+      startTime: "10:00",
+      endTime: "12:00",
+      purposeDesc: "",
       status: "Pending",
       allocatedRoomID: null,
       approvedBy: null,
       approvalDate: null,
       recurrence: "Bi-Weekly",
+      endDate: "2024-07-27",
     },
     {
       requestID: "REQ013",
@@ -1705,14 +2060,16 @@ const RequestData: RoomRequestTable = {
       purpose: "UI/UX Review",
       priority: "Medium",
       requestDate: "2024-08-08",
-      requiredDate: "2024-08-11",
-      requiredTimeStart: "14:30",
-      requiredTimeEnd: "15:00",
+      startDate: "2024-08-11",
+      startTime: "14:30",
+      endTime: "15:00",
       status: "Approved",
+      purposeDesc: "",
       allocatedRoomID: "SMR003",
       approvedBy: "EMP006",
       approvalDate: "2024-08-09",
       recurrence: "None",
+      endDate: "2024-07-27",
     },
     {
       requestID: "REQ014",
@@ -1722,14 +2079,16 @@ const RequestData: RoomRequestTable = {
       purpose: "Onboarding Session",
       priority: "High",
       requestDate: "2024-08-09",
-      requiredDate: "2024-09-05",
-      requiredTimeStart: "09:00",
-      requiredTimeEnd: "16:00",
+      startDate: "2024-09-05",
+      purposeDesc: "",
+      startTime: "09:00",
+      endTime: "16:00",
       status: "Pending",
       allocatedRoomID: null,
       approvedBy: null,
       approvalDate: null,
       recurrence: "Monthly",
+      endDate: "2024-07-27",
     },
     {
       requestID: "REQ015",
@@ -1739,14 +2098,16 @@ const RequestData: RoomRequestTable = {
       purpose: "Budget Review",
       priority: "Critical",
       requestDate: "2024-08-10",
-      requiredDate: "2024-08-22",
-      requiredTimeStart: "10:00",
-      requiredTimeEnd: "12:00",
+      startDate: "2024-08-22",
+      startTime: "10:00",
+      endTime: "12:00",
+      purposeDesc: "",
       status: "Approved",
       allocatedRoomID: "BR001",
       approvedBy: "EMP005",
       approvalDate: "2024-08-11",
       recurrence: "None",
+      endDate: "2024-07-27",
     },
     {
       requestID: "REQ016",
@@ -1756,14 +2117,16 @@ const RequestData: RoomRequestTable = {
       purpose: "Content Strategy",
       priority: "Medium",
       requestDate: "2024-08-11",
-      requiredDate: "2024-08-13",
-      requiredTimeStart: "15:00",
-      requiredTimeEnd: "16:00",
+      startDate: "2024-08-13",
+      startTime: "15:00",
+      endTime: "16:00",
+      purposeDesc: "",
       status: "Approved",
       allocatedRoomID: "SMR001",
       approvedBy: "EMP005",
       approvalDate: "2024-08-11",
       recurrence: "None",
+      endDate: "2024-07-27",
     },
     {
       requestID: "REQ017",
@@ -1773,14 +2136,16 @@ const RequestData: RoomRequestTable = {
       purpose: "Vendor Negotiation",
       priority: "High",
       requestDate: "2024-08-12",
-      requiredDate: "2024-08-28",
-      requiredTimeStart: "11:00",
-      requiredTimeEnd: "13:00",
+      startDate: "2024-08-28",
+      startTime: "11:00",
+      endTime: "13:00",
       status: "Rejected",
       allocatedRoomID: null,
+      purposeDesc: "",
       approvedBy: "EMP005",
       approvalDate: "2024-08-13",
       recurrence: "None",
+      endDate: "2024-07-27",
     },
     {
       requestID: "REQ018",
@@ -1790,14 +2155,16 @@ const RequestData: RoomRequestTable = {
       purpose: "New Material Testing",
       priority: "High",
       requestDate: "2024-08-13",
-      requiredDate: "2024-08-20",
-      requiredTimeStart: "13:00",
-      requiredTimeEnd: "16:00",
+      startDate: "2024-08-20",
+      startTime: "13:00",
+      purposeDesc: "",
+      endTime: "16:00",
       status: "Approved",
       allocatedRoomID: "LAB002",
       approvedBy: "EMP006",
       approvalDate: "2024-08-14",
       recurrence: "Weekly",
+      endDate: "2024-07-27",
     },
     {
       requestID: "REQ019",
@@ -1807,14 +2174,16 @@ const RequestData: RoomRequestTable = {
       purpose: "Team Huddle",
       priority: "Low",
       requestDate: "2024-08-14",
-      requiredDate: "2024-08-15",
-      requiredTimeStart: "09:30",
-      requiredTimeEnd: "10:00",
+      startDate: "2024-08-15",
+      startTime: "09:30",
+      purposeDesc: "",
+      endTime: "10:00",
       status: "Approved",
       allocatedRoomID: "SMR004",
       approvedBy: "EMP006",
       approvalDate: "2024-08-14",
       recurrence: "None",
+      endDate: "2024-07-27",
     },
     {
       requestID: "REQ020",
@@ -1824,14 +2193,16 @@ const RequestData: RoomRequestTable = {
       purpose: "Roadmap Presentation",
       priority: "High",
       requestDate: "2024-08-15",
-      requiredDate: "2024-08-29",
-      requiredTimeStart: "10:00",
-      requiredTimeEnd: "11:00",
+      startDate: "2024-08-29",
+      purposeDesc: "",
+      startTime: "10:00",
+      endTime: "11:00",
       status: "Pending",
       allocatedRoomID: null,
       approvedBy: null,
       approvalDate: null,
       recurrence: "None",
+      endDate: "2024-07-27",
     },
     {
       requestID: "REQ021",
@@ -1841,14 +2212,16 @@ const RequestData: RoomRequestTable = {
       purpose: "Software Installation Workshop",
       priority: "Medium",
       requestDate: "2024-08-16",
-      requiredDate: "2024-09-10",
-      requiredTimeStart: "09:00",
-      requiredTimeEnd: "12:00",
+      startDate: "2024-09-10",
+      purposeDesc: "",
+      startTime: "09:00",
+      endTime: "12:00",
       status: "Approved",
       allocatedRoomID: "TR001",
       approvedBy: "EMP005",
       approvalDate: "2024-08-17",
       recurrence: "None",
+      endDate: "2024-07-27",
     },
     {
       requestID: "REQ022",
@@ -1858,14 +2231,16 @@ const RequestData: RoomRequestTable = {
       purpose: "Quarterly Review",
       priority: "Critical",
       requestDate: "2024-08-17",
-      requiredDate: "2024-09-05",
-      requiredTimeStart: "13:00",
-      requiredTimeEnd: "16:00",
+      startDate: "2024-09-05",
+      startTime: "13:00",
+      endTime: "16:00",
+      purposeDesc: "",
       status: "Pending",
       allocatedRoomID: null,
       approvedBy: null,
       approvalDate: null,
       recurrence: "Quarterly",
+      endDate: "2024-07-27",
     },
     {
       requestID: "REQ023",
@@ -1875,14 +2250,16 @@ const RequestData: RoomRequestTable = {
       purpose: "Code Review",
       priority: "Medium",
       requestDate: "2024-08-18",
-      requiredDate: "2024-08-21",
-      requiredTimeStart: "10:00",
-      requiredTimeEnd: "11:00",
+      startDate: "2024-08-21",
+      startTime: "10:00",
+      endTime: "11:00",
+      purposeDesc: "",
       status: "Approved",
       allocatedRoomID: "SMR005",
       approvedBy: "EMP006",
       approvalDate: "2024-08-19",
       recurrence: "None",
+      endDate: "2024-07-27",
     },
     {
       requestID: "REQ024",
@@ -1892,14 +2269,16 @@ const RequestData: RoomRequestTable = {
       purpose: "Leadership Summit",
       priority: "Critical",
       requestDate: "2024-08-19",
-      requiredDate: "2024-09-15",
-      requiredTimeStart: "09:00",
-      requiredTimeEnd: "17:00",
+      startDate: "2024-09-15",
+      startTime: "09:00",
+      endTime: "17:00",
+      purposeDesc: "",
       status: "Pending",
       allocatedRoomID: null,
       approvedBy: null,
       approvalDate: null,
       recurrence: "Annually",
+      endDate: "2024-07-27",
     },
     {
       requestID: "REQ025",
@@ -1909,14 +2288,15 @@ const RequestData: RoomRequestTable = {
       purpose: "Recruitment Drive",
       priority: "High",
       requestDate: "2024-08-20",
-      requiredDate: "2024-09-02",
-      requiredTimeStart: "09:00",
-      requiredTimeEnd: "16:00",
+      startDate: "2024-09-02",
+      startTime: "09:00",
+      endTime: "16:00",
       status: "Approved",
       allocatedRoomID: "IR001",
       approvedBy: "EMP005",
       approvalDate: "2024-08-21",
       recurrence: "None",
+      endDate: "2024-07-27",
     },
     {
       requestID: "REQ026",
@@ -1926,14 +2306,15 @@ const RequestData: RoomRequestTable = {
       purpose: "Investor Presentation",
       priority: "Critical",
       requestDate: "2024-08-21",
-      requiredDate: "2024-09-12",
-      requiredTimeStart: "10:00",
-      requiredTimeEnd: "11:00",
+      startDate: "2024-09-12",
+      startTime: "10:00",
+      endTime: "11:00",
       status: "Approved",
       allocatedRoomID: "CR003",
       approvedBy: "EMP005",
       approvalDate: "2024-08-22",
       recurrence: "None",
+      endDate: "2024-07-27",
     },
     {
       requestID: "REQ027",
@@ -1943,14 +2324,15 @@ const RequestData: RoomRequestTable = {
       purpose: "Social Media Strategy Workshop",
       priority: "Medium",
       requestDate: "2024-08-22",
-      requiredDate: "2024-09-08",
-      requiredTimeStart: "14:00",
-      requiredTimeEnd: "17:00",
+      startDate: "2024-09-08",
+      startTime: "14:00",
+      endTime: "17:00",
       status: "Pending",
       allocatedRoomID: null,
       approvedBy: null,
       approvalDate: null,
       recurrence: "None",
+      endDate: "2024-07-27",
     },
     {
       requestID: "REQ028",
@@ -1960,14 +2342,15 @@ const RequestData: RoomRequestTable = {
       purpose: "Prototype Assembly",
       priority: "High",
       requestDate: "2024-08-23",
-      requiredDate: "2024-09-01",
-      requiredTimeStart: "09:00",
-      requiredTimeEnd: "12:00",
+      startDate: "2024-09-01",
+      startTime: "09:00",
+      endTime: "12:00",
       status: "Approved",
       allocatedRoomID: "LAB003",
       approvedBy: "EMP006",
       approvalDate: "2024-08-24",
       recurrence: "Bi-Weekly",
+      endDate: "2024-07-27",
     },
     {
       requestID: "REQ029",
@@ -1977,14 +2360,15 @@ const RequestData: RoomRequestTable = {
       purpose: "Quarterly Performance Review",
       priority: "Low",
       requestDate: "2024-08-24",
-      requiredDate: "2024-08-27",
-      requiredTimeStart: "10:00",
-      requiredTimeEnd: "11:00",
+      startDate: "2024-08-27",
+      startTime: "10:00",
+      endTime: "11:00",
       status: "Approved",
       allocatedRoomID: "SMR006",
       approvedBy: "EMP006",
       approvalDate: "2024-08-25",
       recurrence: "Quarterly",
+      endDate: "2024-07-27",
     },
     {
       requestID: "REQ030",
@@ -1994,14 +2378,15 @@ const RequestData: RoomRequestTable = {
       purpose: "Client Follow-up Meeting",
       priority: "Medium",
       requestDate: "2024-08-25",
-      requiredDate: "2024-08-30",
-      requiredTimeStart: "14:00",
-      requiredTimeEnd: "15:00",
+      startDate: "2024-08-30",
+      startTime: "14:00",
+      endTime: "15:00",
       status: "Pending",
       allocatedRoomID: null,
       approvedBy: null,
       approvalDate: null,
       recurrence: "None",
+      endDate: "2024-07-27",
     },
   ],
 };
