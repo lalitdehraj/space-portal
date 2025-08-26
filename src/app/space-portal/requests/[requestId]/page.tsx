@@ -208,7 +208,7 @@ export default function RequestInfoPage() {
                     value={purposeDesc}
                     disabled={true}
                     rows={3}
-                    className="text-sm p-2"
+                    className="text-sm p-2 border border-gray-200 rounded-sm"
                   />
                 </div>
               )}
@@ -221,7 +221,7 @@ export default function RequestInfoPage() {
                     rows={3}
                     value={description}
                     disabled={true}
-                    className="text-sm p-2"
+                    className="text-sm p-2 border border-gray-200 rounded-sm"
                   />
                 </div>
               )}

@@ -157,10 +157,11 @@ export default function RequestApprovalPage() {
         {
           limit: pageSize,
           offset: curruntPage,
-          acadmeicSession: acadmeicSession,
-          acadmeicYear: acadmeicYear,
+          acadSess: acadmeicSession,
+          acadYr: acadmeicYear,
         }
       );
+      console.log(response);
       setTotalPages(parseInt(response.data?.totalPages || "0"));
       setCurruntPage(parseInt(response.data?.curruntPage || "0"));
       setRequestList(response.data?.requests || []);

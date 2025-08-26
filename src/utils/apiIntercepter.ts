@@ -17,42 +17,15 @@ export type ApiResponse<T> = {
   error?: string;
 };
 
-// export const callApi = async <T>(
-//   url: string,
-//   requestBody?: any,
-//   config?: false | Partial<CacheProperties<any, string>>
-// ): Promise<ApiResponse<T>> => {
-//   try {
-//     const response = await api.post(url, JSON.stringify(requestBody));
-//     //@ts-ignore
-//     return { success: true, data: response.data };
-//   } catch (err) {
-//     const error = err as AxiosError;
-//     //@ts-ignore
-//     const errorMessage =
-//       error.response?.data?.message ||
-//       error.message ||
-//       "An unknown error occurred";
-//     return { success: false, error: errorMessage };
-//   }
-// };
-
 export const callApi = async <T>(
   url: string,
   requestBody?: any,
   config?: false | Partial<CacheProperties<any, string>>
 ): Promise<ApiResponse<T>> => {
   try {
-    const response = await api.post(url, JSON.stringify(requestBody || {}), {
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Basic ${credentials}`,
-      },
-      cache: config,
-    });
+    const response = await api.post(url, JSON.stringify(requestBody));
     //@ts-ignore
-    return { success: true, data: JSON.parse(response.data.value) };
-    // return { success: true, data: response.data };
+    return { success: true, data: response.data };
   } catch (err) {
     const error = err as AxiosError;
     //@ts-ignore
@@ -63,5 +36,30 @@ export const callApi = async <T>(
     return { success: false, error: errorMessage };
   }
 };
-//active session
-//
+
+// export const callApi = async <T>(
+//   url: string,
+//   requestBody?: any,
+//   config?: false | Partial<CacheProperties<any, string>>
+// ): Promise<ApiResponse<T>> => {
+//   try {
+//     const response = await api.post(url, JSON.stringify(requestBody || {}), {
+//       headers: {
+//         "Content-Type": "application/json",
+//         Authorization: `Basic ${credentials}`,
+//       },
+//       cache: config,
+//     });
+//     //@ts-ignore
+//     return { success: true, data: JSON.parse(response.data.value) };
+//     // return { success: true, data: response.data };
+//   } catch (err) {
+//     const error = err as AxiosError;
+//     //@ts-ignore
+//     const errorMessage =
+//       error.response?.data?.message ||
+//       error.message ||
+//       "An unknown error occurred";
+//     return { success: false, error: errorMessage };
+//   }
+// };
