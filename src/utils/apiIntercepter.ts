@@ -27,9 +27,10 @@ export const callApi = async <T>(
     //@ts-ignore
     return { success: true, data: response.data };
   } catch (err) {
+    console.log(err);
     const error = err as AxiosError;
-    //@ts-ignore
     const errorMessage =
+      //@ts-ignore
       error.response?.data?.message ||
       error.message ||
       "An unknown error occurred";
@@ -55,8 +56,8 @@ export const callApi = async <T>(
 //     // return { success: true, data: response.data };
 //   } catch (err) {
 //     const error = err as AxiosError;
-//     //@ts-ignore
 //     const errorMessage =
+//     //@ts-ignore
 //       error.response?.data?.message ||
 //       error.message ||
 //       "An unknown error occurred";

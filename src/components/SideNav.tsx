@@ -1,13 +1,15 @@
 // src/components/SideNav.tsx
 "use client";
 
-import React, { FC } from "react";
+import React, { FC, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { X } from "lucide-react";
 import { useDispatch } from "react-redux";
 import { setHeaderText } from "@/app/feature/dataSlice";
 import { useRouter } from "next/navigation";
+import { callApi } from "@/utils/apiIntercepter";
+import { URL_NOT_FOUND } from "@/constants";
 
 type NavLink = {
   title: string;
@@ -29,6 +31,24 @@ const spaceManagementLinks: NavLink[] = [
   {
     title: "Building - Floor - Rooms",
     href: "/space-portal/buildings",
+    iconSrc: "/images/menu-board.svg",
+    alt: "Building icon",
+  },
+  {
+    title: "Manage by GSA",
+    href: "/space-portal/role/GSA",
+    iconSrc: "/images/menu-board.svg",
+    alt: "Building icon",
+  },
+  {
+    title: "Manage by HR",
+    href: "/space-portal/role/HR",
+    iconSrc: "/images/menu-board.svg",
+    alt: "Building icon",
+  },
+  {
+    title: "Manage by GHS",
+    href: "/space-portal/role/GHS",
     iconSrc: "/images/menu-board.svg",
     alt: "Building icon",
   },
@@ -86,6 +106,15 @@ const NavItem: FC<NavLink & { onClose: () => void }> = ({
 
 const SideNav: FC<SideNavProps> = ({ onClose }) => {
   const router = useRouter();
+  useEffect(() => {
+    const fetchUserRoles = async () => {
+      const response = await callApi(
+        process.env.NEXT_PUBLIC_GET_USERS_ROLE || URL_NOT_FOUND
+      );
+      console.log(response);
+    };
+    // fetchUserRoles();
+  }, []);
   return (
     <aside className="flex h-full w-full md:w-64 flex-col bg-gray-50 shadow-lg ">
       <div className="flex items-center justify-between p-4 md:justify-center ">
@@ -118,9 +147,11 @@ const SideNav: FC<SideNavProps> = ({ onClose }) => {
           <div className="px-8 pb-2 text-xs text-gray-500">
             Space Management
           </div>
-          {spaceManagementLinks.map((link) => (
-            <NavItem key={link.href} {...link} onClose={onClose} />
-          ))}
+          <div className="space-y-0.5">
+            {spaceManagementLinks.map((link) => (
+              <NavItem key={link.href} {...link} onClose={onClose} />
+            ))}
+          </div>
         </div>
 
         <div className="flex flex-col border-t border-[#F26722] py-4">

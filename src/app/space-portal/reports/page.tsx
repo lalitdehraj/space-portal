@@ -92,6 +92,7 @@ export default function UtilizationReport() {
   const [jobId, setJobId] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const [polling, setPolling] = useState(false);
+  const [isLoadingReports, setIsLoadingReports] = useState(false);
 
   const startJob = async (fileName: string) => {
     const res = await fetch("/api/start-job", {
@@ -172,21 +173,28 @@ export default function UtilizationReport() {
   const [totalPages, setTotalPages] = useState(0);
   useEffect(() => {
     const fetchReports = async () => {
-      const requestBody = {
-        limit: pageSize,
-        offset: curruntPage,
-        acadmeicSession: acadmeicSession,
-        acadmeicYear: acadmeicYear,
-      };
-      let response = await callApi<ReportsResponse>(
-        `${process.env.NEXT_PUBLIC_GET_REPORTS}` || URL_NOT_FOUND,
-        requestBody
-      );
-      let res = response;
-      setTotalPages(res.data?.totalPages || 0);
+      setIsLoadingReports(true);
+      try {
+        const requestBody = {
+          limit: pageSize,
+          offset: curruntPage,
+          acadmeicSession: acadmeicSession,
+          acadmeicYear: acadmeicYear,
+        };
+        let response = await callApi<ReportsResponse>(
+          `${process.env.NEXT_PUBLIC_GET_REPORTS}` || URL_NOT_FOUND,
+          requestBody
+        );
+        let res = response;
+        setTotalPages(res.data?.totalPages || 0);
 
-      setCurruntPage(res.data?.currentPage || 0);
-      setReportsList(res.data?.reports || []);
+        setCurruntPage(res.data?.currentPage || 0);
+        setReportsList(res.data?.reports || []);
+      } catch (error) {
+        console.error('Error fetching reports:', error);
+      } finally {
+        setIsLoadingReports(false);
+      }
     };
     fetchReports();
   }, [acadmeicYear, acadmeicSession, pageSize, curruntPage]);
@@ -290,36 +298,73 @@ export default function UtilizationReport() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredList.map((report, index) => (
-                  <tr key={report.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                      {index + 1}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                      {report.fileName}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                      {formatDate(report.createdAt)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                      {report.size}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                      {report.startDate}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                      {report.endDate}
-                    </td>
-                    <td
-                      className="px-6 py-4 whitespace-nowrap text-sm text-indigo-400 cursor-pointer hover:text-indigo-700"
-                      onClick={() => {
-                        handleDownloadClick(report);
-                      }}
-                    >
-                      Download
+                {isLoadingReports ? (
+                  <tr>
+                    <td colSpan={Object.keys(tableHeadersList).length + 1}>
+                      <div className="flex justify-center items-center h-32">
+                        <svg
+                          className="animate-spin h-12 w-12 text-orange-500"
+                          xmlns="http://www.w3.org/2000/svg"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                        >
+                          <circle
+                            className="opacity-25"
+                            cx="12"
+                            cy="12"
+                            r="10"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                          ></circle>
+                          <path
+                            className="opacity-75"
+                            fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                          ></path>
+                        </svg>
+                      </div>
                     </td>
                   </tr>
-                ))}
+                ) : filteredList.length === 0 ? (
+                  <tr>
+                    <td colSpan={Object.keys(tableHeadersList).length + 1}>
+                      <div className="flex justify-center items-center h-32 text-gray-500">
+                        No reports found.
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  filteredList.map((report, index) => (
+                    <tr key={report.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                        {index + 1}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                        {report.fileName}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                        {formatDate(report.createdAt)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                        {report.size}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                        {report.startDate}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                        {report.endDate}
+                      </td>
+                      <td
+                        className="px-6 py-4 whitespace-nowrap text-sm text-indigo-400 cursor-pointer hover:text-indigo-700"
+                        onClick={() => {
+                          handleDownloadClick(report);
+                        }}
+                      >
+                        Download
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -493,28 +538,32 @@ function GenerateReportForm({ onClosePressed }: FormProps) {
                 >
                   <option value="room">Room Report</option>
                   <option value="building">Building Report</option>
-                </select>{" "}
-              </div>
-            </div>
-            <div className="flex flex-col md:flex-row md:space-x-4">
-              <div className="w-full">
-                <label className="block text-sm text-gray-700 mb-1">
-                  Building
-                </label>
-                <select
-                  className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
-                  value={selectedBuildingId}
-                  onChange={(e) => setSelectedBuildingId(e.target.value)}
-                >
-                  <option value="">Select building</option>
-                  {buildings.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.name}
-                    </option>
-                  ))}
+                  <option value="department">Department Report</option>
+                  <option value="faculty">Faculty Report</option>
                 </select>
               </div>
             </div>
+            {(reportType === "room" || reportType === "building") && (
+              <div className="flex flex-col md:flex-row md:space-x-4">
+                <div className="w-full">
+                  <label className="block text-sm text-gray-700 mb-1">
+                    Building
+                  </label>
+                  <select
+                    className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
+                    value={selectedBuildingId}
+                    onChange={(e) => setSelectedBuildingId(e.target.value)}
+                  >
+                    <option value="">Select building</option>
+                    {buildings.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
             {reportType === "room" && (
               <div className="flex flex-col md:flex-row md:space-x-4">
                 <div className="md:w-1/2 w-full mt-4 md:mt-0">
@@ -558,6 +607,53 @@ function GenerateReportForm({ onClosePressed }: FormProps) {
                     ))}
                   </select>
                 </div>
+              </div>
+            )}
+            {(reportType === "department" || reportType === "faculty") && (
+              <div className="flex flex-col md:flex-row md:space-x-4">
+                <div className="w-full mt-4 md:mt-0">
+                  <label className="block text-sm text-gray-700 mb-1">
+                    Department
+                  </label>
+                  <select
+                    className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
+                    value={selectedFloorId}
+                    onChange={(e) => setSelectedFloorId(e.target.value)}
+                    disabled={!selectedBuildingId}
+                  >
+                    <option value="">Select department</option>
+                    {buildings.filter((b) => b.id === selectedBuildingId)
+                      .length > 0
+                      ? buildings
+                          .filter((b) => b.id === selectedBuildingId)[0]
+                          .floors.map((f) => (
+                            <option key={f.id} value={f.id}>
+                              {f.name}
+                            </option>
+                          ))
+                      : null}
+                  </select>
+                </div>
+                {reportType === "faculty" && (
+                  <div className="w-full mt-4 md:mt-0">
+                    <label className="block text-sm text-gray-700 mb-1">
+                      Faculty
+                    </label>
+                    <select
+                      className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
+                      value={selectedRoomId}
+                      onChange={(e) => setSelectedRoomId(e.target.value)}
+                      disabled={!selectedFloorId}
+                    >
+                      <option value="">Select faculty</option>
+                      {rooms.map((r) => (
+                        <option key={r.id} value={r.id}>
+                          {r.roomName}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
               </div>
             )}
             {timePeriod !== "custom" ? (

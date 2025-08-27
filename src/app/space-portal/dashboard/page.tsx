@@ -23,6 +23,8 @@ import { Building1, DashboardDataResponse } from "@/types";
 
 export default function Dashboard() {
   const [data, setData] = useState<DashboardDataResponse | null>(null);
+  const [isLoadingDashboard, setIsLoadingDashboard] = useState(false);
+  const [isLoadingBuildings, setIsLoadingBuildings] = useState(false);
   const acadmeicYear = useSelector(
     (state: any) => state.dataState.academicYear
   );
@@ -30,19 +32,27 @@ export default function Dashboard() {
     (state: any) => state.dataState.academicSession
   );
   const [days, setDays] = useState("7");
+  
   useEffect(() => {
     const fetchDashboardData = async () => {
-      const requestBody = {
-        noOfDays: days,
-        acadmeicSession: acadmeicSession,
-        acadmeicYear: acadmeicYear,
-      };
-      let response = callApi<DashboardDataResponse>(
-        process.env.NEXT_PUBLIC_GET_DASHBOARD_DATA || URL_NOT_FOUND,
-        requestBody
-      );
-      let res = await response;
-      setData(res.data || null);
+      setIsLoadingDashboard(true);
+      try {
+        const requestBody = {
+          noOfDays: days,
+          acadmeicSession: acadmeicSession,
+          acadmeicYear: acadmeicYear,
+        };
+        let response = callApi<DashboardDataResponse>(
+          process.env.NEXT_PUBLIC_GET_DASHBOARD_DATA || URL_NOT_FOUND,
+          requestBody
+        );
+        let res = await response;
+        setData(res.data || null);
+      } catch (error) {
+        console.error('Error fetching dashboard data:', error);
+      } finally {
+        setIsLoadingDashboard(false);
+      }
     };
     fetchDashboardData();
   }, [days, acadmeicYear, acadmeicSession]);
@@ -51,16 +61,23 @@ export default function Dashboard() {
 
   useEffect(() => {
     const fetchBuildings = async () => {
-      const reqBody = {
-        acadSession: `${acadmeicSession}`,
-        acadYear: `${acadmeicYear}`,
-      };
-      const response = await callApi<Building1[]>(
-        process.env.NEXT_PUBLIC_GET_BUILDING_LIST || URL_NOT_FOUND
-      );
-      console.log(response);
-      if (response.success) {
-        setAllBuildingsData(response.data || []);
+      setIsLoadingBuildings(true);
+      try {
+        const reqBody = {
+          acadSession: `${acadmeicSession}`,
+          acadYear: `${acadmeicYear}`,
+        };
+        const response = await callApi<Building1[]>(
+          process.env.NEXT_PUBLIC_GET_BUILDING_LIST || URL_NOT_FOUND
+        );
+        console.log(response);
+        if (response.success) {
+          setAllBuildingsData(response.data || []);
+        }
+      } catch (error) {
+        console.error('Error fetching buildings:', error);
+      } finally {
+        setIsLoadingBuildings(false);
       }
     };
     fetchBuildings();
@@ -282,24 +299,38 @@ export default function Dashboard() {
           Key Metrics
         </h2>
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-6 md:grid-cols-3">
-          {kpiCards.map((card) => (
-            <div key={card.title} className="rounded-lg bg-white p-4 shadow-sm">
-              <div className="mb-2 flex items-center justify-between">
-                <Image
-                  src={card.iconSrc}
-                  alt={card.alt}
-                  height={24}
-                  width={24}
-                  className="h-6 w-6"
-                />
-                {card.extraContent}
+          {isLoadingDashboard || isLoadingBuildings ? (
+            // Loading skeleton for KPI cards
+            Array.from({ length: 6 }).map((_, index) => (
+              <div key={index} className="rounded-lg bg-white p-4 shadow-sm animate-pulse">
+                <div className="mb-2 flex items-center justify-between">
+                  <div className="h-6 w-6 bg-gray-200 rounded"></div>
+                  <div className="h-4 w-16 bg-gray-200 rounded"></div>
+                </div>
+                <div className="h-3 bg-gray-200 rounded w-20 mb-2"></div>
+                <div className="h-6 bg-gray-200 rounded w-16"></div>
               </div>
-              <p className="text-xs text-gray-600">{card.title}</p>
-              <p className="text-xl font-semibold text-gray-900">
-                {card.value}
-              </p>
-            </div>
-          ))}
+            ))
+          ) : (
+            kpiCards.map((card) => (
+              <div key={card.title} className="rounded-lg bg-white p-4 shadow-sm">
+                <div className="mb-2 flex items-center justify-between">
+                  <Image
+                    src={card.iconSrc}
+                    alt={card.alt}
+                    height={24}
+                    width={24}
+                    className="h-6 w-6"
+                  />
+                  {card.extraContent}
+                </div>
+                <p className="text-xs text-gray-600">{card.title}</p>
+                <p className="text-xl font-semibold text-gray-900">
+                  {card.value}
+                </p>
+              </div>
+            ))
+          )}
         </div>
       </section>
 
@@ -345,8 +376,24 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="flex w-full flex-col justify-between mt-2 lg:flex-row">
-            <HourlyOccupancyChart />
-            <SummaryChart />
+            {isLoadingDashboard ? (
+              // Loading skeleton for charts
+              <>
+                <div className="p-6 rounded-lg max-w-3xl min-w-2xl bg-white border border-gray-200 animate-pulse">
+                  <div className="h-8 bg-gray-200 rounded w-48 mb-4"></div>
+                  <div className="h-64 bg-gray-200 rounded"></div>
+                </div>
+                <div className="p-6 rounded-lg max-w-3xl min-w-2xl bg-white border border-gray-200 animate-pulse">
+                  <div className="h-8 bg-gray-200 rounded w-32 mb-4"></div>
+                  <div className="h-64 bg-gray-200 rounded"></div>
+                </div>
+              </>
+            ) : (
+              <>
+                <HourlyOccupancyChart />
+                <SummaryChart />
+              </>
+            )}
           </div>
         </div>
       </section>

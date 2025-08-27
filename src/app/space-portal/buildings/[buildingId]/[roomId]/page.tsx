@@ -10,6 +10,7 @@ import {
   AcademicSessionResponse,
   AcademicYearResponse,
 } from "@/components/Header";
+import { WeekdaySelector } from "@/components/WeekDays";
 
 function RoomPage() {
   const params = useParams();
@@ -62,11 +63,11 @@ function RoomPage() {
           <button
             className="mt-4 flex h-fit items-center rounded-md bg-[#F26722] px-4 py-2 text-xs text-white shadow-md transition-all hover:bg-[#a5705a] md:mt-0"
             onClick={() => {
-              router.push(`/space-portal/buildings/${encrypt(buildingId)}`);
+              router.back();
             }}
           >
             <BuildingSVG className="mr-2 h-4 w-4 fill-white" />
-            Back to Buildings
+            Back
           </button>
         </div>
 
@@ -216,7 +217,7 @@ function RoomPage() {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200">
-                          {room.occupiedBy?.length || 0 > 0 ? (
+                          {room.occupants && room.occupants.length > 0 ? (
                             room.occupants.map((occupant, index) => (
                               <tr
                                 key={index}
@@ -228,7 +229,7 @@ function RoomPage() {
                                 <td className="px-4 py-3 text-sm">
                                   {occupant.type}
                                 </td>
-                                <td className="px-4 py-3 text-sm">{`${new Date(
+                                <td className="px-4 py-3 text-sm whitespace-nowrap">{`${new Date(
                                   occupant.startTime || ""
                                 ).getHours()}:${new Date(
                                   occupant.startTime || ""
@@ -326,9 +327,7 @@ function AddAssignmentForm({ onClose }: FormProps) {
   const [timeType, setTimeType] = useState("fullDay");
   const [customStartTime, setCustomStartTime] = useState("");
   const [customEndTime, setCustomEndTime] = useState("");
-
-  // Dummy data for dropdown options
-
+  const [selectedDays, setSelectedDays] = useState<string[]>([]);
   const [academicYearsList, setAcademicYearsList] = useState<AcademicYear[]>();
   const [academicSessionsList, setAcademicSessionsList] =
     useState<AcademicSession[]>();
@@ -481,36 +480,40 @@ function AddAssignmentForm({ onClose }: FormProps) {
 
             <div>
               {dateType !== "custom" ? (
-                <div className="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-4 w-full">
-                  <div className="flex flex-col space-y-4 md:space-y-0 md:space-x-4 w-1/2">
-                    <label className="block text-sm text-gray-700">Date</label>
-                    <select
-                      className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
-                      value={dateType}
-                      onChange={(e) => setDateType(e.target.value)}
-                    >
-                      <option value="day">Day</option>
-                      <option value="week">Week</option>
-                      <option value="month">Month</option>
-                      <option value="activeSession">Active Session</option>
-                      <option value="custom">Custom Range</option>
-                    </select>
-                  </div>
-                  {(dateType === "day" ||
-                    dateType === "week" ||
-                    dateType === "month") && (
-                    <div className="w-full md:w-1/2 mt-1">
-                      <label className="block text-xs text-gray-500">
-                        Start Date
+                <div>
+                  <div className="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-4 w-full">
+                    <div className="flex flex-col space-y-4 md:space-y-0 md:space-x-4 w-1/2">
+                      <label className="block text-sm text-gray-700">
+                        Date
                       </label>
-                      <input
-                        type="date"
+                      <select
                         className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
-                        value={customStartDate}
-                        onChange={(e) => setCustomStartDate(e.target.value)}
-                      />
+                        value={dateType}
+                        onChange={(e) => setDateType(e.target.value)}
+                      >
+                        <option value="day">Day</option>
+                        <option value="week">Week</option>
+                        <option value="month">Month</option>
+                        <option value="activeSession">Active Session</option>
+                        <option value="custom">Custom Range</option>
+                      </select>
                     </div>
-                  )}
+                    {(dateType === "day" ||
+                      dateType === "week" ||
+                      dateType === "month") && (
+                      <div className="w-full md:w-1/2 mt-1">
+                        <label className="block text-xs text-gray-500">
+                          Start Date
+                        </label>
+                        <input
+                          type="date"
+                          className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
+                          value={customStartDate}
+                          onChange={(e) => setCustomStartDate(e.target.value)}
+                        />
+                      </div>
+                    )}
+                  </div>
                 </div>
               ) : (
                 <div className="flex flex-col md:flex-row md:space-x-4">
@@ -549,6 +552,17 @@ function AddAssignmentForm({ onClose }: FormProps) {
                       Reset
                     </button>
                   </div>
+                </div>
+              )}
+              {dateType !== "day" && (
+                <div className="mt-4">
+                  <label className="block text-sm text-gray-700 mb-1">
+                    Recurrance
+                  </label>
+                  <WeekdaySelector
+                    value={selectedDays}
+                    onChange={setSelectedDays}
+                  />
                 </div>
               )}
             </div>

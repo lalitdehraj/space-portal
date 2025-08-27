@@ -639,6 +639,7 @@ const RoomsData: Room1[] = [
     status: "Partially Allocated",
     roomArea: "60",
     buildingId: "AB1",
+    managedBy: "GHS",
   },
   {
     id: "AB1-G-02",
@@ -652,6 +653,7 @@ const RoomsData: Room1[] = [
     status: "Allocated",
     roomArea: "75",
     buildingId: "AB1",
+    managedBy: "GSA",
   },
   {
     id: "AB1-G-03",
@@ -665,6 +667,7 @@ const RoomsData: Room1[] = [
     status: "Partially Allocated",
     roomArea: "45",
     buildingId: "AB1",
+    managedBy: "HR",
   },
   {
     id: "AB1-G-04",
@@ -678,6 +681,7 @@ const RoomsData: Room1[] = [
     status: "Available",
     roomArea: "150",
     buildingId: "AB1",
+    managedBy: "GHS",
   },
   {
     id: "AB1-G-05",
@@ -691,6 +695,7 @@ const RoomsData: Room1[] = [
     status: "Allocated",
     roomArea: "30",
     buildingId: "AB1",
+    managedBy: "GSA",
   },
   {
     id: "AB1-G-06",
@@ -704,6 +709,7 @@ const RoomsData: Room1[] = [
     status: "Available",
     roomArea: "25",
     buildingId: "AB1",
+    managedBy: "HR",
   },
   {
     id: "AB1-F-01",
@@ -717,6 +723,7 @@ const RoomsData: Room1[] = [
     status: "Allocated",
     roomArea: "60",
     buildingId: "AB1",
+    managedBy: "GHS",
   },
   {
     id: "AB1-F-02",
@@ -730,6 +737,7 @@ const RoomsData: Room1[] = [
     status: "Partially Allocated",
     roomArea: "60",
     buildingId: "AB1",
+    managedBy: "GSA",
   },
   {
     id: "AB1-F-03",
@@ -743,6 +751,7 @@ const RoomsData: Room1[] = [
     status: "Allocated",
     roomArea: "80",
     buildingId: "AB1",
+    managedBy: "HR",
   },
   {
     id: "AB1-F-04",
@@ -756,6 +765,7 @@ const RoomsData: Room1[] = [
     status: "Partially Allocated",
     roomArea: "50",
     buildingId: "AB1",
+    managedBy: "GHS",
   },
   {
     id: "AB1-F-05",
@@ -769,6 +779,7 @@ const RoomsData: Room1[] = [
     status: "Available",
     roomArea: "70",
     buildingId: "AB1",
+    managedBy: "GSA",
   },
   {
     id: "AB1-F-06",
@@ -782,6 +793,7 @@ const RoomsData: Room1[] = [
     status: "Available",
     roomArea: "25",
     buildingId: "AB1",
+    managedBy: "HR",
   },
   {
     id: "AB1-S-01",
@@ -795,6 +807,7 @@ const RoomsData: Room1[] = [
     status: "Available",
     roomArea: "60",
     buildingId: "AB1",
+    managedBy: "GHS",
   },
   {
     id: "AB1-S-02",
@@ -808,6 +821,7 @@ const RoomsData: Room1[] = [
     status: "Partially Allocated",
     roomArea: "60",
     buildingId: "AB1",
+    managedBy: "GSA",
   },
   {
     id: "AB1-S-03",
@@ -821,6 +835,7 @@ const RoomsData: Room1[] = [
     status: "Partially Allocated",
     roomArea: "80",
     buildingId: "AB1",
+    managedBy: "HR",
   },
   {
     id: "AB1-S-04",
@@ -834,6 +849,7 @@ const RoomsData: Room1[] = [
     status: "Allocated",
     roomArea: "50",
     buildingId: "AB1",
+    managedBy: "GHS",
   },
   {
     id: "AB1-S-05",
@@ -847,6 +863,7 @@ const RoomsData: Room1[] = [
     status: "Partially Allocated",
     roomArea: "40",
     buildingId: "AB1",
+    managedBy: "GSA",
   },
   {
     id: "AB1-S-06",
@@ -860,6 +877,7 @@ const RoomsData: Room1[] = [
     status: "Available",
     roomArea: "25",
     buildingId: "AB1",
+    managedBy: "HR",
   },
   {
     id: "AB1-S-07",
@@ -873,6 +891,7 @@ const RoomsData: Room1[] = [
     status: "Allocated",
     roomArea: "20",
     buildingId: "AB1",
+    managedBy: "GHS",
   },
   {
     id: "AB1-S-08",
@@ -886,6 +905,7 @@ const RoomsData: Room1[] = [
     status: "Available",
     roomArea: "60",
     buildingId: "AB1",
+    managedBy: "GSA",
   },
   {
     id: "AB2-G-01",
@@ -899,6 +919,7 @@ const RoomsData: Room1[] = [
     status: "Partially Allocated",
     roomArea: "60",
     buildingId: "AB2",
+    managedBy: "GHS",
   },
   {
     id: "AB2-G-02",
@@ -912,6 +933,7 @@ const RoomsData: Room1[] = [
     status: "Partially Allocated",
     roomArea: "75",
     buildingId: "AB2",
+    managedBy: "GSA",
   },
   {
     id: "AB2-G-03",
@@ -925,6 +947,7 @@ const RoomsData: Room1[] = [
     status: "Allocated",
     roomArea: "50",
     buildingId: "AB2",
+    managedBy: "HR",
   },
   {
     id: "AB2-G-04",
@@ -938,6 +961,7 @@ const RoomsData: Room1[] = [
     status: "Available",
     roomArea: "200",
     buildingId: "AB2",
+    managedBy: "GHS",
   },
   {
     id: "AB2-F1-01",
@@ -951,6 +975,7 @@ const RoomsData: Room1[] = [
     status: "Allocated",
     roomArea: "60",
     buildingId: "AB2",
+    managedBy: "GHS",
   },
   {
     id: "AB2-F1-02",
@@ -964,6 +989,7 @@ const RoomsData: Room1[] = [
     status: "Partially Allocated",
     roomArea: "75",
     buildingId: "AB2",
+    managedBy: "GSA",
   },
   {
     id: "AB2-F1-03",
@@ -977,6 +1003,7 @@ const RoomsData: Room1[] = [
     status: "Partially Allocated",
     roomArea: "55",
     buildingId: "AB2",
+    managedBy: "HR",
   },
   {
     id: "AB2-F1-04",
@@ -990,6 +1017,7 @@ const RoomsData: Room1[] = [
     status: "Available",
     roomArea: "40",
     buildingId: "AB2",
+    managedBy: "GSA",
   },
   {
     id: "AB2-F2-01",
@@ -1003,6 +1031,7 @@ const RoomsData: Room1[] = [
     status: "Partially Allocated",
     roomArea: "60",
     buildingId: "AB2",
+    managedBy: "GHS",
   },
   {
     id: "AB2-F2-02",
@@ -1016,6 +1045,7 @@ const RoomsData: Room1[] = [
     status: "Allocated",
     roomArea: "60",
     buildingId: "AB2",
+    managedBy: "GSA",
   },
   {
     id: "AB2-F2-03",
@@ -1029,6 +1059,7 @@ const RoomsData: Room1[] = [
     status: "Allocated",
     roomArea: "90",
     buildingId: "AB2",
+    managedBy: "HR",
   },
   {
     id: "AB2-F2-04",
@@ -1042,6 +1073,7 @@ const RoomsData: Room1[] = [
     status: "Allocated",
     roomArea: "45",
     buildingId: "AB2",
+    managedBy: "GHS",
   },
   {
     id: "AB2-F3-01",
@@ -1055,6 +1087,7 @@ const RoomsData: Room1[] = [
     status: "Available",
     roomArea: "60",
     buildingId: "AB2",
+    managedBy: "GHS",
   },
   {
     id: "AB2-F3-02",
@@ -1068,6 +1101,7 @@ const RoomsData: Room1[] = [
     status: "Partially Allocated",
     roomArea: "80",
     buildingId: "AB2",
+    managedBy: "GSA",
   },
   {
     id: "AB2-F3-03",
@@ -1081,6 +1115,7 @@ const RoomsData: Room1[] = [
     status: "Partially Allocated",
     roomArea: "100",
     buildingId: "AB2",
+    managedBy: "GSA",
   },
   {
     id: "AB2-F3-04",
@@ -1094,6 +1129,7 @@ const RoomsData: Room1[] = [
     status: "Available",
     roomArea: "80",
     buildingId: "AB2",
+    managedBy: "GHS",
   },
   {
     id: "AD0-G-01",
@@ -1107,6 +1143,7 @@ const RoomsData: Room1[] = [
     status: "Partially Allocated",
     roomArea: "60",
     buildingId: "AD0",
+    managedBy: "GHS",
   },
   {
     id: "AD0-G-02",
@@ -1120,6 +1157,7 @@ const RoomsData: Room1[] = [
     status: "Partially Allocated",
     roomArea: "80",
     buildingId: "AD0",
+    managedBy: "GSA",
   },
   {
     id: "AD0-G-03",
@@ -1133,6 +1171,7 @@ const RoomsData: Room1[] = [
     status: "Partially Allocated",
     roomArea: "50",
     buildingId: "AD0",
+    managedBy: "GSA",
   },
   {
     id: "AD0-G-04",
@@ -1146,6 +1185,7 @@ const RoomsData: Room1[] = [
     status: "Allocated",
     roomArea: "40",
     buildingId: "AD0",
+    managedBy: "GSA",
   },
   {
     id: "AD0-G-05",
@@ -1159,6 +1199,7 @@ const RoomsData: Room1[] = [
     status: "Allocated",
     roomArea: "45",
     buildingId: "AD0",
+    managedBy: "GSA",
   },
   {
     id: "AD0-F1-01",
@@ -1172,6 +1213,7 @@ const RoomsData: Room1[] = [
     status: "Partially Allocated",
     roomArea: "70",
     buildingId: "AD0",
+    managedBy: "GHS",
   },
   {
     id: "AD0-F1-02",
@@ -1185,6 +1227,7 @@ const RoomsData: Room1[] = [
     status: "Available",
     roomArea: "65",
     buildingId: "AD0",
+    managedBy: "GSA",
   },
   {
     id: "AD0-F1-03",
@@ -1198,6 +1241,7 @@ const RoomsData: Room1[] = [
     status: "Allocated",
     roomArea: "50",
     buildingId: "AD0",
+    managedBy: "GHS",
   },
   {
     id: "AD0-F1-04",
@@ -1211,6 +1255,7 @@ const RoomsData: Room1[] = [
     status: "Available",
     roomArea: "35",
     buildingId: "AD0",
+    managedBy: "GSA",
   },
   {
     id: "AD0-F1-05",
@@ -1224,6 +1269,7 @@ const RoomsData: Room1[] = [
     status: "Available",
     roomArea: "20",
     buildingId: "AD0",
+    managedBy: "GSA",
   },
   {
     id: "LB1-G-01",
@@ -1237,6 +1283,7 @@ const RoomsData: Room1[] = [
     status: "Partially Allocated",
     roomArea: "250",
     buildingId: "LB1",
+    managedBy: "GHS",
   },
   {
     id: "LB1-G-02",
@@ -1250,6 +1297,7 @@ const RoomsData: Room1[] = [
     status: "Partially Allocated",
     roomArea: "40",
     buildingId: "LB1",
+    managedBy: "GSA",
   },
   {
     id: "LB1-G-03",
@@ -1263,6 +1311,7 @@ const RoomsData: Room1[] = [
     status: "Partially Allocated",
     roomArea: "100",
     buildingId: "LB1",
+    managedBy: "GSA",
   },
   {
     id: "LB1-G-04",
@@ -1276,6 +1325,7 @@ const RoomsData: Room1[] = [
     status: "Available",
     roomArea: "60",
     buildingId: "LB1",
+    managedBy: "GHS",
   },
   {
     id: "LB1-F1-01",
@@ -1289,6 +1339,7 @@ const RoomsData: Room1[] = [
     status: "Allocated",
     roomArea: "25",
     buildingId: "LB1",
+    managedBy: "GSA",
   },
   {
     id: "LB1-F1-02",
@@ -1302,6 +1353,7 @@ const RoomsData: Room1[] = [
     status: "Available",
     roomArea: "25",
     buildingId: "LB1",
+    managedBy: "GSA",
   },
   {
     id: "LB1-F1-03",
@@ -1315,6 +1367,7 @@ const RoomsData: Room1[] = [
     status: "Partially Allocated",
     roomArea: "150",
     buildingId: "LB1",
+    managedBy: "GSA",
   },
   {
     id: "LB1-F1-04",
@@ -1328,6 +1381,7 @@ const RoomsData: Room1[] = [
     status: "Partially Allocated",
     roomArea: "100",
     buildingId: "LB1",
+    managedBy: "GSA",
   },
   {
     id: "LB1-F2-01",
@@ -1341,6 +1395,7 @@ const RoomsData: Room1[] = [
     status: "Allocated",
     roomArea: "75",
     buildingId: "LB1",
+    managedBy: "GSA",
   },
   {
     id: "LB1-F2-02",
@@ -1354,6 +1409,7 @@ const RoomsData: Room1[] = [
     status: "Partially Allocated",
     roomArea: "80",
     buildingId: "LB1",
+    managedBy: "GSA",
   },
   {
     id: "SPC-G-01",
@@ -1367,6 +1423,7 @@ const RoomsData: Room1[] = [
     status: "Partially Allocated",
     roomArea: "500",
     buildingId: "SPC",
+    managedBy: "GHS",
   },
   {
     id: "SPC-G-02",
@@ -1380,6 +1437,7 @@ const RoomsData: Room1[] = [
     status: "Partially Allocated",
     roomArea: "250",
     buildingId: "SPC",
+    managedBy: "GSA",
   },
   {
     id: "SPC-G-03",
@@ -1393,6 +1451,7 @@ const RoomsData: Room1[] = [
     status: "Available",
     roomArea: "80",
     buildingId: "SPC",
+    managedBy: "GSA",
   },
   {
     id: "SPC-G-04",
@@ -1406,6 +1465,7 @@ const RoomsData: Room1[] = [
     status: "Available",
     roomArea: "80",
     buildingId: "SPC",
+    managedBy: "GSA",
   },
   {
     id: "SPC-G-05",
@@ -1419,6 +1479,7 @@ const RoomsData: Room1[] = [
     status: "Allocated",
     roomArea: "30",
     buildingId: "SPC",
+    managedBy: "GHS",
   },
   {
     id: "SPC-G-06",
@@ -1432,6 +1493,7 @@ const RoomsData: Room1[] = [
     status: "Allocated",
     roomArea: "40",
     buildingId: "SPC",
+    managedBy: "GSA",
   },
   {
     id: "SPC-G-07",
@@ -1445,6 +1507,82 @@ const RoomsData: Room1[] = [
     status: "Partially Allocated",
     roomArea: "25",
     buildingId: "SPC",
+    managedBy: "GHS",
+  },
+  {
+    id: "AD0-F1-01-C1",
+    roomName: "HR Manager's Cabin",
+    capacity: 1,
+    occupied: 1,
+    hasSubtype: false,
+    occupiedBy: "HR Manager",
+    roomType: "Cabin",
+    floor: "first",
+    status: "Allocated",
+    roomArea: "15",
+    buildingId: "AD0",
+    managedBy: "GHS",
+    parentId: "AD0-F1-01",
+  },
+  {
+    id: "AD0-F1-01-C2",
+    roomName: "HR Analyst Workstation 1",
+    capacity: 1,
+    occupied: 1,
+    hasSubtype: false,
+    occupiedBy: "HR Analyst 1",
+    roomType: "Workstation",
+    floor: "first",
+    status: "Allocated",
+    roomArea: "10",
+    buildingId: "AD0",
+    managedBy: "GSA",
+    parentId: "AD0-F1-01",
+  },
+  {
+    id: "AD0-F1-01-C3",
+    roomName: "HR Analyst Workstation 2",
+    capacity: 1,
+    occupied: 1,
+    hasSubtype: false,
+    occupiedBy: "HR Analyst 2",
+    roomType: "Workstation",
+    floor: "first",
+    status: "Allocated",
+    roomArea: "10",
+    buildingId: "AD0",
+    managedBy: "GSA",
+    parentId: "AD0-F1-01",
+  },
+  {
+    id: "AD0-F1-01-C4",
+    roomName: "HR Workstation 3",
+    capacity: 1,
+    occupied: 1,
+    hasSubtype: false,
+    occupiedBy: "HR Intern",
+    roomType: "Workstation",
+    floor: "first",
+    status: "Allocated",
+    roomArea: "10",
+    buildingId: "AD0",
+    managedBy: "GSA",
+    parentId: "AD0-F1-01",
+  },
+  {
+    id: "AD0-F1-01-MTG",
+    roomName: "Internal Meeting Area",
+    capacity: 6,
+    occupied: 2,
+    hasSubtype: false,
+    occupiedBy: null,
+    roomType: "Meeting Area",
+    floor: "first",
+    status: "Partially Allocated",
+    roomArea: "20",
+    buildingId: "AD0",
+    managedBy: "GHS",
+    parentId: "AD0-F1-01",
   },
 ];
 
@@ -1462,6 +1600,7 @@ const SubRoomsData: Room1[] = [
     roomArea: "150",
     buildingId: "SPC",
     parentId: "SPC-G-01",
+    managedBy: "GHS",
   },
   {
     id: "SPC-G-01-CA",
@@ -1476,6 +1615,7 @@ const SubRoomsData: Room1[] = [
     roomArea: "150",
     buildingId: "SPC",
     parentId: "SPC-G-01",
+    managedBy: "GSA",
   },
   {
     id: "SPC-G-01-YC",
@@ -1490,6 +1630,7 @@ const SubRoomsData: Room1[] = [
     roomArea: "50",
     buildingId: "SPC",
     parentId: "SPC-G-01",
+    managedBy: "GSA",
   },
   {
     id: "SPC-G-01-MS",
@@ -1504,6 +1645,7 @@ const SubRoomsData: Room1[] = [
     roomArea: "150",
     buildingId: "SPC",
     parentId: "SPC-G-01",
+    managedBy: "GHS",
   },
   {
     id: "AB1-G-04-SA",
@@ -1518,6 +1660,7 @@ const SubRoomsData: Room1[] = [
     roomArea: "120",
     buildingId: "AB1",
     parentId: "AB1-G-04",
+    managedBy: "GHS",
   },
   {
     id: "AB1-G-04-STG",
@@ -1532,6 +1675,7 @@ const SubRoomsData: Room1[] = [
     roomArea: "20",
     buildingId: "AB1",
     parentId: "AB1-G-04",
+    managedBy: "GHS",
   },
   {
     id: "AB1-G-04-CR",
@@ -1546,6 +1690,7 @@ const SubRoomsData: Room1[] = [
     roomArea: "10",
     buildingId: "AB1",
     parentId: "AB1-G-04",
+    managedBy: "GHS",
   },
   {
     id: "LB1-G-01-SC1",
@@ -1560,6 +1705,7 @@ const SubRoomsData: Room1[] = [
     roomArea: "2",
     buildingId: "LB1",
     parentId: "LB1-G-01",
+    managedBy: "GSA",
   },
   {
     id: "LB1-G-01-SC2",
@@ -1574,6 +1720,7 @@ const SubRoomsData: Room1[] = [
     roomArea: "2",
     buildingId: "LB1",
     parentId: "LB1-G-01",
+    managedBy: "GSA",
   },
   {
     id: "LB1-G-01-SC3",
@@ -1588,6 +1735,7 @@ const SubRoomsData: Room1[] = [
     roomArea: "2",
     buildingId: "LB1",
     parentId: "LB1-G-01",
+    managedBy: "GSA",
   },
   {
     id: "LB1-G-01-LW1",
@@ -1602,6 +1750,7 @@ const SubRoomsData: Room1[] = [
     roomArea: "5",
     buildingId: "LB1",
     parentId: "LB1-G-01",
+    managedBy: "GSA",
   },
   {
     id: "LB1-G-01-LW2",
@@ -1616,6 +1765,7 @@ const SubRoomsData: Room1[] = [
     roomArea: "5",
     buildingId: "LB1",
     parentId: "LB1-G-01",
+    managedBy: "GSA",
   },
   {
     id: "LB1-G-01-QA",
@@ -1630,6 +1780,7 @@ const SubRoomsData: Room1[] = [
     roomArea: "50",
     buildingId: "LB1",
     parentId: "LB1-G-01",
+    managedBy: "GSA",
   },
   {
     id: "AB2-F1-04-MA",
@@ -1644,6 +1795,7 @@ const SubRoomsData: Room1[] = [
     roomArea: "35",
     buildingId: "AB2",
     parentId: "AB2-F1-04",
+    managedBy: "GHS",
   },
   {
     id: "AB2-F1-04-AV",
@@ -1658,6 +1810,7 @@ const SubRoomsData: Room1[] = [
     roomArea: "5",
     buildingId: "AB2",
     parentId: "AB2-F1-04",
+    managedBy: "GSA",
   },
   {
     id: "AB1-G-02-WS1",
@@ -1672,6 +1825,7 @@ const SubRoomsData: Room1[] = [
     roomArea: "3",
     buildingId: "AB1",
     parentId: "AB1-G-02",
+    managedBy: "GHS",
   },
   {
     id: "AB1-G-02-WS2",
@@ -1686,6 +1840,7 @@ const SubRoomsData: Room1[] = [
     roomArea: "3",
     buildingId: "AB1",
     parentId: "AB1-G-02",
+    managedBy: "GSA",
   },
   {
     id: "AB1-G-02-WS3",
@@ -1700,6 +1855,7 @@ const SubRoomsData: Room1[] = [
     roomArea: "3",
     buildingId: "AB1",
     parentId: "AB1-G-02",
+    managedBy: "GSA",
   },
   {
     id: "AB1-G-02-WS4",
@@ -1714,6 +1870,7 @@ const SubRoomsData: Room1[] = [
     roomArea: "3",
     buildingId: "AB1",
     parentId: "AB1-G-02",
+    managedBy: "GSA",
   },
   {
     id: "AB1-G-02-WS5",
@@ -1728,6 +1885,7 @@ const SubRoomsData: Room1[] = [
     roomArea: "3",
     buildingId: "AB1",
     parentId: "AB1-G-02",
+    managedBy: "GSA",
   },
   {
     id: "AB1-G-02-WS6",
@@ -1742,6 +1900,7 @@ const SubRoomsData: Room1[] = [
     roomArea: "3",
     buildingId: "AB1",
     parentId: "AB1-G-02",
+    managedBy: "GSA",
   },
   {
     id: "AD0-F1-01-C1",
@@ -1756,6 +1915,7 @@ const SubRoomsData: Room1[] = [
     roomArea: "15",
     buildingId: "AD0",
     parentId: "AD0-F1-01",
+    managedBy: "GHS",
   },
   {
     id: "AD0-F1-01-C2",
@@ -1770,6 +1930,7 @@ const SubRoomsData: Room1[] = [
     roomArea: "10",
     buildingId: "AD0",
     parentId: "AD0-F1-01",
+    managedBy: "GSA",
   },
   {
     id: "AD0-F1-01-C3",
@@ -1784,6 +1945,7 @@ const SubRoomsData: Room1[] = [
     roomArea: "10",
     buildingId: "AD0",
     parentId: "AD0-F1-01",
+    managedBy: "GSA",
   },
   {
     id: "AD0-F1-01-C4",
@@ -1798,6 +1960,7 @@ const SubRoomsData: Room1[] = [
     roomArea: "10",
     buildingId: "AD0",
     parentId: "AD0-F1-01",
+    managedBy: "GSA",
   },
   {
     id: "AD0-F1-01-MTG",
@@ -1812,6 +1975,7 @@ const SubRoomsData: Room1[] = [
     roomArea: "20",
     buildingId: "AD0",
     parentId: "AD0-F1-01",
+    managedBy: "GHS",
   },
 ];
 
@@ -2461,6 +2625,78 @@ const RoomInformation: RoomInfo[] = [
     status: "Partially Allocated",
     roomArea: "60",
     occupants: [
+      {
+        occupantName: "Introduction to Physics",
+        type: "Lecture",
+        startTime: "2025-08-13T09:00:00.000Z",
+        endTime: "2025-08-13T10:30:00.000Z",
+      },
+      {
+        occupantName: "Introduction to Physics",
+        type: "Lecture",
+        startTime: "2025-08-13T09:00:00.000Z",
+        endTime: "2025-08-13T10:30:00.000Z",
+      },
+      {
+        occupantName: "Introduction to Physics",
+        type: "Lecture",
+        startTime: "2025-08-13T09:00:00.000Z",
+        endTime: "2025-08-13T10:30:00.000Z",
+      },
+      {
+        occupantName: "Introduction to Physics",
+        type: "Lecture",
+        startTime: "2025-08-13T09:00:00.000Z",
+        endTime: "2025-08-13T10:30:00.000Z",
+      },
+      {
+        occupantName: "Introduction to Physics",
+        type: "Lecture",
+        startTime: "2025-08-13T09:00:00.000Z",
+        endTime: "2025-08-13T10:30:00.000Z",
+      },
+      {
+        occupantName: "Introduction to Physics",
+        type: "Lecture",
+        startTime: "2025-08-13T09:00:00.000Z",
+        endTime: "2025-08-13T10:30:00.000Z",
+      },
+      {
+        occupantName: "Introduction to Physics",
+        type: "Lecture",
+        startTime: "2025-08-13T09:00:00.000Z",
+        endTime: "2025-08-13T10:30:00.000Z",
+      },
+      {
+        occupantName: "Introduction to Physics",
+        type: "Lecture",
+        startTime: "2025-08-13T09:00:00.000Z",
+        endTime: "2025-08-13T10:30:00.000Z",
+      },
+      {
+        occupantName: "Introduction to Physics",
+        type: "Lecture",
+        startTime: "2025-08-13T09:00:00.000Z",
+        endTime: "2025-08-13T10:30:00.000Z",
+      },
+      {
+        occupantName: "Introduction to Physics",
+        type: "Lecture",
+        startTime: "2025-08-13T09:00:00.000Z",
+        endTime: "2025-08-13T10:30:00.000Z",
+      },
+      {
+        occupantName: "Introduction to Physics",
+        type: "Lecture",
+        startTime: "2025-08-13T09:00:00.000Z",
+        endTime: "2025-08-13T10:30:00.000Z",
+      },
+      {
+        occupantName: "Introduction to Physics",
+        type: "Lecture",
+        startTime: "2025-08-13T09:00:00.000Z",
+        endTime: "2025-08-13T10:30:00.000Z",
+      },
       {
         occupantName: "Introduction to Physics",
         type: "Lecture",

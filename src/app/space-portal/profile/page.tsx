@@ -66,20 +66,28 @@ function ProfilePage() {
   const { data } = useSession();
   const userEmail = data?.user?.email;
   const [user, setUser] = useState<UserProfile | null>(null);
+  const [isLoadingUser, setIsLoadingUser] = useState(false);
 
   useEffect(() => {
     const fetchUser = async (email: string | null) => {
       if (!email) return;
-      const requestBody = {
-        email: email,
-      };
-      const response = await callApi<UserProfile>(
-        process.env.NEXT_PUBLIC_GET_USER || URL_NOT_FOUND,
-        requestBody
-      );
-      if (response.success) {
-        setUser(response.data || null);
-        console.log(response);
+      setIsLoadingUser(true);
+      try {
+        const requestBody = {
+          email: email,
+        };
+        const response = await callApi<UserProfile>(
+          process.env.NEXT_PUBLIC_GET_USER || URL_NOT_FOUND,
+          requestBody
+        );
+        if (response.success) {
+          setUser(response.data || null);
+          console.log(response);
+        }
+      } catch (error) {
+        console.error('Error fetching user profile:', error);
+      } finally {
+        setIsLoadingUser(false);
       }
     };
     fetchUser(userEmail || null);
@@ -116,26 +124,40 @@ function ProfilePage() {
           <h1 className="text-3xl font-bold text-gray-800">
             {data?.user?.name}
           </h1>
-          <p className="text-lg text-orange-600 font-semibold">
-            {user?.userPosition}
-          </p>
+          {isLoadingUser ? (
+            <div className="h-6 bg-gray-200 rounded w-32 animate-pulse"></div>
+          ) : (
+            <p className="text-lg text-orange-600 font-semibold">
+              {user?.userPosition}
+            </p>
+          )}
           <div className="flex flex-col space-y-2 pt-4 text-sm text-gray-600">
             <div className="flex items-center space-x-2">
               <Mail size={16} className="text-gray-500" />
               <span>{data?.user?.email}</span>
             </div>
-            <div className="flex items-center space-x-2">
-              <Phone size={16} className="text-gray-500" />
-              <span>{user?.userContact}</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Building2 size={16} className="text-gray-500" />
-              <span>{user?.userDepartment} Department</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <CalendarCheck size={16} className="text-gray-500" />
-              <span>{`${user?.activeSession}, ${user?.activeYear}`}</span>
-            </div>
+            {isLoadingUser ? (
+              <>
+                <div className="h-4 bg-gray-200 rounded w-32 animate-pulse"></div>
+                <div className="h-4 bg-gray-200 rounded w-40 animate-pulse"></div>
+                <div className="h-4 bg-gray-200 rounded w-36 animate-pulse"></div>
+              </>
+            ) : (
+              <>
+                <div className="flex items-center space-x-2">
+                  <Phone size={16} className="text-gray-500" />
+                  <span>{user?.userContact}</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Building2 size={16} className="text-gray-500" />
+                  <span>{user?.userDepartment} Department</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <CalendarCheck size={16} className="text-gray-500" />
+                  <span>{`${user?.activeSession}, ${user?.activeYear}`}</span>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>

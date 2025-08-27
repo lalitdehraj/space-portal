@@ -12,6 +12,7 @@ import { encrypt } from "@/utils/encryption";
 export default function Buildings() {
   const router = useRouter();
   const dispatcher = useDispatch();
+  const [isLoadingBuildings, setIsLoadingBuildings] = useState(false);
   const acadmeicYear = useSelector(
     (state: any) => state.dataState.academicYear
   );
@@ -25,17 +26,24 @@ export default function Buildings() {
 
   useEffect(() => {
     const fetchBuildings = async () => {
-      const reqBody = {
-        acadSession: `${acadmeicSession}`,
-        acadYear: `${acadmeicYear}`,
-      };
+      setIsLoadingBuildings(true);
+      try {
+        const reqBody = {
+          acadSession: `${acadmeicSession}`,
+          acadYear: `${acadmeicYear}`,
+        };
 
-      const response = await callApi<Building1[]>(
-        process.env.NEXT_PUBLIC_GET_BUILDING_LIST || URL_NOT_FOUND,
-        reqBody
-      );
-      if (response.success) {
-        setAllBuildingsData(response.data || []);
+        const response = await callApi<Building1[]>(
+          process.env.NEXT_PUBLIC_GET_BUILDING_LIST || URL_NOT_FOUND,
+          reqBody
+        );
+        if (response.success) {
+          setAllBuildingsData(response.data || []);
+        }
+      } catch (error) {
+        console.error('Error fetching buildings:', error);
+      } finally {
+        setIsLoadingBuildings(false);
       }
     };
     fetchBuildings();
@@ -61,16 +69,22 @@ export default function Buildings() {
         </div>
 
         <div className="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {allBuildingsData.map((building) => (
-            <BuildingCard
-              building={building}
-              key={building.id}
-              onClick={() => {
-                dispatcher(setSelectedBuilding(building));
-                encryptAndPush(building.id);
-              }}
-            />
-          ))}
+          {isLoadingBuildings ? (
+            <p>Loading buildings...</p>
+          ) : allBuildingsData.length === 0 ? (
+            <p>No buildings data available.</p>
+          ) : (
+            allBuildingsData.map((building) => (
+              <BuildingCard
+                building={building}
+                key={building.id}
+                onClick={() => {
+                  dispatcher(setSelectedBuilding(building));
+                  encryptAndPush(building.id);
+                }}
+              />
+            ))
+          )}
         </div>
       </div>
     </div>

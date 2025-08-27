@@ -78,6 +78,7 @@ export interface Room1 {
   roomArea: string;
   buildingId: string;
   parentId?: string;
+  managedBy?: string;
 }
 
 export interface Occupants {

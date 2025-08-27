@@ -240,11 +240,11 @@ export default function Buildings() {
                 onClick={() => {
                   setSelectedFloor(null);
                   setSelectedRoomType("All Rooms");
-                  router.push("/space-portal/buildings");
+                  router.back();
                 }}
               >
                 <BuildingSVG className="mr-2 h-4 w-4 fill-white" />
-                Back to Buildings
+                Back
               </button>
             </div>
 
