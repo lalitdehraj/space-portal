@@ -2,13 +2,9 @@
 
 import React from "react";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
-import { signIn, signOut, useSession } from "next-auth/react";
+import { signIn } from "next-auth/react";
 
 export default function LoginPage() {
-  const router = useRouter();
-  const { data: session } = useSession();
-
   return (
     <div
       className="flex min-h-screen items-center justify-center bg-cover bg-center font-sans"

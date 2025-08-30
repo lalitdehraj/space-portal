@@ -73,19 +73,19 @@ function ProfilePage() {
       if (!email) return;
       setIsLoadingUser(true);
       try {
-        const requestBody = {
-          email: email,
-        };
-        const response = await callApi<UserProfile>(
-          process.env.NEXT_PUBLIC_GET_USER || URL_NOT_FOUND,
-          requestBody
+        const response = await callApi<UserProfile[]>(
+          process.env.NEXT_PUBLIC_GET_USER || URL_NOT_FOUND
         );
         if (response.success) {
-          setUser(response.data || null);
+          const filteredUsers = response.data?.filter(
+            (u) =>
+              u.userEmail.toLowerCase().trim() === email.toLowerCase().trim()
+          );
+          setUser(filteredUsers?.[0] || null);
           console.log(response);
         }
       } catch (error) {
-        console.error('Error fetching user profile:', error);
+        console.error("Error fetching user profile:", error);
       } finally {
         setIsLoadingUser(false);
       }
@@ -113,8 +113,9 @@ function ProfilePage() {
         <div className="relative w-40 h-40 rounded-full overflow-hidden border-4 border-white shadow-md">
           <img
             src={
-              user?.userImage ||
-              `https://placehold.co/150x150/E2E8F0/A0AEC0?text=${data?.user?.name}`
+              user?.userImage
+                ? `data:image/png;base64,${user?.userImage}`
+                : `https://placehold.co/150x150/E2E8F0/A0AEC0?text=Munipal`
             }
             alt={`${data?.user?.name}'s profile`}
             className="w-full h-full object-cover"

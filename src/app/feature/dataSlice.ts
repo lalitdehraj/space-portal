@@ -1,47 +1,66 @@
-import { Building1, Floor1,Room } from "@/types";
 import { createSlice } from "@reduxjs/toolkit";
 
 export interface DataState {
-    academicYear:string
-    academicSession:string
-    selectedBuilding:Building1|null
-    selectedFloor:string  
-    headerText:string 
-    selectedRoom:Room|null
+  selectedAcademicYear: string;
+  selectedAcademicSession: string;
+  selectedBuildingId: string;
+  selectedFloorId: string;
+  selectedRoomType: string;
+  selectedRoomId: string;
+  headerText: string;
+  userRole: string;
 }
-const initialState:DataState= {
-    academicYear:"",
-    academicSession:"",
-    selectedBuilding :null,
-    headerText:"Dashboard",
-    selectedFloor :"",
-    selectedRoom :null
-}
+const initialState: DataState = {
+  selectedAcademicYear: "",
+  selectedAcademicSession: "",
+  selectedBuildingId: "",
+  selectedFloorId: "",
+  selectedRoomType: "All Rooms",
+  selectedRoomId: "",
+  headerText: "",
+  userRole: "",
+};
 
 export const dataSlice = createSlice({
-    name: "dataState",
-    initialState,
-    reducers:{
-        setAcademicYear:(state,action)=>{
-            state.academicYear = action.payload;
-        },
-        setAcademicSession:(state,action)=>{
-            state.academicSession = action.payload;
-        },
-        setSelectedBuilding:(state,action)=>{
-            state.selectedBuilding = action.payload;
-        },
-        setSeletedFloor:(state,action)=>{
-            state.selectedFloor = action.payload;
-        },setHeaderText:(state,action)=>{
-            state.headerText = action.payload;
-        },
-        setSelectedRoom:(state,action)=>{
-            state.selectedRoom = action.payload;
-        }
-    }
-})
+  name: "dataState",
+  initialState,
+  reducers: {
+    setAcademicYearId: (state, action) => {
+      state.selectedAcademicYear = action.payload;
+    },
+    setAcademicSessionId: (state, action) => {
+      state.selectedAcademicSession = action.payload;
+    },
+    setSelectedBuildingId: (state, action) => {
+      state.selectedBuildingId = action.payload;
+    },
+    setSelectedFloorId: (state, action) => {
+      state.selectedFloorId = action.payload;
+    },
+    setSeletedRoomTypeId: (state, action) => {
+      state.selectedRoomType = action.payload;
+    },
+    setHeaderTextId: (state, action) => {
+      state.headerText = action.payload;
+    },
+    setSelectedRoomId: (state, action) => {
+      state.selectedRoomId = action.payload;
+    },
+    setUserRoleId: (state, action) => {
+      state.userRole = action.payload;
+    },
+  },
+});
 
-export const {setSelectedBuilding,setSeletedFloor,setSelectedRoom,setAcademicYear,setAcademicSession,setHeaderText} = dataSlice.actions;
+export const {
+  setAcademicYearId,
+  setAcademicSessionId,
+  setSelectedBuildingId,
+  setSelectedFloorId,
+  setSeletedRoomTypeId,
+  setHeaderTextId,
+  setSelectedRoomId,
+  setUserRoleId,
+} = dataSlice.actions;
 
 export default dataSlice.reducer;

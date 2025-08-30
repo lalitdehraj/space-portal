@@ -4,13 +4,7 @@ import Pagination from "@/components/PageNumberIndicator";
 import { callApi } from "@/utils/apiIntercepter";
 import { URL_NOT_FOUND } from "@/constants";
 import { useSelector } from "react-redux";
-import {
-  Building1,
-  Report,
-  AcademicSession,
-  AcademicYear,
-  Room1,
-} from "@/types";
+import { Building, Report, AcademicSession, AcademicYear, Room } from "@/types";
 import { formatDate } from "@/utils";
 import { setAcademicYear } from "@/app/feature/dataSlice";
 import {
@@ -191,7 +185,7 @@ export default function UtilizationReport() {
         setCurruntPage(res.data?.currentPage || 0);
         setReportsList(res.data?.reports || []);
       } catch (error) {
-        console.error('Error fetching reports:', error);
+        console.error("Error fetching reports:", error);
       } finally {
         setIsLoadingReports(false);
       }
@@ -209,7 +203,7 @@ export default function UtilizationReport() {
   };
 
   const handleDownloadClick = (request: Report) => {
-    startJob(request.id);
+    startJob(request.fileName);
   };
 
   return (
@@ -398,6 +392,7 @@ export default function UtilizationReport() {
       {generateReportVisible && (
         <GenerateReportForm
           onClosePressed={() => setGenerateReportVisible(false)}
+          startJob={startJob} // Pass startJob to the form
         />
       )}
     </>
@@ -406,15 +401,16 @@ export default function UtilizationReport() {
 
 type FormProps = {
   onClosePressed: () => void;
+  startJob: (fileName: string) => void; // Add startJob to the props
 };
 
-function GenerateReportForm({ onClosePressed }: FormProps) {
+function GenerateReportForm({ onClosePressed, startJob }: FormProps) {
   const [selectedBuildingId, setSelectedBuildingId] = useState<string>("");
   const [timePeriod, setTimePeriod] = useState<string>("");
   const [selectedRoomId, setSelectedRoomId] = useState<string>("");
   const [selectedFloorId, setSelectedFloorId] = useState<string>("");
-  const [buildings, setBuildings] = useState<Building1[]>([]);
-  const [rooms, setRooms] = useState<Room1[]>([]);
+  const [buildings, setBuildings] = useState<Building[]>([]);
+  const [rooms, setRooms] = useState<Room[]>([]);
   const [reportType, setReportType] = useState("room");
   const [academicYearsList, setAcademicYearsList] = useState<AcademicYear[]>();
   const [academicSessionsList, setAcademicSessionsList] =
@@ -423,6 +419,7 @@ function GenerateReportForm({ onClosePressed }: FormProps) {
   const [selectedSession, setSelectedSession] = useState("");
   const [customStartDate, setCustomStartDate] = useState("");
   const [customEndDate, setCustomEndDate] = useState("");
+  const [isGenerateDisabled, setIsGenerateDisabled] = useState(true);
   const acadmeicYear = useSelector(
     (state: any) => state.dataState.academicYear
   );
@@ -445,6 +442,7 @@ function GenerateReportForm({ onClosePressed }: FormProps) {
       );
 
       if (responseSession.success) {
+        console.log(responseSession.data?.["Academic Session"]);
         setAcademicSessionsList(responseSession.data?.["Academic Session"]);
       }
     };
@@ -457,7 +455,7 @@ function GenerateReportForm({ onClosePressed }: FormProps) {
         acadYear: `${acadmeicYear}`,
       };
 
-      const response = await callApi<Building1[]>(
+      const response = await callApi<Building[]>(
         process.env.NEXT_PUBLIC_GET_BUILDING_LIST || URL_NOT_FOUND,
         reqBody
       );
@@ -467,6 +465,55 @@ function GenerateReportForm({ onClosePressed }: FormProps) {
     };
     fetchBuildings();
   }, [acadmeicSession, acadmeicYear]);
+  useEffect(() => {
+    if (timePeriod === "last7") {
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setDate(endDate.getDate() - 7);
+      setCustomStartDate(startDate.toISOString().split("T")[0]);
+      setCustomEndDate(endDate.toISOString().split("T")[0]);
+    } else if (timePeriod === "last30") {
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setDate(endDate.getDate() - 30);
+      setCustomStartDate(startDate.toISOString().split("T")[0]);
+      setCustomEndDate(endDate.toISOString().split("T")[0]);
+    } else if (timePeriod !== "custom") {
+      setCustomStartDate("");
+      setCustomEndDate("");
+    }
+  }, [timePeriod]);
+  useEffect(() => {
+    let isValid = true;
+
+    if (reportType === "building" && !selectedBuildingId) {
+      isValid = false;
+    } else if (
+      reportType === "room" &&
+      (!selectedBuildingId || !selectedRoomId)
+    ) {
+      isValid = false;
+    } else if (
+      (reportType === "department" || reportType === "faculty") &&
+      !selectedFloorId
+    ) {
+      isValid = false;
+    }
+
+    if (timePeriod === "custom" && (!customStartDate || !customEndDate)) {
+      isValid = false;
+    }
+
+    setIsGenerateDisabled(!isValid);
+  }, [
+    reportType,
+    selectedBuildingId,
+    selectedRoomId,
+    selectedFloorId,
+    timePeriod,
+    customStartDate,
+    customEndDate,
+  ]);
 
   useEffect(() => {
     const fetchRoomsForBuilding = async (buildingId: string) => {
@@ -475,7 +522,7 @@ function GenerateReportForm({ onClosePressed }: FormProps) {
         setRooms([]);
         return;
       }
-      const floorIds = building.floors?.map((f) => f.id) || [];
+      const floorIds = building.floors?.map((f) => f.floorId) || [];
       if (floorIds.length === 0) {
         setRooms([]);
         return;
@@ -486,7 +533,7 @@ function GenerateReportForm({ onClosePressed }: FormProps) {
         // acadSession: `${acadmeicSession}`,
         // acadYear: `${acadmeicYear}`,
       };
-      const response = await callApi<Room1[]>(
+      const response = await callApi<Room[]>(
         process.env.NEXT_PUBLIC_GET_ROOMS_LIST || URL_NOT_FOUND,
         reqBody
       );
@@ -512,7 +559,48 @@ function GenerateReportForm({ onClosePressed }: FormProps) {
     setSelectedRoomId("");
   }, [reportType]);
 
-  const handleSubmit = () => {};
+  useEffect(() => {}, [timePeriod]);
+  const handleSubmit = () => {
+    let fileName = "";
+
+    if (reportType === "building" && selectedBuildingId) {
+      const building = buildings.find((b) => b.id === selectedBuildingId);
+      fileName = `${
+        building?.name || "Building"
+      }_${customStartDate}_${customEndDate}`;
+    } else if (reportType === "room" && selectedBuildingId && selectedRoomId) {
+      const building = buildings.find((b) => b.id === selectedBuildingId);
+      const room = rooms.find((r) => r.roomId === selectedRoomId);
+      fileName = `${building?.name || "Building"}_${
+        room?.roomName || "Room"
+      }_${customStartDate}_${customEndDate}`;
+    } else if (reportType === "department") {
+      const departmentName = buildings
+        .find((b) => b.id === selectedBuildingId)
+        ?.floors.find((f) => f.floorId === selectedFloorId)?.floorName;
+      fileName = `${
+        departmentName || "Department"
+      }_${customStartDate}_${customEndDate}`;
+    } else if (reportType === "faculty") {
+      const departmentName = buildings
+        .find((b) => b.id === selectedBuildingId)
+        ?.floors.find((f) => f.floorId === selectedFloorId)?.floorName;
+      const facultyName = rooms.find(
+        (r) => r.roomId === selectedRoomId
+      )?.roomName;
+      fileName = `${departmentName || "Department"}_${
+        facultyName || "Faculty"
+      }_${customStartDate}_${customEndDate}`;
+    } else {
+      fileName = `Report_${customStartDate}_${customEndDate}`;
+    }
+
+    console.log("Generated File Name:", fileName);
+
+    startJob(fileName);
+
+    onClosePressed();
+  };
   return (
     <section className="fixed inset-0 z-50 h-screen w-screen bg-[#00000070] flex items-center justify-center text-gray-500">
       <div className="relative w-full max-w-3xl bg-white rounded-xl shadow-2xl p-6 transform transition-all duration-300 ease-in-out scale-95 md:scale-100">
@@ -582,8 +670,8 @@ function GenerateReportForm({ onClosePressed }: FormProps) {
                       ? buildings
                           .filter((b) => b.id === selectedBuildingId)[0]
                           .floors.map((f) => (
-                            <option key={f.id} value={f.id}>
-                              {f.name}
+                            <option key={f.floorId} value={f.floorId}>
+                              {f.floorName}
                             </option>
                           ))
                       : null}
@@ -601,7 +689,7 @@ function GenerateReportForm({ onClosePressed }: FormProps) {
                   >
                     <option value="">Select room</option>
                     {rooms.map((r) => (
-                      <option key={r.id} value={r.id}>
+                      <option key={r.roomId} value={r.roomId}>
                         {r.roomName}
                       </option>
                     ))}
@@ -627,8 +715,8 @@ function GenerateReportForm({ onClosePressed }: FormProps) {
                       ? buildings
                           .filter((b) => b.id === selectedBuildingId)[0]
                           .floors.map((f) => (
-                            <option key={f.id} value={f.id}>
-                              {f.name}
+                            <option key={f.floorId} value={f.floorId}>
+                              {f.floorName}
                             </option>
                           ))
                       : null}
@@ -647,7 +735,7 @@ function GenerateReportForm({ onClosePressed }: FormProps) {
                     >
                       <option value="">Select faculty</option>
                       {rooms.map((r) => (
-                        <option key={r.id} value={r.id}>
+                        <option key={r.roomId} value={r.roomId}>
                           {r.roomName}
                         </option>
                       ))}
@@ -765,8 +853,13 @@ function GenerateReportForm({ onClosePressed }: FormProps) {
             </button>
             <button
               type="button"
-              className="px-3 py-2 rounded-lg shadow-md transition duration-300 bg-orange-500 text-white hover:bg-orange-600"
+              className={`px-3 py-2 rounded-lg shadow-md transition duration-300 ${
+                isGenerateDisabled
+                  ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                  : "bg-orange-500 text-white hover:bg-orange-600"
+              }`}
               onClick={handleSubmit}
+              disabled={isGenerateDisabled}
             >
               Generate
             </button>

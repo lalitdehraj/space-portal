@@ -3,9 +3,9 @@ import React, { JSX, useEffect, useState } from "react";
 import Image from "next/image";
 import { useParams, useRouter } from "next/navigation";
 import { useSelector, useDispatch } from "react-redux";
-import { Room, Room1 } from "@/types";
+import { Room, Room } from "@/types";
 import RoomCard from "@/components/RoomCard";
-import { Building1, Floor1 } from "@/types";
+import { Building, Floor } from "@/types";
 import { BuildingSVG } from "@/components/BuildingSvg";
 import { FloorSVG } from "@/components/FloorSvg";
 import { removeSpaces } from "@/utils";
@@ -20,12 +20,12 @@ import {
 export default function Buildings() {
   const router = useRouter();
   const params = useParams();
-  let role = params.role?.toString();
-  let [buildings, setBuildings] = useState<Building1[]>();
-  const [selectedFloor, setSelectedFloor] = useState<Floor1 | null>(null);
-  const [roomsList, setRoomsList] = useState<Room1[]>([]);
-  const [selectedRoom, setSelectedRoom] = useState<Room1 | null>(null);
-  const [subRooms, setSubRooms] = useState<Room1[]>([]);
+  let role = params.role?.toString().replace("%20", " ");
+  let [buildings, setBuildings] = useState<Building[]>();
+  const [selectedFloor, setSelectedFloor] = useState<Floor | null>(null);
+  const [roomsList, setRoomsList] = useState<Room[]>([]);
+  const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
+  const [subRooms, setSubRooms] = useState<Room[]>([]);
   const [isLoadingBuildings, setIsLoadingBuildings] = useState(false);
   const [isLoadingRooms, setIsLoadingRooms] = useState(false);
   const [isLoadingSubrooms, setIsLoadingSubrooms] = useState(false);
@@ -45,7 +45,7 @@ export default function Buildings() {
           acadYear: `${acadmeicYear}`,
         };
 
-        const response = await callApi<Building1[]>(
+        const response = await callApi<Building[]>(
           process.env.NEXT_PUBLIC_GET_BUILDING_LIST || URL_NOT_FOUND,
           reqBody
         );
@@ -53,7 +53,7 @@ export default function Buildings() {
           setBuildings(response.data);
         }
       } catch (error) {
-        console.error('Error fetching buildings:', error);
+        console.error("Error fetching buildings:", error);
       } finally {
         setIsLoadingBuildings(false);
       }
@@ -72,9 +72,9 @@ export default function Buildings() {
       try {
         const promises = buildings.flatMap((b) =>
           b.floors.map(async (f) => {
-            const response = await callApi<Room1[]>(
+            const response = await callApi<Room[]>(
               process.env.NEXT_PUBLIC_GET_ROOMS_LIST || URL_NOT_FOUND,
-              { buildingNo: String(b.id), floorID: String(f.id) }
+              { buildingNo: String(b.id), floorID: String(f.floorId) }
             );
             // Filter rooms based on managedBy attribute matching the current role
             const filteredRooms = (response.data || []).filter(
@@ -87,7 +87,7 @@ export default function Buildings() {
         const roomLists = await Promise.all(promises);
         setRoomsList(roomLists.flat());
       } catch (error) {
-        console.error('Error fetching rooms:', error);
+        console.error("Error fetching rooms:", error);
       } finally {
         setIsLoadingRooms(false);
       }
@@ -131,7 +131,7 @@ export default function Buildings() {
       setSelectedRoomType("All Rooms");
   }, [roomCategories]);
 
-  const filteredRooms: Room1[] = roomsList.filter((room) => {
+  const filteredRooms: Room[] = roomsList.filter((room) => {
     return (
       selectedRoomType === "All Rooms" ||
       removeSpaces(room.roomType)
@@ -140,34 +140,35 @@ export default function Buildings() {
     );
   });
 
-  const fetchSubrooms = async (room: Room1) => {
+  const fetchSubrooms = async (room: Room) => {
     if (!room) return;
     setIsLoadingSubrooms(true);
     try {
       const requestBody = {
-        roomId: room.id,
+        roomId: room.roomId,
       };
-      let response = callApi<Room1[]>(
+      let response = callApi<Room[]>(
         process.env.NEXT_PUBLIC_GET_SUBROOMS_LIST || URL_NOT_FOUND,
         requestBody
       );
       let res = await response;
       setSubRooms(res.data || []);
     } catch (error) {
-      console.error('Error fetching subrooms:', error);
+      console.error("Error fetching subrooms:", error);
     } finally {
       setIsLoadingSubrooms(false);
     }
   };
 
-  const handleRoomClick = (room: Room1) => {
-    if (room.hasSubtype) {
-      setSelectedRoom(room.id === selectedRoom?.id ? null : room);
+  const handleRoomClick = (room: Room) => {
+    console.log(room);
+    if (room.hasSubroom) {
+      setSelectedRoom(room.roomId === selectedRoom?.roomId ? null : room);
       fetchSubrooms(room);
     } else {
       router.push(
-        `/space-portal/buildings/${encrypt(selectedRoom?.parentId)}/${encrypt(
-          room.id
+        `/space-portal/buildings/${encrypt(room.parentId || "b")}/${encrypt(
+          room.roomId
         )}`
       );
     }
@@ -179,7 +180,7 @@ export default function Buildings() {
     let expandedRowIndex: number | null = null;
     let cardsPerRow = 4;
     for (let i = 0; i < (filteredRooms?.length || 1); i++) {
-      if (selectedRoom?.id === filteredRooms?.[i].id) {
+      if (selectedRoom?.roomId === filteredRooms?.[i].roomId) {
         expandedRowIndex = Math.floor(i / cardsPerRow);
         break;
       }
@@ -188,8 +189,8 @@ export default function Buildings() {
       items.push(
         <RoomCard
           room={room}
-          key={room.id}
-          isExpanded={selectedRoom?.id === room.id}
+          key={room.roomId}
+          isExpanded={selectedRoom?.roomId === room.roomId}
           onClick={(room) => handleRoomClick(room)}
         />
       );
@@ -204,7 +205,7 @@ export default function Buildings() {
       ) {
         items.push(
           <div
-            key={`details-${selectedRoom.id}`}
+            key={`details-${selectedRoom.roomId}`}
             className="
                 col-span-full bg-gray-50 p-8 rounded-xl shadow-inner
                 border border-gray-200
@@ -226,28 +227,26 @@ export default function Buildings() {
               </button>
             </h4>
             <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3">
-              {isLoadingSubrooms ? (
-                // Loading skeleton for subrooms
-                Array.from({ length: 3 }).map((_, index) => (
-                  <div
-                    key={index}
-                    className="bg-white rounded-lg shadow-sm p-4 animate-pulse"
-                  >
-                    <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
-                    <div className="h-3 bg-gray-200 rounded w-1/2 mb-4"></div>
-                    <div className="h-3 bg-gray-200 rounded w-1/3"></div>
-                  </div>
-                ))
-              ) : (
-                subRooms &&
-                subRooms.map((room) => (
-                  <RoomCard
-                    key={room.id}
-                    onClick={handleRoomClick}
-                    room={room}
-                  />
-                ))
-              )}
+              {isLoadingSubrooms
+                ? // Loading skeleton for subrooms
+                  Array.from({ length: 3 }).map((_, index) => (
+                    <div
+                      key={index}
+                      className="bg-white rounded-lg shadow-sm p-4 animate-pulse"
+                    >
+                      <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+                      <div className="h-3 bg-gray-200 rounded w-1/2 mb-4"></div>
+                      <div className="h-3 bg-gray-200 rounded w-1/3"></div>
+                    </div>
+                  ))
+                : subRooms &&
+                  subRooms.map((room) => (
+                    <RoomCard
+                      key={room.roomId}
+                      onClick={handleRoomClick}
+                      room={room}
+                    />
+                  ))}
             </div>
           </div>
         );
@@ -265,13 +264,12 @@ export default function Buildings() {
             <div className="flex flex-col md:flex-row md:items-center md:justify-between">
               <div>
                 <h2 className="text-base font-semibold text-gray-800 md:ml-2">
-                  Rooms Managed by {role}
+                  {role}
                 </h2>
                 <h4 className="text-xs font-semibold text-gray-500 md:ml-2">
-                  {isLoadingBuildings || isLoadingRooms 
-                    ? "Loading rooms..." 
-                    : `${roomsList.length} rooms under your management`
-                  }
+                  {isLoadingBuildings || isLoadingRooms
+                    ? "Loading rooms..."
+                    : `${roomsList.length} rooms under your management`}
                 </h4>
               </div>
 
@@ -289,44 +287,42 @@ export default function Buildings() {
             </div>
 
             <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-              {isLoadingBuildings || isLoadingRooms ? (
-                // Loading skeleton for KPI cards
-                Array.from({ length: 3 }).map((_, index) => (
-                  <div
-                    key={index}
-                    className="rounded-lg bg-white p-4 pl-6 shadow-sm animate-pulse"
-                  >
-                    <div className="h-6 w-6 bg-gray-200 rounded mb-2"></div>
-                    <div className="h-3 bg-gray-200 rounded w-20 mb-2"></div>
-                    <div className="h-6 bg-gray-200 rounded w-16"></div>
-                  </div>
-                ))
-              ) : (
-                kpiCards.map((card) => (
-                  <div
-                    key={card.title}
-                    className="rounded-lg bg-white p-4 pl-6 shadow-sm"
-                  >
-                    <Image
-                      src={card.iconSrc}
-                      alt={card.alt}
-                      height={24}
-                      width={24}
-                      className="mb-2 h-6 w-6"
-                    />
-                    <h3 className="text-xs text-black">{card.title}</h3>
-                    <h5 className="text-xl font-semibold text-black">
-                      {card.value}
-                    </h5>
-                  </div>
-                ))
-              )}
+              {isLoadingBuildings || isLoadingRooms
+                ? // Loading skeleton for KPI cards
+                  Array.from({ length: 3 }).map((_, index) => (
+                    <div
+                      key={index}
+                      className="rounded-lg bg-white p-4 pl-6 shadow-sm animate-pulse"
+                    >
+                      <div className="h-6 w-6 bg-gray-200 rounded mb-2"></div>
+                      <div className="h-3 bg-gray-200 rounded w-20 mb-2"></div>
+                      <div className="h-6 bg-gray-200 rounded w-16"></div>
+                    </div>
+                  ))
+                : kpiCards.map((card) => (
+                    <div
+                      key={card.title}
+                      className="rounded-lg bg-white p-4 pl-6 shadow-sm"
+                    >
+                      <Image
+                        src={card.iconSrc}
+                        alt={card.alt}
+                        height={24}
+                        width={24}
+                        className="mb-2 h-6 w-6"
+                      />
+                      <h3 className="text-xs text-black">{card.title}</h3>
+                      <h5 className="text-xl font-semibold text-black">
+                        {card.value}
+                      </h5>
+                    </div>
+                  ))}
             </div>
 
             <h4 className="mt-6 text-xs font-semibold text-gray-500 md:ml-2">
               Rooms
             </h4>
-            
+
             {isLoadingRooms ? (
               // Loading skeleton for room categories
               <div className="mt-4 flex gap-2 overflow-x-auto pb-2">
@@ -356,21 +352,19 @@ export default function Buildings() {
             )}
 
             <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {isLoadingRooms ? (
-                // Loading skeleton for room cards
-                Array.from({ length: 8 }).map((_, index) => (
-                  <div
-                    key={index}
-                    className="bg-white rounded-lg shadow-sm p-4 animate-pulse"
-                  >
-                    <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
-                    <div className="h-3 bg-gray-200 rounded w-1/2 mb-4"></div>
-                    <div className="h-3 bg-gray-200 rounded w-1/3"></div>
-                  </div>
-                ))
-              ) : (
-                renderRoomCards()
-              )}
+              {isLoadingRooms
+                ? // Loading skeleton for room cards
+                  Array.from({ length: 8 }).map((_, index) => (
+                    <div
+                      key={index}
+                      className="bg-white rounded-lg shadow-sm p-4 animate-pulse"
+                    >
+                      <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+                      <div className="h-3 bg-gray-200 rounded w-1/2 mb-4"></div>
+                      <div className="h-3 bg-gray-200 rounded w-1/3"></div>
+                    </div>
+                  ))
+                : renderRoomCards()}
             </div>
           </div>
         </div>

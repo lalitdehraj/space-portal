@@ -2,10 +2,20 @@
 import React, { cache, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { callApi } from "@/utils/apiIntercepter";
-import { SearchResult,AcademicSession,AcademicYear,SearchResults } from "@/types";
+import {
+  SearchResult,
+  AcademicSession,
+  AcademicYear,
+  SearchResults,
+  UserProfile,
+} from "@/types";
 import { URL_NOT_FOUND } from "@/constants";
 import { useDispatch, useSelector } from "react-redux";
-import { setAcademicSession, setAcademicYear } from "@/app/feature/dataSlice";
+import {
+  setAcademicSessionId,
+  setAcademicYearId,
+  setUserRoleId,
+} from "@/app/feature/dataSlice";
 import { useRouter } from "next/navigation";
 import { encrypt } from "@/utils/encryption";
 import { signOut, useSession } from "next-auth/react";
@@ -22,6 +32,28 @@ export default function Header() {
   const [academicYearsList, setAcademicYearsList] = useState<AcademicYear[]>();
   const [academicSessionsList, setAcademicSessionsList] =
     useState<AcademicSession[]>();
+  const { data } = useSession();
+  useEffect(() => {
+    const fetchUserRoles = async () => {
+      const response = await callApi<UserProfile[]>(
+        process.env.NEXT_PUBLIC_GET_USER || URL_NOT_FOUND
+      );
+      if (response.success) {
+        const user = response.data?.filter(
+          (u) => u.userEmail.toLowerCase() === data?.user?.email?.toLowerCase()
+        );
+        if (user && user.length > 0) {
+          dispatcher(setUserRoleId(user[0].userRole));
+          dispatcher(setAcademicYearId(user[0].activeYear));
+          dispatcher(setAcademicSessionId(user[0].activeSession));
+        }
+      }
+    };
+    fetchUserRoles();
+  }, []);
+  const academicYear = useSelector(
+    (state: any) => state.dataState.selectedAcademicYear
+  );
 
   useEffect(() => {
     const getAcadmicCalender = async () => {
@@ -31,9 +63,6 @@ export default function Header() {
       if (responseYear.success) {
         const acadYearsList = responseYear.data?.["Academic Year"]?.reverse();
         setAcademicYearsList(acadYearsList);
-        dispatcher(
-          setAcademicYear(responseYear.data?.["Academic Year"]?.[0].Code)
-        );
       }
 
       let responseSession = await callApi<AcademicSessionResponse>(
@@ -47,12 +76,10 @@ export default function Header() {
     getAcadmicCalender();
   }, []);
 
-  const academicYear = useSelector(
-    (state: any) => state.dataState.academicYear
-  );
   const [sessionsPerYear, setSessionsPerYear] = useState<string[]>();
 
   useEffect(() => {
+    if (!academicYear || !setAcademicSessionsList || !academicYearsList) return;
     const filteredList = academicSessionsList?.filter(
       (year) => year["Academic Year"] == academicYear
     );
@@ -66,10 +93,8 @@ export default function Header() {
       }
     }
     setSessionsPerYear(Array.from(unique.keys()) || []);
-  }, [academicYear]);
+  }, [academicYear, academicSessionsList, academicYearsList]);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
-  const { data: session } = useSession();
-
   const filterRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -220,12 +245,14 @@ export default function Header() {
 
       <div className="flex items-center space-x-2 md:space-x-4 ">
         <select
-          value={useSelector((state: any) => state.dataState.academicSession)}
+          value={useSelector(
+            (state: any) => state.dataState.selectedAcademicSession
+          )}
           className={`hidden rounded-md px-2 py-2 text-xs text-gray-700 focus:outline-none ${
             (sessionsPerYear?.length || 0) > 0 ? "md:block" : ""
           }`}
           onChange={(event) => {
-            dispatcher(setAcademicSession(event.target.value));
+            dispatcher(setAcademicSessionId(event.target.value));
           }}
         >
           {sessionsPerYear?.map((session) => (
@@ -238,7 +265,7 @@ export default function Header() {
           value={academicYear}
           className="hidden rounded-md  px-2 py-2 text-xs text-gray-700 focus:outline-none md:block"
           onChange={(event) => {
-            dispatcher(setAcademicYear(event.target.value));
+            dispatcher(setAcademicYearId(event.target.value));
           }}
         >
           {academicYearsList?.map((year) => (

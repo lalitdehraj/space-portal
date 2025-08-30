@@ -1,10 +1,10 @@
 import Image from "next/image";
-import { Building1 } from "@/types";
+import { Building } from "@/types";
 import React, { SVGProps } from "react";
 
 type BuildingCardProps = {
-  building: Building1;
-  onClick?: (building: Building1) => void;
+  building: Building;
+  onClick?: (building: Building) => void;
 };
 
 const FloorIcon = (props: SVGProps<SVGSVGElement>) => (
@@ -37,7 +37,7 @@ const RoomIcon = (props: SVGProps<SVGSVGElement>) => (
 
 const BuildingCard = ({ building, onClick }: BuildingCardProps) => {
   let occupancyRate = Math.floor(
-    (building.occupied / building.totalOccupancy) * 100
+    (building.totalOccupiedRooms / building.totalCapacity || 1) * 100
   );
   const occupancyBgClass =
     occupancyRate <= 10
@@ -69,15 +69,19 @@ const BuildingCard = ({ building, onClick }: BuildingCardProps) => {
             </h4>
             <div className="flex items-center gap-2">
               <FloorIcon className="h-3 w-3 fill-white" />
-              <p className="text-[10px]">Floors - {building.totalFloors}</p>
+              <p className="text-[10px]">
+                Floors - {building.totalFloors || 0}
+              </p>
               <RoomIcon className="ml-3 h-2.5 w-2.5 fill-white" />
-              <p className="text-[10px]">Rooms - {building.totalRooms}</p>
+              <p className="text-[10px]">Rooms - {building.totalRooms || 0}</p>
             </div>
           </div>
           {/* Occupancy rate */}
           <div className="flex flex-col items-center">
             <span className="text-[10px]">Occupied</span>
-            <span className="text-lg font-bold">{occupancyRate}%</span>
+            <span className="text-lg font-bold">
+              {`${occupancyRate}%` || "NA"}
+            </span>
           </div>
         </div>
       </div>

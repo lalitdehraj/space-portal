@@ -11,11 +11,12 @@ import {
   AcademicYearResponse,
 } from "@/components/Header";
 import { WeekdaySelector } from "@/components/WeekDays";
+import { useSelector } from "react-redux";
 
 function RoomPage() {
   const params = useParams();
   const router = useRouter();
-  let buildingId = decrypt(params.buildingId?.toString() || "");
+  const userRole = useSelector((state: any) => state.dataState.userRole);
   let roomId = decrypt(params.roomId?.toString() || "");
   const [isAllocationFormVisible, setIsAllocationFormVisible] = useState(false);
 
@@ -184,14 +185,16 @@ function RoomPage() {
                     <h3 className="text-lg font-semibold mb-4 text-gray-500">
                       Current Assignment
                     </h3>
-                    <button
-                      className="mt-4 flex h-fit items-center rounded-md bg-[#F26722] px-4 py-2 text-xs text-white shadow-md transition-all hover:bg-[#a5705a] md:mt-0"
-                      onClick={() => {
-                        setIsAllocationFormVisible(true);
-                      }}
-                    >
-                      + Add Allocation
-                    </button>
+                    {room.managedBy?.split("|").includes(userRole) && (
+                      <button
+                        className="mt-4 flex h-fit items-center rounded-md bg-[#F26722] px-4 py-2 text-xs text-white shadow-md transition-all hover:bg-[#a5705a] md:mt-0"
+                        onClick={() => {
+                          setIsAllocationFormVisible(true);
+                        }}
+                      >
+                        + Add Allocation
+                      </button>
+                    )}
                   </div>
 
                   {room.occupied > 0 ? (
@@ -317,13 +320,9 @@ function AddAssignmentForm({ onClose }: FormProps) {
   const [selectedFaculty, setSelectedFaculty] = useState("");
   const [purpose, setPurpose] = useState("");
   const [remarks, setRemarks] = useState("");
-
-  // State for custom date fields
   const [dateType, setDateType] = useState("day");
   const [customStartDate, setCustomStartDate] = useState("");
   const [customEndDate, setCustomEndDate] = useState("");
-
-  // State for custom time fields
   const [timeType, setTimeType] = useState("fullDay");
   const [customStartTime, setCustomStartTime] = useState("");
   const [customEndTime, setCustomEndTime] = useState("");

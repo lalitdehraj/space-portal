@@ -5,8 +5,8 @@ import {
   RoomRequestTable,
   RoomRequest,
   AcademicSessions,
-  Building1,
-  Room1,
+  Building,
+  Room,
 } from "@/types";
 import { api, callApi } from "@/utils/apiIntercepter";
 import { URL_NOT_FOUND } from "@/constants";
@@ -151,7 +151,7 @@ export default function RequestApprovalPage() {
 
   const [totalPages, setTotalPages] = useState(0);
   const [isLoadingRequests, setIsLoadingRequests] = useState(false);
-  
+
   useEffect(() => {
     const fetchRoomsRequest = async () => {
       setIsLoadingRequests(true);
@@ -170,7 +170,7 @@ export default function RequestApprovalPage() {
         setCurruntPage(parseInt(response.data?.curruntPage || "0"));
         setRequestList(response.data?.requests || []);
       } catch (error) {
-        console.error('Error fetching requests:', error);
+        console.error("Error fetching requests:", error);
       } finally {
         setIsLoadingRequests(false);
       }

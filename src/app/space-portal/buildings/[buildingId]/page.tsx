@@ -3,18 +3,19 @@ import React, { JSX, useEffect, useState } from "react";
 import Image from "next/image";
 import { useParams, useRouter } from "next/navigation";
 import { useSelector, useDispatch } from "react-redux";
-import { Room, Room1 } from "@/types";
+import { Room } from "@/types";
 import RoomCard from "@/components/RoomCard";
-import { Building1, Floor1 } from "@/types";
+import { Building, Floor } from "@/types";
 import { BuildingSVG } from "@/components/BuildingSvg";
 import { FloorSVG } from "@/components/FloorSvg";
 import { removeSpaces } from "@/utils";
-import { api, callApi } from "@/utils/apiIntercepter";
-import { credentials, URL_NOT_FOUND } from "@/constants";
+import { callApi } from "@/utils/apiIntercepter";
+import { URL_NOT_FOUND } from "@/constants";
 import { encrypt, decrypt } from "@/utils/encryption";
 import {
-  setSelectedBuilding,
-  setSeletedFloor as sliceFloor,
+  setSelectedFloorId,
+  setSelectedRoomId,
+  setSeletedRoomTypeId,
 } from "@/app/feature/dataSlice";
 
 export default function Buildings() {
@@ -22,16 +23,22 @@ export default function Buildings() {
   const dispatcher = useDispatch();
   const params = useParams();
   let buildingId = decrypt(params.buildingId?.toString() || "");
-  let [selectedBuilding, setSelectedBuilding] = useState<Building1>();
-  const [selectedFloor, setSelectedFloor] = useState<Floor1 | null>(null);
-  const [roomsList, setRoomsList] = useState<Room1[]>([]);
-  const [selectedRoom, setSelectedRoom] = useState<Room1 | null>(null);
-  const [subRooms, setSubRooms] = useState<Room1[]>([]);
+  let [selectedBuilding, setSelectedBuilding] = useState<Building>();
+  const [selectedFloor, setSelectedFloor] = useState<Floor>();
+  const [roomsList, setRoomsList] = useState<Room[]>([]);
+  const [selectedRoom, setSelectedRoom] = useState<Room>();
+  const [subRooms, setSubRooms] = useState<Room[]>([]);
   const acadmeicYear = useSelector(
     (state: any) => state.dataState.academicYear
   );
   const acadmeicSession = useSelector(
     (state: any) => state.dataState.academicSession
+  );
+  const selectedFloorId = useSelector(
+    (state: any) => state.dataState.selectedFloorId
+  );
+  const selectedRoomId = useSelector(
+    (state: any) => state.dataState.selectedRoomId
   );
 
   useEffect(() => {
@@ -41,7 +48,7 @@ export default function Buildings() {
         acadYear: `${acadmeicYear}`,
       };
 
-      const response = await callApi<Building1[]>(
+      const response = await callApi<Building[]>(
         process.env.NEXT_PUBLIC_GET_BUILDING_LIST || URL_NOT_FOUND,
         reqBody
       );
@@ -50,30 +57,39 @@ export default function Buildings() {
           (building) => building.id === buildingId
         );
         setSelectedBuilding(building);
+        if ((building?.floors?.length || 0) > 0) {
+          const floor = building?.floors.filter(
+            (f) => f.floorId === selectedFloorId
+          );
+          setSelectedFloor(
+            floor && (floor?.length || 0) > 0 ? floor?.[0] : building?.floors[0]
+          );
+        }
       }
     };
     fetchBuildings();
   }, [acadmeicSession, acadmeicYear]);
 
-  if (selectedBuilding && !selectedFloor) {
-    if (selectedBuilding?.floors.length > 0)
-      setSelectedFloor(selectedBuilding?.floors[0]);
-  }
   useEffect(() => {
     const fetchRooms = async () => {
       const reqBody = {
         buildingNo: `${buildingId}`,
-        floorID: `${selectedFloor?.id}`,
-        // acadSession: `${acadmeicSession}`,
-        // acadYear: `${acadmeicYear}`,
+        floorID: `${selectedFloor?.floorId}`,
       };
 
-      const response = await callApi<Room1[]>(
+      const response = await callApi<Room[]>(
         process.env.NEXT_PUBLIC_GET_ROOMS_LIST || URL_NOT_FOUND,
         reqBody
       );
       if (response.success) {
         setRoomsList(response.data || []);
+        if (selectedRoomId) {
+          const room = response?.data?.filter(
+            (r) => r.roomId === selectedRoomId
+          );
+          setSelectedRoom(room?.[0] || undefined);
+          fetchSubrooms(selectedRoomId);
+        }
       }
     };
     if (selectedFloor) fetchRooms();
@@ -88,7 +104,7 @@ export default function Buildings() {
     },
     {
       title: "Occupancy",
-      value: selectedFloor?.roomOccupied,
+      value: selectedFloor?.roomsOccupied,
       iconSrc: "/images/floor-plan.svg",
       alt: "Occupancy icon",
     },
@@ -105,13 +121,15 @@ export default function Buildings() {
   ];
   let roomCategories = ["All Rooms"];
   roomCategories = [...roomCategories, ...allRoomsCategories];
-  const [selectedRoomType, setSelectedRoomType] = useState<string>("All Rooms");
+  const selectedRoomType = useSelector(
+    (state: any) => state.dataState.selectedRoomType
+  );
   useEffect(() => {
-    if (!roomCategories.some((category) => category === selectedRoomType))
-      setSelectedRoomType("All Rooms");
-  }, [roomCategories]);
+    if (roomCategories.some((category) => category === selectedRoomType))
+      dispatcher(setSeletedRoomTypeId("All Rooms"));
+  }, [selectedFloor]);
 
-  const filteredRooms: Room1[] = roomsList.filter((room) => {
+  const filteredRooms: Room[] = roomsList.filter((room) => {
     return (
       selectedRoomType === "All Rooms" ||
       removeSpaces(room.roomType)
@@ -120,31 +138,35 @@ export default function Buildings() {
     );
   });
 
-  const fetchSubrooms = async (room: Room1) => {
-    if (!room) return;
+  const handleRoomTypesClick = (roomType: string) => {
+    dispatcher(setSeletedRoomTypeId(roomType));
+  };
+  const fetchSubrooms = async (roomId: string) => {
+    if (!roomId) return;
     const requestBody = {
-      roomId: room.id,
+      roomId: roomId,
     };
-    let response = callApi<Room1[]>(
+    let response = callApi<Room[]>(
       process.env.NEXT_PUBLIC_GET_SUBROOMS_LIST || URL_NOT_FOUND,
       requestBody
     );
     let res = await response;
     setSubRooms(res.data || []);
   };
-  const handleFloorClick = (floor: Floor1) => {
+  const handleFloorClick = (floor: Floor) => {
     setSelectedFloor(floor);
-    dispatcher(sliceFloor(floor.id));
+    dispatcher(setSelectedFloorId(floor.floorId));
   };
 
-  const handleRoomClick = (room: Room1) => {
-    if (room.hasSubtype) {
-      setSelectedRoom(room.id === selectedRoom?.id ? null : room);
-      fetchSubrooms(room);
+  const handleRoomClick = (room: Room) => {
+    if (room.hasSubroom) {
+      dispatcher(setSelectedRoomId(room.roomId));
+      setSelectedRoom(room.roomId === selectedRoom?.roomId ? undefined : room);
+      fetchSubrooms(room.roomId);
     } else {
       router.push(
         `/space-portal/buildings/${encrypt(selectedBuilding?.id)}/${encrypt(
-          room.id
+          room.roomId
         )}`
       );
     }
@@ -156,7 +178,7 @@ export default function Buildings() {
     let expandedRowIndex: number | null = null;
     let cardsPerRow = 4;
     for (let i = 0; i < (filteredRooms?.length || 1); i++) {
-      if (selectedRoom?.id === filteredRooms?.[i].id) {
+      if (selectedRoom?.roomId === filteredRooms?.[i].roomId) {
         expandedRowIndex = Math.floor(i / cardsPerRow);
         break;
       }
@@ -165,8 +187,8 @@ export default function Buildings() {
       items.push(
         <RoomCard
           room={room}
-          key={room.id}
-          isExpanded={selectedRoom?.id === room.id}
+          key={room.roomId}
+          isExpanded={selectedRoom?.roomId === room.roomId}
           onClick={(room) => handleRoomClick(room)}
         />
       );
@@ -181,7 +203,7 @@ export default function Buildings() {
       ) {
         items.push(
           <div
-            key={`details-${selectedRoom.id}`}
+            key={`details-${selectedRoom?.roomId}`}
             className="
                 col-span-full bg-gray-50 p-8 rounded-xl shadow-inner
                 border border-gray-200
@@ -194,9 +216,12 @@ export default function Buildings() {
             }}
           >
             <h4 className="flex justify-between text-normal text-gray-700 mb-2">
-              {selectedRoom.roomName}
+              {selectedRoom?.roomName}
               <button
-                onClick={() => setSelectedRoom(null)}
+                onClick={() => {
+                  setSelectedRoom(undefined);
+                  dispatcher(setSelectedRoomId(""));
+                }}
                 className="px-2 py-1 bg-orange-500 text-white rounded-lg text-xs hover:bg-orange-600 transition-colors duration-300"
               >
                 Close &times;
@@ -206,7 +231,7 @@ export default function Buildings() {
               {subRooms &&
                 subRooms.map((room) => (
                   <RoomCard
-                    key={room.id}
+                    key={room.roomId}
                     onClick={handleRoomClick}
                     room={room}
                   />
@@ -237,11 +262,7 @@ export default function Buildings() {
 
               <button
                 className="mt-4 flex h-fit items-center rounded-md bg-[#F26722] px-4 py-2 text-xs text-white shadow-md transition-all hover:bg-[#a5705a] md:mt-0"
-                onClick={() => {
-                  setSelectedFloor(null);
-                  setSelectedRoomType("All Rooms");
-                  router.back();
-                }}
+                onClick={() => router.back()}
               >
                 <BuildingSVG className="mr-2 h-4 w-4 fill-white" />
                 Back
@@ -251,16 +272,16 @@ export default function Buildings() {
             <div className="mt-4 flex gap-2 overflow-x-auto pb-2">
               {selectedBuilding?.floors.map((floor) => (
                 <button
-                  key={floor.id}
+                  key={floor.floorId}
                   className={`flex items-center rounded-md px-4 py-2 text-xs transition-all ${
-                    selectedFloor?.id === floor.id
+                    selectedFloor?.floorId === floor.floorId
                       ? "bg-[#F26722] text-white shadow-md"
                       : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                   }`}
                   onClick={() => handleFloorClick(floor)}
                 >
                   <FloorSVG className="mr-2 h-4 w-4" />
-                  {floor.name}
+                  {floor.floorName}
                 </button>
               ))}
             </div>
@@ -286,28 +307,33 @@ export default function Buildings() {
               ))}
             </div>
 
-            <h4 className="mt-6 text-xs font-semibold text-gray-500 md:ml-2">
-              Rooms
-            </h4>
-            <div className="mt-4 flex gap-2 overflow-x-auto pb-2">
-              {roomCategories.map((roomType) => (
-                <button
-                  key={roomType}
-                  className={`flex items-center rounded-md px-3 py-1 text-xs font-medium transition-all ${
-                    selectedRoomType === roomType
-                      ? "bg-[#F26722] text-white shadow-md"
-                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                  }`}
-                  onClick={() => setSelectedRoomType(roomType)}
-                >
-                  {roomType}
-                </button>
-              ))}
-            </div>
-
-            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {renderRoomCards()}
-            </div>
+            {filteredRooms.length ? (
+              <div>
+                <h4 className="mt-6 text-xs font-semibold text-gray-500 md:ml-2">
+                  Rooms
+                </h4>
+                <div className="mt-4 flex gap-2 overflow-x-auto pb-2">
+                  {roomCategories.map((roomType) => (
+                    <button
+                      key={roomType}
+                      className={`flex items-center rounded-md px-3 py-1 text-xs font-medium transition-all ${
+                        selectedRoomType === roomType
+                          ? "bg-[#F26722] text-white shadow-md"
+                          : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                      }`}
+                      onClick={() => handleRoomTypesClick(roomType)}
+                    >
+                      {roomType}
+                    </button>
+                  ))}
+                </div>
+                <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  {renderRoomCards()}
+                </div>
+              </div>
+            ) : (
+              <div className="mt-6 text-gray-500">No Rooms Found</div>
+            )}
           </div>
         </div>
       </section>

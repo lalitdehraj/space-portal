@@ -1,6 +1,6 @@
 "use client";
 import React, { useEffect, useState, useRef } from "react";
-import { RoomRequestTable, RoomRequest, Building1, Room1 } from "@/types";
+import { RoomRequestTable, RoomRequest, Building, Room } from "@/types";
 import { api, callApi } from "@/utils/apiIntercepter";
 import { URL_NOT_FOUND } from "@/constants";
 import { useSelector } from "react-redux";
@@ -275,10 +275,10 @@ function RequestApprovalForm({
   const acadmeicSession = useSelector(
     (state: any) => state.dataState.academicSession
   );
-  const [buildings, setBuildings] = useState<Building1[]>([]);
+  const [buildings, setBuildings] = useState<Building[]>([]);
   const [selectedBuildingId, setSelectedBuildingId] = useState<string>("");
   const [selectedFloorId, setSelectedFloorId] = useState<string>("");
-  const [rooms, setRooms] = useState<Room1[]>([]);
+  const [rooms, setRooms] = useState<Room[]>([]);
   const [selectedRoomId, setSelectedRoomId] = useState<string>("");
   useEffect(() => {
     const fetchBuildings = async () => {
@@ -287,7 +287,7 @@ function RequestApprovalForm({
         acadYear: `${acadmeicYear}`,
       };
 
-      const response = await callApi<Building1[]>(
+      const response = await callApi<Building[]>(
         process.env.NEXT_PUBLIC_GET_BUILDING_LIST || URL_NOT_FOUND,
         reqBody
       );
@@ -304,7 +304,7 @@ function RequestApprovalForm({
         setRooms([]);
         return;
       }
-      const floorIds = building.floors?.map((f) => f.id) || [];
+      const floorIds = building.floors?.map((f) => f.floorId) || [];
       if (floorIds.length === 0) {
         setRooms([]);
         return;
@@ -315,7 +315,7 @@ function RequestApprovalForm({
         // acadSession: `${acadmeicSession}`,
         // acadYear: `${acadmeicYear}`,
       };
-      const response = await callApi<Room1[]>(
+      const response = await callApi<Room[]>(
         process.env.NEXT_PUBLIC_GET_ROOMS_LIST || URL_NOT_FOUND,
         reqBody
       );
@@ -394,8 +394,8 @@ function RequestApprovalForm({
                           ? buildings
                               .filter((b) => b.id === selectedBuildingId)[0]
                               .floors.map((f) => (
-                                <option key={f.id} value={f.id}>
-                                  {f.name}
+                                <option key={f.floorId} value={f.floorId}>
+                                  {f.floorName}
                                 </option>
                               ))
                           : null}
@@ -413,7 +413,7 @@ function RequestApprovalForm({
                       >
                         <option value="">Select room</option>
                         {rooms.map((r) => (
-                          <option key={r.id} value={r.id}>
+                          <option key={r.roomId} value={r.roomId}>
                             {r.roomName}
                           </option>
                         ))}

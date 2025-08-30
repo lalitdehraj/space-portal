@@ -4,9 +4,9 @@ import { useRouter } from "next/navigation";
 import { useDispatch, useSelector } from "react-redux";
 import BuildingCard from "@/components/BuildingCard";
 import { URL_NOT_FOUND } from "@/constants";
-import { Building1 } from "@/types";
-import { api, callApi } from "@/utils/apiIntercepter";
-import { setSelectedBuilding } from "@/app/feature/dataSlice";
+import { Building } from "@/types";
+import { callApi } from "@/utils/apiIntercepter";
+import { setSelectedBuildingId } from "@/app/feature/dataSlice";
 import { encrypt } from "@/utils/encryption";
 
 export default function Buildings() {
@@ -33,7 +33,7 @@ export default function Buildings() {
           acadYear: `${acadmeicYear}`,
         };
 
-        const response = await callApi<Building1[]>(
+        const response = await callApi<Building[]>(
           process.env.NEXT_PUBLIC_GET_BUILDING_LIST || URL_NOT_FOUND,
           reqBody
         );
@@ -41,7 +41,7 @@ export default function Buildings() {
           setAllBuildingsData(response.data || []);
         }
       } catch (error) {
-        console.error('Error fetching buildings:', error);
+        console.error("Error fetching buildings:", error);
       } finally {
         setIsLoadingBuildings(false);
       }
@@ -49,7 +49,7 @@ export default function Buildings() {
     fetchBuildings();
   }, [acadmeicSession, acadmeicYear]);
 
-  const [allBuildingsData, setAllBuildingsData] = useState<Building1[]>([]);
+  const [allBuildingsData, setAllBuildingsData] = useState<Building[]>([]);
 
   return (
     <div>
@@ -79,7 +79,7 @@ export default function Buildings() {
                 building={building}
                 key={building.id}
                 onClick={() => {
-                  dispatcher(setSelectedBuilding(building));
+                  dispatcher(setSelectedBuildingId(building));
                   encryptAndPush(building.id);
                 }}
               />

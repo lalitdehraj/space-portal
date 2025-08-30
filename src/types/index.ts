@@ -1,79 +1,39 @@
-export interface Room {
-  id: string;
-  name: string;
-  capacity: number;
-  occupied: number;
-  occupants: string[];
-  position: { x: number; y: number; width: number; height: number };
-}
-
-export interface Floor {
-  id: string;
-  name: string;
-  totalRooms: number;
-  occupancyRate: number;
-  rooms: Room[];
-  layout: string;
-}
-
 export interface Building {
   id: string;
   name: string;
   totalFloors: number;
   totalRooms: number;
-  occupancyRate: number;
+  totalCapacity: number;
+  totalOccupiedRooms: number;
+  image: string;
   floors: Floor[];
-  position: { x: number; y: number };
-  image: string;
 }
 
-export interface University {
-  id: string;
-  name: string;
-  coordinates: { x: number; y: number };
-  image: string;
+export interface Faculty {
+  facultyName: string;
+  facultyId: string;
 }
-
-interface Duration1 {
-  startTime: string;
-  endTime: string;
-  session: string;
-  acadmenicYear: string;
+export interface Department {
+  departmentId: string;
+  departmentName: string;
 }
-interface University1 {
-  id: string;
-  name: string;
-  image: string;
-}
-
-export interface Building1 {
-  id: string;
-  name: string;
-  totalFloors: number;
-  totalRooms: number;
-  totalOccupancy: number;
-  occupied: number;
-  image: string;
-  floors: Floor1[];
-}
-
-export interface Floor1 {
-  id: string;
-  name: string;
+export interface Floor {
+  floorId: string;
+  floorName: string;
   totalRoomsOnFloor: number;
-  roomOccupied: number;
+  roomsOccupied: number;
   floorArea: string;
 }
 
-export interface Room1 {
-  id: string;
+export interface Room {
+  roomId: string;
   roomName: string;
-  capacity: number;
+  roomCapactiy: number;
   occupied: number;
-  occupiedBy: string | null;
-  hasSubtype: boolean;
+  occupiedBy: string;
+  hasSubroom: boolean;
   roomType: string;
-  floor: string;
+  floorId: string;
   status: string;
   roomArea: string;
   buildingId: string;
@@ -115,15 +75,17 @@ export interface RoomInfo {
   roomName: string;
   capacity: number;
   occupied: number;
-  occupants: Occupants[];
+  occupants?: Occupants[];
   occupiedBy: string | null;
-  building: string;
+  building?: string;
+  buildingId?: string;
   hasSubtype: boolean;
   roomType: string;
   parentId?: string;
   floor: string;
   status: string;
   roomArea: string;
+  managedBy?: string;
 }
 
 export type SearchResults = {
@@ -148,6 +110,9 @@ export type UserProfile = {
   activeSession: string;
   activeYear: string;
   userImage: string;
+  userId: string;
+  userEmail: string;
+  userRole: string;
 };
 
 export interface AcademicSessions {

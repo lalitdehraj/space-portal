@@ -1,20 +1,21 @@
 // src/components/SideNav.tsx
 "use client";
 
-import React, { FC, useEffect } from "react";
+import React, { FC, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { X } from "lucide-react";
 import { useDispatch } from "react-redux";
-import { setHeaderText } from "@/app/feature/dataSlice";
+import { setHeaderTextId } from "@/app/feature/dataSlice";
 import { useRouter } from "next/navigation";
 import { callApi } from "@/utils/apiIntercepter";
 import { URL_NOT_FOUND } from "@/constants";
+import { UserProfile } from "@/types";
 
 type NavLink = {
   title: string;
   href: string;
-  iconSrc: string;
+  iconSrc?: string;
   alt: string;
 };
 
@@ -34,27 +35,15 @@ const spaceManagementLinks: NavLink[] = [
     iconSrc: "/images/menu-board.svg",
     alt: "Building icon",
   },
-  {
-    title: "Manage by GSA",
-    href: "/space-portal/role/GSA",
-    iconSrc: "/images/menu-board.svg",
-    alt: "Building icon",
-  },
-  {
-    title: "Manage by HR",
-    href: "/space-portal/role/HR",
-    iconSrc: "/images/menu-board.svg",
-    alt: "Building icon",
-  },
-  {
-    title: "Manage by GHS",
-    href: "/space-portal/role/GHS",
-    iconSrc: "/images/menu-board.svg",
-    alt: "Building icon",
-  },
 ];
 
 const maintenanceLinks: NavLink[] = [
+  {
+    title: "Add Allocation",
+    href: "/space-portal/allocation",
+    iconSrc: "/images/dollar-square.svg",
+    alt: "Allocation icon",
+  },
   {
     title: "Request Approval",
     href: "/space-portal/requests",
@@ -89,7 +78,7 @@ const NavItem: FC<NavLink & { onClose: () => void }> = ({
   const dispatcher = useDispatch();
   return (
     <Link
-      onClickCapture={() => dispatcher(setHeaderText(title))}
+      onClickCapture={() => dispatcher(setHeaderTextId(title))}
       href={href}
       className={`ml-10 flex items-center rounded p-2 text-sm transition-colors duration-200 hover:bg-gray-200 ${
         isActive
@@ -98,22 +87,30 @@ const NavItem: FC<NavLink & { onClose: () => void }> = ({
       }`}
       onClick={onClose}
     >
-      <img src={iconSrc} alt={alt} className="mr-3 h-[20px] w-[20px]" />
+      {iconSrc && (
+        <img src={iconSrc} alt={alt} className="mr-3 h-[20px] w-[20px]" />
+      )}
       {title}
     </Link>
   );
 };
 
 const SideNav: FC<SideNavProps> = ({ onClose }) => {
+  const dispatcher = useDispatch();
   const router = useRouter();
+  const [userRoles, setUserRoles] = useState<string[]>([]);
   useEffect(() => {
     const fetchUserRoles = async () => {
-      const response = await callApi(
-        process.env.NEXT_PUBLIC_GET_USERS_ROLE || URL_NOT_FOUND
+      const response = await callApi<UserProfile[]>(
+        process.env.NEXT_PUBLIC_GET_USER || URL_NOT_FOUND
       );
-      console.log(response);
+      if (response.success) {
+        const roles = response.data?.map((u) => u.userRole) || [];
+        const uniqueRoles = Array.from(new Set(roles));
+        setUserRoles(uniqueRoles);
+      }
     };
-    // fetchUserRoles();
+    fetchUserRoles();
   }, []);
   return (
     <aside className="flex h-full w-full md:w-64 flex-col bg-gray-50 shadow-lg ">
@@ -150,6 +147,16 @@ const SideNav: FC<SideNavProps> = ({ onClose }) => {
           <div className="space-y-0.5">
             {spaceManagementLinks.map((link) => (
               <NavItem key={link.href} {...link} onClose={onClose} />
+            ))}
+            {userRoles.map((role) => (
+              <NavItem
+                key={`space-portal/role/${role}`}
+                alt={role}
+                href={`/space-portal/role/${role}`}
+                title={`${role}`}
+                iconSrc="/images/menu-board.svg"
+                onClose={onClose}
+              />
             ))}
           </div>
         </div>

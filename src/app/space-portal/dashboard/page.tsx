@@ -19,7 +19,7 @@ import {
 import { callApi } from "@/utils/apiIntercepter";
 import { URL_NOT_FOUND } from "@/constants";
 import { useSelector } from "react-redux";
-import { Building1, DashboardDataResponse } from "@/types";
+import { Building, DashboardDataResponse } from "@/types";
 
 export default function Dashboard() {
   const [data, setData] = useState<DashboardDataResponse | null>(null);
@@ -32,7 +32,7 @@ export default function Dashboard() {
     (state: any) => state.dataState.academicSession
   );
   const [days, setDays] = useState("7");
-  
+
   useEffect(() => {
     const fetchDashboardData = async () => {
       setIsLoadingDashboard(true);
@@ -49,7 +49,7 @@ export default function Dashboard() {
         let res = await response;
         setData(res.data || null);
       } catch (error) {
-        console.error('Error fetching dashboard data:', error);
+        console.error("Error fetching dashboard data:", error);
       } finally {
         setIsLoadingDashboard(false);
       }
@@ -57,7 +57,7 @@ export default function Dashboard() {
     fetchDashboardData();
   }, [days, acadmeicYear, acadmeicSession]);
 
-  const [allBuildingsData, setAllBuildingsData] = useState<Building1[]>([]);
+  const [allBuildingsData, setAllBuildingsData] = useState<Building[]>([]);
 
   useEffect(() => {
     const fetchBuildings = async () => {
@@ -67,7 +67,7 @@ export default function Dashboard() {
           acadSession: `${acadmeicSession}`,
           acadYear: `${acadmeicYear}`,
         };
-        const response = await callApi<Building1[]>(
+        const response = await callApi<Building[]>(
           process.env.NEXT_PUBLIC_GET_BUILDING_LIST || URL_NOT_FOUND
         );
         console.log(response);
@@ -75,7 +75,7 @@ export default function Dashboard() {
           setAllBuildingsData(response.data || []);
         }
       } catch (error) {
-        console.error('Error fetching buildings:', error);
+        console.error("Error fetching buildings:", error);
       } finally {
         setIsLoadingBuildings(false);
       }
@@ -299,38 +299,42 @@ export default function Dashboard() {
           Key Metrics
         </h2>
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-6 md:grid-cols-3">
-          {isLoadingDashboard || isLoadingBuildings ? (
-            // Loading skeleton for KPI cards
-            Array.from({ length: 6 }).map((_, index) => (
-              <div key={index} className="rounded-lg bg-white p-4 shadow-sm animate-pulse">
-                <div className="mb-2 flex items-center justify-between">
-                  <div className="h-6 w-6 bg-gray-200 rounded"></div>
-                  <div className="h-4 w-16 bg-gray-200 rounded"></div>
+          {isLoadingDashboard || isLoadingBuildings
+            ? // Loading skeleton for KPI cards
+              Array.from({ length: 6 }).map((_, index) => (
+                <div
+                  key={index}
+                  className="rounded-lg bg-white p-4 shadow-sm animate-pulse"
+                >
+                  <div className="mb-2 flex items-center justify-between">
+                    <div className="h-6 w-6 bg-gray-200 rounded"></div>
+                    <div className="h-4 w-16 bg-gray-200 rounded"></div>
+                  </div>
+                  <div className="h-3 bg-gray-200 rounded w-20 mb-2"></div>
+                  <div className="h-6 bg-gray-200 rounded w-16"></div>
                 </div>
-                <div className="h-3 bg-gray-200 rounded w-20 mb-2"></div>
-                <div className="h-6 bg-gray-200 rounded w-16"></div>
-              </div>
-            ))
-          ) : (
-            kpiCards.map((card) => (
-              <div key={card.title} className="rounded-lg bg-white p-4 shadow-sm">
-                <div className="mb-2 flex items-center justify-between">
-                  <Image
-                    src={card.iconSrc}
-                    alt={card.alt}
-                    height={24}
-                    width={24}
-                    className="h-6 w-6"
-                  />
-                  {card.extraContent}
+              ))
+            : kpiCards.map((card) => (
+                <div
+                  key={card.title}
+                  className="rounded-lg bg-white p-4 shadow-sm"
+                >
+                  <div className="mb-2 flex items-center justify-between">
+                    <Image
+                      src={card.iconSrc}
+                      alt={card.alt}
+                      height={24}
+                      width={24}
+                      className="h-6 w-6"
+                    />
+                    {card.extraContent}
+                  </div>
+                  <p className="text-xs text-gray-600">{card.title}</p>
+                  <p className="text-xl font-semibold text-gray-900">
+                    {card.value}
+                  </p>
                 </div>
-                <p className="text-xs text-gray-600">{card.title}</p>
-                <p className="text-xl font-semibold text-gray-900">
-                  {card.value}
-                </p>
-              </div>
-            ))
-          )}
+              ))}
         </div>
       </section>
 

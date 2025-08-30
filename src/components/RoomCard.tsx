@@ -1,13 +1,13 @@
-import { Room1 } from "@/types";
+import { Room } from "@/types";
 
 interface RoomCardProps {
-  room: Room1;
+  room: Room;
   isExpanded?: boolean;
-  onClick?: (room: Room1) => void;
+  onClick?: (room: Room) => void;
 }
 
-const getOccupancyStatus = (room: Room1): "low" | "medium" | "high" => {
-  const occupancyRate = room.occupied / room.capacity;
+const getOccupancyStatus = (room: Room): "low" | "medium" | "high" => {
+  const occupancyRate = room.occupied / room.roomCapactiy;
   if (occupancyRate <= 0.1) return "low";
   if (occupancyRate > 0.8) return "high";
   return "medium";
@@ -59,7 +59,7 @@ export default function RoomCard({
               {room.roomName}
             </p>
             <p className="text-[10px] text-gray-500">
-              Occupied: {room.occupied} / {room.capacity}
+              Occupied: {room.occupied} / {room.roomCapactiy}
             </p>
           </div>
           <div
@@ -73,7 +73,7 @@ export default function RoomCard({
           <div
             className={`h-full rounded-full ${classes.progressBar}`}
             style={{
-              width: `${(room.occupied / room.capacity) * 100}%`,
+              width: `${(room.occupied / room.roomCapactiy) * 100}%`,
             }}
           />
         </div>
