@@ -73,7 +73,8 @@ const NavItem: FC<NavLink & { onClose: () => void }> = ({
   onClose,
 }) => {
   const pathname = usePathname();
-  const isActive = pathname === href || pathname.includes(href);
+  const isActive =
+    pathname.replace("%20", " ") === href || pathname.includes(href);
 
   const dispatcher = useDispatch();
   return (
@@ -148,16 +149,20 @@ const SideNav: FC<SideNavProps> = ({ onClose }) => {
             {spaceManagementLinks.map((link) => (
               <NavItem key={link.href} {...link} onClose={onClose} />
             ))}
-            {userRoles.map((role) => (
-              <NavItem
-                key={`space-portal/role/${role}`}
-                alt={role}
-                href={`/space-portal/role/${role}`}
-                title={`${role}`}
-                iconSrc="/images/menu-board.svg"
-                onClose={onClose}
-              />
-            ))}
+            {userRoles.length > 0 &&
+              userRoles.map(
+                (role) =>
+                  role && (
+                    <NavItem
+                      key={`space-portal/role/${role}`}
+                      alt={role}
+                      href={`/space-portal/role/${role}`}
+                      title={`${role}`}
+                      iconSrc="/images/menu-board.svg"
+                      onClose={onClose}
+                    />
+                  )
+              )}
           </div>
         </div>
 

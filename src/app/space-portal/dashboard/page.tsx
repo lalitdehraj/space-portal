@@ -26,10 +26,10 @@ export default function Dashboard() {
   const [isLoadingDashboard, setIsLoadingDashboard] = useState(false);
   const [isLoadingBuildings, setIsLoadingBuildings] = useState(false);
   const acadmeicYear = useSelector(
-    (state: any) => state.dataState.academicYear
+    (state: any) => state.dataState.selectedAcademicYear
   );
   const acadmeicSession = useSelector(
-    (state: any) => state.dataState.academicSession
+    (state: any) => state.dataState.selectedAcademicSession
   );
   const [days, setDays] = useState("7");
 
@@ -61,6 +61,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     const fetchBuildings = async () => {
+      if (!acadmeicSession && !acadmeicYear) return;
       setIsLoadingBuildings(true);
       try {
         const reqBody = {
@@ -68,7 +69,8 @@ export default function Dashboard() {
           acadYear: `${acadmeicYear}`,
         };
         const response = await callApi<Building[]>(
-          process.env.NEXT_PUBLIC_GET_BUILDING_LIST || URL_NOT_FOUND
+          process.env.NEXT_PUBLIC_GET_BUILDING_LIST || URL_NOT_FOUND,
+          reqBody
         );
         console.log(response);
         if (response.success) {

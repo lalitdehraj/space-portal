@@ -1,10 +1,9 @@
-
 export function removeSpaces(str: string): string {
   return str.replace(/ /g, "");
 }
 
-export function formatDate(dateString: string) {
-  const date = new Date(dateString);
+export function formatDate(dateString: Date | string) {
+  const date = dateString instanceof Date ? dateString : new Date(dateString);
 
   let hours = date.getHours();
   const minutes = String(date.getMinutes()).padStart(2, "0");
@@ -18,8 +17,40 @@ export function formatDate(dateString: string) {
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const year = String(date.getFullYear()).slice(-2);
 
-  return `${day}-${month}-${year} ${formattedHours}:${minutes}${ampm}`;
+  return `${day}/${month}/${year} ${formattedHours}:${minutes}${ampm}`;
 }
+
+export function compareDates(dateA: Date, dateB: Date) {
+  if (!(dateA instanceof Date) || !(dateB instanceof Date)) {
+    console.error("Invalid input: Both arguments must be Date objects.");
+    return NaN;
+  }
+
+  // Compare the numeric timestamp values
+  const timeA = dateA.getTime();
+  const timeB = dateB.getTime();
+
+  if (timeA < timeB) {
+    return -1;
+  } else if (timeA > timeB) {
+    return 1;
+  } else {
+    return 0;
+  }
+}
+
+export const getTodaysDate = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = (now.getMonth() + 1).toString().padStart(2, "0"); // Months are 0-indexed
+  const day = now.getDate().toString().padStart(2, "0");
+  const hours = now.getHours().toString().padStart(2, "0");
+  const minutes = now.getMinutes().toString().padStart(2, "0");
+
+  const minDateTime = `${year}-${month}-${day}T${hours}:${minutes}`;
+  const minDate = `${year}-${month}-${day}`;
+  return { minDateTime, minDate };
+};
 
 function parseSession(session: { Code: string; "Academic Year": string }) {
   const monthMap: Record<string, number> = {
@@ -57,6 +88,88 @@ function parseSession(session: { Code: string; "Academic Year": string }) {
 
   return {
     startDate: startDate.toISOString().split("T")[0], // "2018-08-01"
-    endDate: endDate.toISOString().split("T")[0],     // "2018-11-30"
+    endDate: endDate.toISOString().split("T")[0], // "2018-11-30"
   };
+}
+
+export function addDaysToDate(date: Date, days: number): Date {
+  // Create a new Date object to avoid modifying the original one
+  const newDate = new Date(date);
+
+  // Get the current day of the month and add the specified number of days
+  newDate.setDate(newDate.getDate() + days);
+
+  return newDate;
+}
+
+export function createDateFromDDMMYYYY(dateString: string): Date | null {
+  const parts = dateString.split("-");
+
+  if (parts.length !== 3) {
+    console.error("Invalid date format. Expected 'DD-MM-YYYY'.");
+    return null;
+  }
+
+  // Parse the parts as numbers
+  const day = parseInt(parts[0], 10);
+  // Subtract 1 from the month because the Date constructor uses a 0-based month index (0-11)
+  const month = parseInt(parts[1], 10) - 1;
+  const year = parseInt(parts[2], 10);
+
+  // Basic validation to ensure the parts are valid numbers
+  if (isNaN(day) || isNaN(month) || isNaN(year)) {
+    console.error(
+      "Invalid date components. Make sure day, month, and year are numbers."
+    );
+    return null;
+  }
+
+  // Create the Date object using the reliable YYYY, MM, DD format
+  const date = new Date(year, month, day);
+
+  // Return the date object, and you can add more validation here if needed
+  return date;
+}
+
+export function getTimeDifference(
+  startTime: string,
+  endTime: string
+): { hours: number; minutes: number; seconds: number } | null {
+  if (!startTime && !endTime) return null;
+  // Regex to validate the time format 'HH:mm:ss'
+  const timeRegex = /^(?:2[0-3]|[01]?[0-9]):[0-5]?[0-9]:[0-5]?[0-9]$/;
+
+  if (!timeRegex.test(startTime) || !timeRegex.test(endTime)) {
+    console.error("Invalid time format. Please use 'HH:mm:ss'.");
+    return null;
+  }
+
+  // Create Date objects from the time strings on an arbitrary day (e.g., Jan 1, 1970)
+  const [startHour, startMinute, startSecond] = startTime
+    .split(":")
+    .map(Number);
+  const [endHour, endMinute, endSecond] = endTime.split(":").map(Number);
+
+  const startDate = new Date();
+  startDate.setHours(startHour, startMinute, startSecond, 0);
+
+  const endDate = new Date();
+  endDate.setHours(endHour, endMinute, endSecond, 0);
+
+  // If the end time is before the start time (e.g., 01:00:00 - 23:00:00),
+  // add a day to the end date to handle the overnight difference correctly.
+  if (endDate.getTime() < startDate.getTime()) {
+    endDate.setDate(endDate.getDate() + 1);
+  }
+
+  // Calculate the difference in milliseconds
+  const diffInMilliseconds = endDate.getTime() - startDate.getTime();
+
+  // Convert milliseconds to hours, minutes, and seconds
+  const diffInSeconds = Math.floor(diffInMilliseconds / 1000);
+  const hours = Math.floor(diffInSeconds / 3600);
+  const minutes = Math.floor((diffInSeconds % 3600) / 60);
+  const seconds = diffInSeconds % 60;
+
+  return { hours, minutes, seconds };
 }

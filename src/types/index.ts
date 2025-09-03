@@ -41,11 +41,13 @@ export interface Room {
   managedBy?: string;
 }
 
-export interface Occupants {
+export interface Occupant {
   occupantName?: string;
   type?: string;
-  startTime?: string;
-  endTime?: string;
+  eventId: string;
+  startTime: Date|string;
+  scheduledDate?: Date;
+  endTime: Date|string;
 }
 
 export interface SearchResult {
@@ -75,7 +77,7 @@ export interface RoomInfo {
   roomName: string;
   capacity: number;
   occupied: number;
-  occupants?: Occupants[];
+  occupants?: Occupant[];
   occupiedBy: string | null;
   building?: string;
   buildingId?: string;
@@ -100,6 +102,8 @@ export type AcademicYear = {
 export type AcademicSession = {
   Code: string;
   "Academic Year": string;
+  "Start Session": string;
+  "End Session": string;
 };
 
 export type UserProfile = {
@@ -156,4 +160,30 @@ export interface Report {
   size: string;
   startDate: string;
   endDate: string;
+}
+
+export interface Department {
+  departmentId: string;
+  departmentName: string;
+}
+export interface Faculty {
+  facultyId: string;
+  facultyName: string;
+}
+
+export interface Allocation {
+  id?: string;
+  programCode: string;
+  courseName?: string;
+  buildingId: string;
+  floorId: string;
+  roomId: string;
+  roomName?: string;
+  acadSession: string;
+  acadYear: string;
+}
+
+export interface Course {
+  code: string;
+  description: string;
 }

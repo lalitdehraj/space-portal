@@ -2,6 +2,7 @@
 import React, { cache, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { callApi } from "@/utils/apiIntercepter";
+import moment from "moment";
 import {
   SearchResult,
   AcademicSession,
@@ -12,8 +13,11 @@ import {
 import { URL_NOT_FOUND } from "@/constants";
 import { useDispatch, useSelector } from "react-redux";
 import {
+  setAcademicSessionEndDate,
   setAcademicSessionId,
+  setAcademicSessionStartDate,
   setAcademicYearId,
+  setIsActiveSession,
   setUserRoleId,
 } from "@/app/feature/dataSlice";
 import { useRouter } from "next/navigation";
@@ -79,7 +83,7 @@ export default function Header() {
   const [sessionsPerYear, setSessionsPerYear] = useState<string[]>();
 
   useEffect(() => {
-    if (!academicYear || !setAcademicSessionsList || !academicYearsList) return;
+    if (!academicYear || !academicSessionsList || !academicYearsList) return;
     const filteredList = academicSessionsList?.filter(
       (year) => year["Academic Year"] == academicYear
     );
@@ -94,6 +98,30 @@ export default function Header() {
     }
     setSessionsPerYear(Array.from(unique.keys()) || []);
   }, [academicYear, academicSessionsList, academicYearsList]);
+  const acadSession = useSelector(
+    (state: any) => state.dataState.selectedAcademicSession
+  );
+  useEffect(() => {
+    if (!academicYearsList) return;
+    let currentSession = academicSessionsList?.filter(
+      (s) => s["Academic Year"] === academicYear
+    )?.[0];
+
+    dispatcher(setAcademicSessionId(currentSession?.Code));
+  }, [academicYear]);
+  useEffect(() => {
+    if (!acadSession && !academicSessionsList) return;
+    const currentSession = academicSessionsList?.find(
+      (s) => s.Code === acadSession
+    );
+    dispatcher(setAcademicSessionStartDate(currentSession?.["Start Session"]));
+    dispatcher(setAcademicSessionEndDate(currentSession?.["End Session"]));
+    const startDate = moment(currentSession?.["Start Session"], "YYYY-MM-DD");
+    const endDate = moment(currentSession?.["End Session"], "YYYY-MM-DD");
+    const today = moment();
+    const isActiveSession = today.isBetween(startDate, endDate, "day", "[]");
+    dispatcher(setIsActiveSession(isActiveSession));
+  }, [acadSession, academicSessionsList, academicYear]);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const filterRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -283,7 +311,7 @@ export default function Header() {
           />
         </button>
 
-        <button className="p-2 text-gray-600 transition-colors hover:text-blue-600">
+        <button className="p-2 text-gray-600 transition-colors hover:text-blue-600 hidden">
           <Image
             src="/images/notification.svg"
             alt="Notifications"

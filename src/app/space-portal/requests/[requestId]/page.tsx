@@ -7,6 +7,7 @@ import { useSelector } from "react-redux";
 import { useParams, useSearchParams } from "next/navigation";
 import { decrypt } from "@/utils/encryption";
 import { useRouter } from "next/navigation";
+import { formatDate, getTimeDifference } from "@/utils";
 
 const DetailRow = ({
   label,
@@ -15,7 +16,7 @@ const DetailRow = ({
   label: string;
   value?: string | null;
 }) => (
-  <div className="flex justify-between items-center border-b pb-0.5">
+  <div className="flex justify-between items-center border-b border-gray-200 pb-0.5">
     <span className="text-gray-900 font-[550] text-sm">{label}:</span>
     <span className="text-gray-700 text-sm">{value || "N/A"}</span>
   </div>
@@ -30,6 +31,39 @@ const getStatusClass = (status: string) => {
     default:
       return "bg-yellow-200 text-yellow-800";
   }
+};
+const getRecurranceString = (recc: string) => {
+  let recString = "";
+  let list = recc.split(",");
+  list.map((str, index) => {
+    switch (str) {
+      case "1":
+        recString = recString + "Mon";
+        break;
+      case "2":
+        recString = recString + "Tues";
+        break;
+      case "3":
+        recString = recString + "Wed";
+        break;
+      case "4":
+        recString = recString + "Thus";
+        break;
+      case "5":
+        recString = recString + "Fri";
+        break;
+      case "6":
+        recString = recString + "Sat";
+        break;
+      case "7":
+        recString = recString + "Sun";
+        break;
+      default:
+        recString = "None";
+    }
+    if (list.length - 1 !== index) recString = recString + ",";
+  });
+  return recString;
 };
 const getPriorityClass = (status: string) => {
   switch (status) {
@@ -49,10 +83,10 @@ export default function RequestInfoPage() {
   const router = useRouter();
   const requestId = decrypt(params.requestId?.toString() || "");
   const acadmeicYear = useSelector(
-    (state: any) => state.dataState.academicYear
+    (state: any) => state.dataState.selectedAcademicYear
   );
   const acadmeicSession = useSelector(
-    (state: any) => state.dataState.academicSession
+    (state: any) => state.dataState.selectedAcademicSession
   );
   const [requestData, setRequestData] = useState<RoomRequest | null>(null);
   const searchParams = useSearchParams();
@@ -65,10 +99,11 @@ export default function RequestInfoPage() {
         {
           limit: pageSize,
           offset: curruntPage,
-          acadmeicSession: acadmeicSession,
-          acadmeicYear: acadmeicYear,
+          acadSess: acadmeicSession,
+          acadYr: acadmeicYear,
         }
       );
+      console.log(response.data);
       setRequestData(
         response.data?.requests.filter(
           (request) => request.requestID === requestId
@@ -111,7 +146,7 @@ export default function RequestInfoPage() {
     }
   }, [initialStatus]);
 
-  const duration = endTime;
+  const duration = getTimeDifference(startTime || "", endTime || "");
   const isApproved = initialStatus === "Approved";
   const isRejected = initialStatus === "Rejected";
 
@@ -149,7 +184,7 @@ export default function RequestInfoPage() {
                 value={employeeDepartment}
               />
               <DetailRow label="Room Type" value={requestedRoomType} />
-              <div className="flex justify-between items-center border-b pb-0.5">
+              <div className="flex justify-between items-center border-b pb-0.5 border-gray-200">
                 <span className="text-gray-900 font-[550] text-sm">
                   Status:
                 </span>
@@ -162,7 +197,7 @@ export default function RequestInfoPage() {
                 </span>
               </div>
               <DetailRow label="Purpose" value={purpose} />
-              <div className="flex justify-between items-center border-b pb-0.5">
+              <div className="flex justify-between items-center border-b pb-0.5 border-gray-200">
                 <span className="text-gray-900 font-[550] text-sm">
                   Priority:
                 </span>
@@ -174,11 +209,38 @@ export default function RequestInfoPage() {
                   {priority || "N/A"}
                 </span>
               </div>
-              <DetailRow label="Date" value={`${startDate} - ${endDate}`} />
+              {startDate && endDate && (
+                <DetailRow
+                  label="Date"
+                  value={
+                    recurrence?.split(",")?.[0] === "0"
+                      ? formatDate(startDate).split(" ")?.[0]
+                      : `${formatDate(startDate).split(" ")?.[0]} - ${
+                          formatDate(endDate).split(" ")?.[0]
+                        }`
+                  }
+                />
+              )}
               <DetailRow label="Time" value={`${startTime} - ${endTime}`} />
-              <DetailRow label="Duration" value={duration} />
-              <DetailRow label="Recurrence" value={recurrence} />
-              <DetailRow label="Requested on" value={requestDate} />
+
+              {duration && (
+                <DetailRow
+                  label="Duration"
+                  value={`${duration.hours} hour  ${duration.minutes} minutes`}
+                />
+              )}
+              {recurrence && (
+                <DetailRow
+                  label="Recurrence"
+                  value={getRecurranceString(recurrence)}
+                />
+              )}
+              {requestDate && (
+                <DetailRow
+                  label="Requested on"
+                  value={formatDate(requestDate).split(" ")?.[0]}
+                />
+              )}
               {isApproved && (
                 <DetailRow label="Allocated Room" value={allocatedRoomID} />
               )}

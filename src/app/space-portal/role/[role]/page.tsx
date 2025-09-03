@@ -3,22 +3,18 @@ import React, { JSX, useEffect, useState } from "react";
 import Image from "next/image";
 import { useParams, useRouter } from "next/navigation";
 import { useSelector, useDispatch } from "react-redux";
-import { Room, Room } from "@/types";
+import { Room } from "@/types";
 import RoomCard from "@/components/RoomCard";
 import { Building, Floor } from "@/types";
 import { BuildingSVG } from "@/components/BuildingSvg";
-import { FloorSVG } from "@/components/FloorSvg";
 import { removeSpaces } from "@/utils";
-import { api, callApi } from "@/utils/apiIntercepter";
-import { credentials, URL_NOT_FOUND } from "@/constants";
-import { encrypt, decrypt } from "@/utils/encryption";
-import {
-  setSelectedBuilding,
-  setSeletedFloor as sliceFloor,
-} from "@/app/feature/dataSlice";
-
+import { callApi } from "@/utils/apiIntercepter";
+import { URL_NOT_FOUND } from "@/constants";
+import { encrypt } from "@/utils/encryption";
+import { setSeletedRoomTypeId } from "@/app/feature/dataSlice";
 export default function Buildings() {
   const router = useRouter();
+  const dispatcher = useDispatch();
   const params = useParams();
   let role = params.role?.toString().replace("%20", " ");
   let [buildings, setBuildings] = useState<Building[]>();
@@ -30,10 +26,16 @@ export default function Buildings() {
   const [isLoadingRooms, setIsLoadingRooms] = useState(false);
   const [isLoadingSubrooms, setIsLoadingSubrooms] = useState(false);
   const acadmeicYear = useSelector(
-    (state: any) => state.dataState.academicYear
+    (state: any) => state.dataState.selectedAcademicYear
   );
   const acadmeicSession = useSelector(
-    (state: any) => state.dataState.academicSession
+    (state: any) => state.dataState.selectedAcademicSession
+  );
+  const selectedRoomId = useSelector(
+    (state: any) => state.dataState.selectedRoomId
+  );
+  const selectedRoomType = useSelector(
+    (state: any) => state.dataState.selectedRoomType
   );
 
   useEffect(() => {
@@ -70,13 +72,20 @@ export default function Buildings() {
     const fetchRooms = async () => {
       setIsLoadingRooms(true);
       try {
+        const now = new Date();
+        const hours = now.getHours().toString().padStart(2, "0");
+        const minutes = now.getMinutes().toString().padStart(2, "0");
+        const time24h = `${hours}:${minutes}`;
         const promises = buildings.flatMap((b) =>
           b.floors.map(async (f) => {
             const response = await callApi<Room[]>(
               process.env.NEXT_PUBLIC_GET_ROOMS_LIST || URL_NOT_FOUND,
-              { buildingNo: String(b.id), floorID: String(f.floorId) }
+              {
+                buildingNo: String(b.id),
+                floorID: String(f.floorId),
+                curreentTime: `${time24h}`,
+              }
             );
-            // Filter rooms based on managedBy attribute matching the current role
             const filteredRooms = (response.data || []).filter(
               (room) => room.managedBy === role
             );
@@ -125,10 +134,9 @@ export default function Buildings() {
   ];
   let roomCategories = ["All Rooms"];
   roomCategories = [...roomCategories, ...allRoomsCategories];
-  const [selectedRoomType, setSelectedRoomType] = useState<string>("All Rooms");
   useEffect(() => {
     if (!roomCategories.some((category) => category === selectedRoomType))
-      setSelectedRoomType("All Rooms");
+      dispatcher(setSeletedRoomTypeId("All Rooms"));
   }, [roomCategories]);
 
   const filteredRooms: Room[] = roomsList.filter((room) => {
@@ -185,76 +193,86 @@ export default function Buildings() {
         break;
       }
     }
-    filteredRooms?.forEach((room, index) => {
-      items.push(
-        <RoomCard
-          room={room}
-          key={room.roomId}
-          isExpanded={selectedRoom?.roomId === room.roomId}
-          onClick={(room) => handleRoomClick(room)}
-        />
+    const searchRooms = filteredRooms.filter((room) => {
+      return (
+        room.roomName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        room.roomId.toLowerCase().includes(searchQuery.toLowerCase())
       );
-      const currentRowIndex = Math.floor(index / cardsPerRow);
-      const isLastCardInRow = (index + 1) % cardsPerRow === 0;
-      const isLastCardOverall = index === filteredRooms.length - 1;
+    });
+    searchRooms.length > 0
+      ? searchRooms?.forEach((room, index) => {
+          items.push(
+            <RoomCard
+              room={room}
+              key={`${room.buildingId}${room.roomId}`}
+              isExpanded={selectedRoom?.roomId === room.roomId}
+              onClick={(room) => handleRoomClick(room)}
+            />
+          );
+          const currentRowIndex = Math.floor(index / cardsPerRow);
+          const isLastCardInRow = (index + 1) % cardsPerRow === 0;
+          const isLastCardOverall = index === filteredRooms.length - 1;
 
-      if (
-        selectedRoom !== null &&
-        currentRowIndex === expandedRowIndex &&
-        (isLastCardInRow || isLastCardOverall)
-      ) {
-        items.push(
-          <div
-            key={`details-${selectedRoom.roomId}`}
-            className="
+          if (
+            selectedRoom !== null &&
+            currentRowIndex === expandedRowIndex &&
+            (isLastCardInRow || isLastCardOverall)
+          ) {
+            items.push(
+              <div
+                key={`details-${selectedRoom.roomId}`}
+                className="
                 col-span-full bg-gray-50 p-8 rounded-xl shadow-inner
                 border border-gray-200
                 transition-all duration-500 ease-in-out transform
                 opacity-100 translate-y-0
               "
-            style={{
-              gridColumn: "1 / -1",
-              animation: "fadeInSlideUp 0.5s ease-out forwards",
-            }}
-          >
-            <h4 className="flex justify-between text-normal text-gray-700 mb-2">
-              {selectedRoom.roomName}
-              <button
-                onClick={() => setSelectedRoom(null)}
-                className="px-2 py-1 bg-orange-500 text-white rounded-lg text-xs hover:bg-orange-600 transition-colors duration-300"
+                style={{
+                  gridColumn: "1 / -1",
+                  animation: "fadeInSlideUp 0.5s ease-out forwards",
+                }}
               >
-                Close &times;
-              </button>
-            </h4>
-            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3">
-              {isLoadingSubrooms
-                ? // Loading skeleton for subrooms
-                  Array.from({ length: 3 }).map((_, index) => (
-                    <div
-                      key={index}
-                      className="bg-white rounded-lg shadow-sm p-4 animate-pulse"
-                    >
-                      <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
-                      <div className="h-3 bg-gray-200 rounded w-1/2 mb-4"></div>
-                      <div className="h-3 bg-gray-200 rounded w-1/3"></div>
-                    </div>
-                  ))
-                : subRooms &&
-                  subRooms.map((room) => (
-                    <RoomCard
-                      key={room.roomId}
-                      onClick={handleRoomClick}
-                      room={room}
-                    />
-                  ))}
-            </div>
-          </div>
-        );
-      }
-    });
+                <h4 className="flex justify-between text-normal text-gray-700 mb-2">
+                  {selectedRoom.roomName}
+                  <button
+                    onClick={() => setSelectedRoom(null)}
+                    className="px-2 py-1 bg-orange-500 text-white rounded-lg text-xs hover:bg-orange-600 transition-colors duration-300"
+                  >
+                    Close &times;
+                  </button>
+                </h4>
+                <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3">
+                  {isLoadingSubrooms
+                    ? // Loading skeleton for subrooms
+                      Array.from({ length: 3 }).map((_, index) => (
+                        <div
+                          key={index}
+                          className="bg-white rounded-lg shadow-sm p-4 animate-pulse"
+                        >
+                          <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+                          <div className="h-3 bg-gray-200 rounded w-1/2 mb-4"></div>
+                          <div className="h-3 bg-gray-200 rounded w-1/3"></div>
+                        </div>
+                      ))
+                    : subRooms &&
+                      subRooms.map((room) => (
+                        <RoomCard
+                          key={room.roomId}
+                          onClick={handleRoomClick}
+                          room={room}
+                        />
+                      ))}
+                </div>
+              </div>
+            );
+          }
+        })
+      : items.push(<div className="text-gray-600">No rooms found </div>);
 
     return items;
   };
+
+  const [searchQuery, setSearchQuery] = useState("");
 
   return (
     <div>
@@ -273,17 +291,13 @@ export default function Buildings() {
                 </h4>
               </div>
 
-              <button
-                className="mt-4 flex h-fit items-center rounded-md bg-[#F26722] px-4 py-2 text-xs text-white shadow-md transition-all hover:bg-[#a5705a] md:mt-0"
-                onClick={() => {
-                  setSelectedFloor(null);
-                  setSelectedRoomType("All Rooms");
-                  router.back();
-                }}
-              >
-                <BuildingSVG className="mr-2 h-4 w-4 fill-white" />
-                Back
-              </button>
+              <input
+                type="text"
+                placeholder="Search"
+                value={searchQuery ? searchQuery : ""}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="border border-gray-300 rounded-md py-1 px-2 text-sm focus:outline-none text-gray-700 focus:ring-1 focus:ring-orange-500 mr-2"
+              />
             </div>
 
             <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
@@ -343,7 +357,7 @@ export default function Buildings() {
                         ? "bg-[#F26722] text-white shadow-md"
                         : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                     }`}
-                    onClick={() => setSelectedRoomType(roomType)}
+                    onClick={() => dispatcher(setSeletedRoomTypeId(roomType))}
                   >
                     {roomType}
                   </button>

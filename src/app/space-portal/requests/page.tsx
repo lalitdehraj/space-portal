@@ -119,10 +119,10 @@ export default function RequestApprovalPage() {
   const router = useRouter();
   const [curruntPage, setCurruntPage] = useState(1);
   const acadmeicYear = useSelector(
-    (state: any) => state.dataState.academicYear
+    (state: any) => state.dataState.selectedAcademicYear
   );
   const acadmeicSession = useSelector(
-    (state: any) => state.dataState.academicSession
+    (state: any) => state.dataState.selectedAcademicSession
   );
   const [sortState, setSortState] = useState<sortingTypes>("");
   const [activeHeader, setActiveHeader] = useState("");
@@ -154,6 +154,7 @@ export default function RequestApprovalPage() {
 
   useEffect(() => {
     const fetchRoomsRequest = async () => {
+      if (!(acadmeicSession && acadmeicSession && pageSize)) return;
       setIsLoadingRequests(true);
       try {
         let response = await callApi<RoomRequestTable>(

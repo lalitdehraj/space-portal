@@ -1,6 +1,7 @@
 import Image from "next/image";
 import { Building } from "@/types";
 import React, { SVGProps } from "react";
+import { useSelector } from "react-redux";
 
 type BuildingCardProps = {
   building: Building;
@@ -36,9 +37,11 @@ const RoomIcon = (props: SVGProps<SVGSVGElement>) => (
 );
 
 const BuildingCard = ({ building, onClick }: BuildingCardProps) => {
-  let occupancyRate = Math.floor(
-    (building.totalOccupiedRooms / building.totalCapacity || 1) * 100
+  const isActiveSession = useSelector(
+    (state: any) => state.dataState.isActiveSession
   );
+  let occupancyRate =
+    Math.floor((building.totalOccupiedRooms / building.totalCapacity) * 100) || 0;
   const occupancyBgClass =
     occupancyRate <= 10
       ? "bg-green-700/50"
@@ -70,19 +73,34 @@ const BuildingCard = ({ building, onClick }: BuildingCardProps) => {
             <div className="flex items-center gap-2">
               <FloorIcon className="h-3 w-3 fill-white" />
               <p className="text-[10px]">
-                Floors - {building.totalFloors || 0}
+                Floors - {building.floors.length || 0}
               </p>
               <RoomIcon className="ml-3 h-2.5 w-2.5 fill-white" />
-              <p className="text-[10px]">Rooms - {building.totalRooms || 0}</p>
+              <p className="text-[10px]">
+                Rooms -{" "}
+                {building.floors.reduce(
+                  (sum, floor) => sum + floor.totalRoomsOnFloor,
+                  0
+                )}
+              </p>
             </div>
           </div>
           {/* Occupancy rate */}
-          <div className="flex flex-col items-center">
-            <span className="text-[10px]">Occupied</span>
-            <span className="text-lg font-bold">
-              {`${occupancyRate}%` || "NA"}
-            </span>
-          </div>
+          {isActiveSession ? (
+            !Number.isNaN(occupancyRate) &&
+            building.totalCapacity !== 0 && (
+              <div className="flex flex-col items-center">
+                <span className="text-[10px]">Occupied</span>
+                <span className="text-lg font-bold">
+                  {`${occupancyRate}%` || "NA"}
+                </span>
+              </div>
+            )
+          ) : (
+            <div className="flex flex-col items-center">
+              <span className="text-[10px]">Session over</span>
+            </div>
+          )}
         </div>
       </div>
     </button>

@@ -164,9 +164,9 @@ function ProfilePage() {
       </div>
 
       {/* Main Content Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 hidden">
+      {/* <div className="grid grid-cols-1 md:grid-cols-2 gap-8 hidden"> */}
         {/* Allocated Spaces Section */}
-        <div className="space-y-4">
+        {/* <div className="space-y-4">
           <h2 className="text-xl font-bold text-gray-800">Allocated Spaces</h2>
           <ul className="space-y-4">
             {allocatedSpaces.map((space) => (
@@ -188,10 +188,9 @@ function ProfilePage() {
               </li>
             ))}
           </ul>
-        </div>
-
+        </div> */}
         {/* Pending Requests Section */}
-        <div className="space-y-4">
+        {/* <div className="space-y-4">
           <h2 className="text-xl font-bold text-gray-800">Recent Requests</h2>
           <ul className="space-y-4">
             {pendingRequests.map((request) => (
@@ -217,8 +216,8 @@ function ProfilePage() {
               </li>
             ))}
           </ul>
-        </div>
-      </div>
+        </div> */}
+      {/* </div> */}
 
       {/* Action Button */}
       <div className="flex justify-end mt-8">

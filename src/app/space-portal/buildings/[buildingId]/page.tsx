@@ -29,10 +29,10 @@ export default function Buildings() {
   const [selectedRoom, setSelectedRoom] = useState<Room>();
   const [subRooms, setSubRooms] = useState<Room[]>([]);
   const acadmeicYear = useSelector(
-    (state: any) => state.dataState.academicYear
+    (state: any) => state.dataState.selectedAcademicYear
   );
   const acadmeicSession = useSelector(
-    (state: any) => state.dataState.academicSession
+    (state: any) => state.dataState.selectedAcademicSession
   );
   const selectedFloorId = useSelector(
     (state: any) => state.dataState.selectedFloorId
@@ -40,7 +40,9 @@ export default function Buildings() {
   const selectedRoomId = useSelector(
     (state: any) => state.dataState.selectedRoomId
   );
-
+  const selectedRoomType = useSelector(
+    (state: any) => state.dataState.selectedRoomType
+  );
   useEffect(() => {
     const fetchBuildings = async () => {
       const reqBody = {
@@ -72,9 +74,14 @@ export default function Buildings() {
 
   useEffect(() => {
     const fetchRooms = async () => {
+      const now = new Date();
+      const hours = now.getHours().toString().padStart(2, "0");
+      const minutes = now.getMinutes().toString().padStart(2, "0");
+      const time24h = `${hours}:${minutes}`;
       const reqBody = {
         buildingNo: `${buildingId}`,
         floorID: `${selectedFloor?.floorId}`,
+        curreentTime: `${time24h}`,
       };
 
       const response = await callApi<Room[]>(
@@ -88,7 +95,6 @@ export default function Buildings() {
             (r) => r.roomId === selectedRoomId
           );
           setSelectedRoom(room?.[0] || undefined);
-          fetchSubrooms(selectedRoomId);
         }
       }
     };
@@ -117,13 +123,11 @@ export default function Buildings() {
   ];
 
   let allRoomsCategories: string[] = [
-    ...new Set(roomsList.map((room) => room.roomType)),
+    ...new Set(roomsList?.map((room) => room.roomType)),
   ];
   let roomCategories = ["All Rooms"];
   roomCategories = [...roomCategories, ...allRoomsCategories];
-  const selectedRoomType = useSelector(
-    (state: any) => state.dataState.selectedRoomType
-  );
+
   useEffect(() => {
     if (roomCategories.some((category) => category === selectedRoomType))
       dispatcher(setSeletedRoomTypeId("All Rooms"));
@@ -141,18 +145,25 @@ export default function Buildings() {
   const handleRoomTypesClick = (roomType: string) => {
     dispatcher(setSeletedRoomTypeId(roomType));
   };
-  const fetchSubrooms = async (roomId: string) => {
-    if (!roomId) return;
-    const requestBody = {
-      roomId: roomId,
+  useEffect(() => {
+    const fetchSubrooms = async () => {
+      if (!selectedRoom) return;
+      const requestBody = {
+        roomID: selectedRoom?.roomId,
+        buildingNo: selectedBuilding?.id,
+        acadSess: acadmeicSession,
+        acadYr: acadmeicYear,
+      };
+      let response = callApi<Room[]>(
+        process.env.NEXT_PUBLIC_GET_SUBROOMS_LIST || URL_NOT_FOUND,
+        requestBody
+      );
+      let res = await response;
+      console.log(res);
+      setSubRooms(res.data || []);
     };
-    let response = callApi<Room[]>(
-      process.env.NEXT_PUBLIC_GET_SUBROOMS_LIST || URL_NOT_FOUND,
-      requestBody
-    );
-    let res = await response;
-    setSubRooms(res.data || []);
-  };
+    fetchSubrooms();
+  }, [selectedRoom, acadmeicSession, acadmeicYear]);
   const handleFloorClick = (floor: Floor) => {
     setSelectedFloor(floor);
     dispatcher(setSelectedFloorId(floor.floorId));
@@ -162,8 +173,8 @@ export default function Buildings() {
     if (room.hasSubroom) {
       dispatcher(setSelectedRoomId(room.roomId));
       setSelectedRoom(room.roomId === selectedRoom?.roomId ? undefined : room);
-      fetchSubrooms(room.roomId);
     } else {
+      dispatcher(setSelectedRoomId(""));
       router.push(
         `/space-portal/buildings/${encrypt(selectedBuilding?.id)}/${encrypt(
           room.roomId
@@ -229,9 +240,9 @@ export default function Buildings() {
             </h4>
             <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3">
               {subRooms &&
-                subRooms.map((room) => (
+                subRooms?.map((room) => (
                   <RoomCard
-                    key={room.roomId}
+                    key={`${room.parentId}${room.roomId}`}
                     onClick={handleRoomClick}
                     room={room}
                   />
@@ -270,7 +281,7 @@ export default function Buildings() {
             </div>
 
             <div className="mt-4 flex gap-2 overflow-x-auto pb-2">
-              {selectedBuilding?.floors.map((floor) => (
+              {selectedBuilding?.floors?.map((floor) => (
                 <button
                   key={floor.floorId}
                   className={`flex items-center rounded-md px-4 py-2 text-xs transition-all ${
@@ -287,24 +298,26 @@ export default function Buildings() {
             </div>
 
             <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-              {kpiCards.map((card) => (
-                <div
-                  key={card.title}
-                  className="rounded-lg bg-white p-4 pl-6 shadow-sm"
-                >
-                  <Image
-                    src={card.iconSrc}
-                    alt={card.alt}
-                    height={24}
-                    width={24}
-                    className="mb-2 h-6 w-6"
-                  />
-                  <h3 className="text-xs text-black">{card.title}</h3>
-                  <h5 className="text-xl font-semibold text-black">
-                    {card.value}
-                  </h5>
-                </div>
-              ))}
+              {kpiCards.map((card) =>
+                card.value ? (
+                  <div
+                    key={card.title}
+                    className="rounded-lg bg-white p-4 pl-6 shadow-sm"
+                  >
+                    <Image
+                      src={card.iconSrc}
+                      alt={card.alt}
+                      height={24}
+                      width={24}
+                      className="mb-2 h-6 w-6"
+                    />
+                    <h3 className="text-xs text-black">{card.title}</h3>
+                    <h5 className="text-xl font-semibold text-black">
+                      {card.value}
+                    </h5>
+                  </div>
+                ) : null
+              )}
             </div>
 
             {filteredRooms.length ? (
@@ -313,7 +326,7 @@ export default function Buildings() {
                   Rooms
                 </h4>
                 <div className="mt-4 flex gap-2 overflow-x-auto pb-2">
-                  {roomCategories.map((roomType) => (
+                  {roomCategories?.map((roomType) => (
                     <button
                       key={roomType}
                       className={`flex items-center rounded-md px-3 py-1 text-xs font-medium transition-all ${
@@ -332,7 +345,9 @@ export default function Buildings() {
                 </div>
               </div>
             ) : (
-              <div className="mt-6 text-gray-500">No Rooms Found</div>
+              <div className="mt-6 text-gray-500 justify-center items-center w-full h-full">
+                No Rooms Found
+              </div>
             )}
           </div>
         </div>

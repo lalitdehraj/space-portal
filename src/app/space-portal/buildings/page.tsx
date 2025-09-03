@@ -4,20 +4,25 @@ import { useRouter } from "next/navigation";
 import { useDispatch, useSelector } from "react-redux";
 import BuildingCard from "@/components/BuildingCard";
 import { URL_NOT_FOUND } from "@/constants";
-import { Building } from "@/types";
+import { Building, Room, RoomInfo } from "@/types";
 import { callApi } from "@/utils/apiIntercepter";
 import { setSelectedBuildingId } from "@/app/feature/dataSlice";
 import { encrypt } from "@/utils/encryption";
+import moment from "moment";
+import { format } from "path";
 
 export default function Buildings() {
   const router = useRouter();
   const dispatcher = useDispatch();
   const [isLoadingBuildings, setIsLoadingBuildings] = useState(false);
   const acadmeicYear = useSelector(
-    (state: any) => state.dataState.academicYear
+    (state: any) => state.dataState.selectedAcademicYear
   );
   const acadmeicSession = useSelector(
-    (state: any) => state.dataState.academicSession
+    (state: any) => state.dataState.selectedAcademicSession
+  );
+  const isActiveSession = useSelector(
+    (state: any) => state.dataState.isActiveSession
   );
   const encryptAndPush = (id: string) => {
     let encrytedId = encrypt(id);
@@ -26,6 +31,7 @@ export default function Buildings() {
 
   useEffect(() => {
     const fetchBuildings = async () => {
+      if (!acadmeicSession && !acadmeicYear) return;
       setIsLoadingBuildings(true);
       try {
         const reqBody = {
@@ -68,7 +74,7 @@ export default function Buildings() {
           </div>
         </div>
 
-        <div className="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-6 grid gap-6 sm:grid-cols-2 grid-col-1 lg:grid-cols-3">
           {isLoadingBuildings ? (
             <p>Loading buildings...</p>
           ) : allBuildingsData.length === 0 ? (
@@ -79,7 +85,7 @@ export default function Buildings() {
                 building={building}
                 key={building.id}
                 onClick={() => {
-                  dispatcher(setSelectedBuildingId(building));
+                  dispatcher(setSelectedBuildingId(building.id));
                   encryptAndPush(building.id);
                 }}
               />

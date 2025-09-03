@@ -1,4 +1,11 @@
-import { Building, Room, RoomInfo, RoomRequestTable } from "@/types";
+import {
+  Allocation,
+  Building,
+  Course,
+  Room,
+  RoomInfo,
+  RoomRequestTable,
+} from "@/types";
 import { removeSpaces } from "@/utils";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -107,8 +114,10 @@ export async function POST(request: NextRequest) {
     )
   ) {
     const body = await request.json();
-    let roomId = body["roomId"];
+    let roomId = body["roomID"];
+    console.log("Requested roomId:", roomId);
     let roomInfo = RoomInformation.filter((room) => room.id === roomId);
+    console.log("Found room:", roomInfo[0]);
     return response(roomInfo[0] || RoomInformation[0]);
   }
   if (
@@ -156,8 +165,43 @@ export async function POST(request: NextRequest) {
     )
   ) {
     return response(UsersList);
+  }
+  if (
+    request.url.includes(
+      `${process.env.NEXT_PUBLIC_BASE_URL}${process.env.NEXT_PUBLIC_GET_ALLOCATIONS}`
+    )
+  ) {
+    return response(Allocations);
+  }
+  if (
+    request.url.includes(
+      `${process.env.NEXT_PUBLIC_BASE_URL}${process.env.NEXT_PUBLIC_GET_PROGRAM}`
+    )
+  ) {
+    return response(Courses);
   } else return response({ error: "return from end" });
 }
+
+const Courses: Course[] = [
+  {
+    code: "BTECH-008",
+    description: "BTECH in Computer Science",
+  },
+];
+
+const Allocations: Allocation[] = [
+  {
+    id: "allo1",
+    programCode: "CSE1",
+    courseName: "Computer science",
+    roomId: "001",
+    buildingId: "AB1",
+    floorId: "ground",
+    roomName: "Class",
+    acadSession: "JUL-NOV 2025",
+    acadYear: "25-26",
+  },
+];
 const AcademicYears = [
   {
     Code: "25-26",
@@ -167,299 +211,25 @@ const AcademicYears = [
     Code: "24-25",
     Description: "2024-25",
   },
-  {
-    Code: "23-24",
-    Description: "2023-24",
-  },
-  {
-    Code: "22-23",
-    Description: "2022-23",
-  },
-  {
-    Code: "21-22",
-    Description: "2021-22",
-  },
-  {
-    Code: "20-21",
-    Description: "2020-21",
-  },
-  {
-    Code: "19-20",
-    Description: "2019-20",
-  },
-  {
-    Code: "18-19",
-    Description: "2018-19",
-  },
-  {
-    Code: "17-18",
-    Description: "2017-18",
-  },
-  {
-    Code: "16-17",
-    Description: "2016-17",
-  },
-  {
-    Code: "15-16",
-    Description: "2015-16",
-  },
-  {
-    Code: "14-15",
-    Description: "2014-15",
-  },
-  {
-    Code: "13-14",
-    Description: "2013-14",
-  },
-  {
-    Code: "12-13",
-    Description: "2012-13",
-  },
-  {
-    Code: "11-12",
-    Description: "2011-12",
-  },
 ].reverse();
 const AcademicSession = [
   {
-    Code: "AUG-NOV 2018",
-    "Academic Year": "18-19",
-  },
-  {
-    Code: "AUG-NOV 2019",
-    "Academic Year": "19-20",
-  },
-  {
-    Code: "AUG-NOV 2020",
-    "Academic Year": "20-21",
-  },
-  {
-    Code: "AUG-NOV 2021",
-    "Academic Year": "21-22",
-  },
-  {
-    Code: "AUG-NOV 2022",
-    "Academic Year": "22-23",
-  },
-  {
-    Code: "AUG-NOV 2023",
-    "Academic Year": "23-24",
-  },
-  {
-    Code: "FEB-APRIL 2019",
-    "Academic Year": "18-19",
-  },
-  {
-    Code: "FEB-APRIL 2020",
-    "Academic Year": "19-20",
-  },
-  {
-    Code: "FEB-APRIL 2021",
-    "Academic Year": "20-21",
-  },
-  {
-    Code: "FEB-APRIL 2022",
-    "Academic Year": "21-22",
-  },
-  {
-    Code: "FEB-APRIL 2023",
-    "Academic Year": "22-23",
-  },
-  {
-    Code: "FEB-APRIL 2024",
-    "Academic Year": "23-24",
-  },
-  {
-    Code: "JAN-MAY 2017",
-    "Academic Year": "16-17",
-  },
-  {
-    Code: "JAN-MAY 2018",
-    "Academic Year": "17-18",
-  },
-  {
-    Code: "JAN-MAY 2019",
-    "Academic Year": "18-19",
-  },
-  {
-    Code: "JAN-MAY 2020",
-    "Academic Year": "19-20",
-  },
-  {
-    Code: "JAN-MAY 2021",
-    "Academic Year": "20-21",
-  },
-  {
-    Code: "JAN-MAY 2022",
-    "Academic Year": "21-22",
-  },
-  {
-    Code: "JAN-MAY 2023",
-    "Academic Year": "22-23",
-  },
-  {
-    Code: "JAN-MAY 2024",
-    "Academic Year": "23-24",
-  },
-  {
-    Code: "JAN-MAY 2025",
-    "Academic Year": "24-25",
-  },
-  {
-    Code: "JUL 2018 - MAY 2019",
-    "Academic Year": "18-19",
-  },
-  {
-    Code: "JUL 2019 - MAY 2020",
-    "Academic Year": "19-20",
-  },
-  {
-    Code: "JUL 2020 - MAY 2021",
-    "Academic Year": "20-21",
-  },
-  {
-    Code: "JUL 2021 - MAY 2022",
-    "Academic Year": "21-22",
-  },
-  {
-    Code: "JUL 2022 - MAY 2023",
-    "Academic Year": "22-23",
-  },
-  {
-    Code: "JUL 2023 - MAY 2024",
-    "Academic Year": "23-24",
-  },
-  {
-    Code: "JUL 2024 - MAY 2025",
-    "Academic Year": "24-25",
-  },
-  {
-    Code: "JUL-NOV 2017",
-    "Academic Year": "17-18",
-  },
-  {
-    Code: "JUL-NOV 2018",
-    "Academic Year": "18-19",
-  },
-  {
-    Code: "JUL-NOV 2019",
-    "Academic Year": "19-20",
-  },
-  {
-    Code: "JUL-NOV 2020",
-    "Academic Year": "20-21",
-  },
-  {
-    Code: "JUL-NOV 2021",
-    "Academic Year": "21-22",
-  },
-  {
-    Code: "JUL-NOV 2022",
-    "Academic Year": "22-23",
-  },
-  {
-    Code: "JUL-NOV 2023",
-    "Academic Year": "23-24",
-  },
-  {
-    Code: "JUL-NOV 2024",
-    "Academic Year": "24-25",
-  },
-  {
-    Code: "NOV-FEB 2019",
-    "Academic Year": "18-19",
-  },
-  {
-    Code: "NOV-FEB 2020",
-    "Academic Year": "19-20",
-  },
-  {
-    Code: "NOV-FEB 2021",
-    "Academic Year": "20-21",
-  },
-  {
-    Code: "NOV-FEB 2022",
-    "Academic Year": "21-22",
-  },
-  {
-    Code: "NOV-FEB 2023",
-    "Academic Year": "22-23",
-  },
-  {
-    Code: "NOV-FEB 2024",
-    "Academic Year": "23-24",
-  },
-  {
-    Code: "SUMMER 2017",
-    "Academic Year": "16-17",
-  },
-  {
-    Code: "SUMMER 2018",
-    "Academic Year": "17-18",
-  },
-  {
-    Code: "SUMMER 2019",
-    "Academic Year": "18-19",
-  },
-  {
-    Code: "SUMMER 2020",
-    "Academic Year": "19-20",
-  },
-  {
-    Code: "SUMMER 2021",
-    "Academic Year": "20-21",
-  },
-  {
-    Code: "SUMMER 2022",
-    "Academic Year": "21-22",
-  },
-  {
-    Code: "SUMMER 2022-I",
-    "Academic Year": "21-22",
-  },
-  {
-    Code: "SUMMER 2022-II",
-    "Academic Year": "21-22",
-  },
-  {
-    Code: "SUMMER 2023",
-    "Academic Year": "22-23",
-  },
-  {
-    Code: "SUMMER 2024",
-    "Academic Year": "23-24",
-  },
-  {
-    Code: "SUMMER 2024-I",
-    "Academic Year": "23-24",
-  },
-  {
-    Code: "SUMMER 2025",
-    "Academic Year": "24-25",
-  },
-  {
-    Code: "WINTER 2019",
-    "Academic Year": "19-20",
-  },
-  {
-    Code: "WINTER 2021",
-    "Academic Year": "21-22",
-  },
-  {
-    Code: "WINTER 2022",
-    "Academic Year": "22-23",
-  },
-  {
-    Code: "WINTER 2023",
-    "Academic Year": "23-24",
-  },
-  {
     Code: "WINTER 2024",
+    "Start Session": "2025-01-13",
+    "End Session": "2025-02-15",
     "Academic Year": "24-25",
   },
   {
     Code: "WINTER 2024-I",
+    "Start Session": "2025-02-13",
+    "End Session": "2025-02-28",
     "Academic Year": "24-25",
+  },
+  {
+    Code: "JUL-NOV 2025",
+    "Start Session": "2025-07-13",
+    "End Session": "2025-11-28",
+    "Academic Year": "25-26",
   },
 ];
 const UsersList = [
@@ -471,8 +241,8 @@ const UsersList = [
     userDepartment: "CSE",
     userPosition: "Developer",
     userRole: "Central facilities",
-    activeSession: "WINTER 2024",
-    activeYear: "24-25",
+    activeSession: "JUL-NOV 2025",
+    activeYear: "25-26",
     userImage: "",
   },
   {
@@ -604,7 +374,7 @@ const RoomsData: Room[] = [
     roomName: "Classroom 101",
     roomCapactiy: 40,
     occupied: 35,
-    hasSubroom: true,
+    hasSubroom: false,
     occupiedBy: "",
     roomType: "Classroom",
     floorId: "ground",
@@ -773,84 +543,182 @@ const RoomInformation: RoomInfo[] = [
     roomArea: "60",
     occupants: [
       {
+        eventId: "event1",
         occupantName: "Introduction to Physics",
         type: "Lecture",
-        startTime: "2025-08-13T09:00:00.000Z",
-        endTime: "2025-08-13T10:30:00.000Z",
+        scheduledDate: new Date("2025-09-27"), // Monday
+        startTime: "14:30",
+        endTime: "15:00",
       },
       {
-        occupantName: "Introduction to Physics",
-        type: "Lecture",
-        startTime: "2025-08-13T09:00:00.000Z",
-        endTime: "2025-08-13T10:30:00.000Z",
+        eventId: "event2",
+        occupantName: "Software Engineering Lab",
+        type: "Lab Session",
+        scheduledDate: new Date("2025-09-28"), // Tuesday
+        startTime: "09:00",
+        endTime: "09:45",
       },
       {
-        occupantName: "Introduction to Physics",
-        type: "Lecture",
-        startTime: "2025-08-13T09:00:00.000Z",
-        endTime: "2025-08-13T10:30:00.000Z",
+        eventId: "event3",
+        occupantName: "Introduction to Psychology",
+        type: "Seminar",
+        scheduledDate: new Date("2025-09-28"), // Wednesday
+        startTime: "09:45",
+        endTime: "10:30",
       },
       {
-        occupantName: "Introduction to Physics",
+        eventId: "event4",
+        occupantName: "Organic Chemistry",
         type: "Lecture",
-        startTime: "2025-08-13T09:00:00.000Z",
-        endTime: "2025-08-13T10:30:00.000Z",
+        scheduledDate: new Date("2025-09-30"), // Thursday
+        startTime: "10:00",
+        endTime: "11:00",
       },
       {
-        occupantName: "Introduction to Physics",
-        type: "Lecture",
-        startTime: "2025-08-13T09:00:00.000Z",
-        endTime: "2025-08-13T10:30:00.000Z",
+        eventId: "event5",
+        occupantName: "Group Project Meeting",
+        type: "Meeting",
+        scheduledDate: new Date("2025-09-31"), // Friday
+        startTime: "16:00",
+        endTime: "17:00",
       },
       {
-        occupantName: "Introduction to Physics",
-        type: "Lecture",
-        startTime: "2025-08-13T09:00:00.000Z",
-        endTime: "2025-08-13T10:30:00.000Z",
+        eventId: "event6",
+        occupantName: "Mathematics Tutorial",
+        type: "Tutorial",
+        scheduledDate: new Date("2025-09-01"), // Saturday
+        startTime: "15:00",
+        endTime: "16:00",
       },
       {
-        occupantName: "Introduction to Physics",
+        eventId: "event7",
+        occupantName: "Computer Science Lecture",
         type: "Lecture",
-        startTime: "2025-08-13T09:00:00.000Z",
-        endTime: "2025-08-13T10:30:00.000Z",
+        scheduledDate: new Date("2025-09-27"), // Monday
+        startTime: "11:00",
+        endTime: "12:00",
       },
       {
-        occupantName: "Introduction to Physics",
-        type: "Lecture",
-        startTime: "2025-08-13T09:00:00.000Z",
-        endTime: "2025-08-13T10:30:00.000Z",
+        eventId: "event8",
+        occupantName: "Biology Lab",
+        type: "Lab Session",
+        scheduledDate: new Date("2025-09-28"), // Tuesday
+        startTime: "14:00",
+        endTime: "16:00",
       },
       {
-        occupantName: "Introduction to Physics",
+        eventId: "event9",
+        occupantName: "English Literature",
         type: "Lecture",
-        startTime: "2025-08-13T09:00:00.000Z",
-        endTime: "2025-08-13T10:30:00.000Z",
+        scheduledDate: new Date("2025-09-29"), // Wednesday
+        startTime: "10:00",
+        endTime: "11:00",
       },
       {
-        occupantName: "Introduction to Physics",
+        eventId: "event10",
+        occupantName: "Research Discussion",
+        type: "Discussion",
+        scheduledDate: new Date("2025-09-30"), // Thursday
+        startTime: "15:00",
+        endTime: "16:00",
+      },
+      // Add data for September 1-7, 2025 (current week being displayed)
+      {
+        eventId: "event11",
+        occupantName: "Advanced Physics",
         type: "Lecture",
-        startTime: "2025-08-13T09:00:00.000Z",
-        endTime: "2025-08-13T10:30:00.000Z",
+        scheduledDate: new Date("2025-09-01T00:00:00.000Z"), // Monday
+        startTime: "10:00",
+        endTime: "11:00",
       },
       {
-        occupantName: "Introduction to Physics",
-        type: "Lecture",
-        startTime: "2025-08-13T09:00:00.000Z",
-        endTime: "2025-08-13T10:30:00.000Z",
+        eventId: "event12",
+        occupantName: "Calculus Tutorial",
+        type: "Tutorial",
+        scheduledDate: new Date("2025-09-02T00:00:00.000Z"), // Tuesday
+        startTime: "14:00",
+        endTime: "15:00",
       },
       {
-        occupantName: "Introduction to Physics",
-        type: "Lecture",
-        startTime: "2025-08-13T09:00:00.000Z",
-        endTime: "2025-08-13T10:30:00.000Z",
+        eventId: "event13",
+        occupantName: "Organic Chemistry Lab",
+        type: "Lab Session",
+        scheduledDate: new Date("2025-09-03T00:00:00.000Z"), // Wednesday
+        startTime: "09:00",
+        endTime: "11:00",
       },
       {
-        occupantName: "Introduction to Physics",
+        eventId: "event14",
+        occupantName: "Molecular Biology",
         type: "Lecture",
-        startTime: "2025-08-13T09:00:00.000Z",
-        endTime: "2025-08-13T10:30:00.000Z",
+        scheduledDate: new Date("2025-09-04T00:00:00.000Z"), // Thursday
+        startTime: "13:00",
+        endTime: "14:00",
+      },
+      {
+        eventId: "event15",
+        occupantName: "Literature Discussion",
+        type: "Discussion",
+        scheduledDate: new Date("2025-09-05T00:00:00.000Z"), // Friday
+        startTime: "16:00",
+        endTime: "17:00",
+      },
+      {
+        eventId: "event16",
+        occupantName: "Computer Science",
+        type: "Lecture",
+        scheduledDate: new Date("2025-09-01T00:00:00.000Z"), // Monday
+        startTime: "11:00",
+        endTime: "12:00",
+      },
+      {
+        eventId: "event17",
+        occupantName: "Data Structures",
+        type: "Lab Session",
+        scheduledDate: new Date("2025-09-02T00:00:00.000Z"), // Tuesday
+        startTime: "09:00",
+        endTime: "11:00",
+      },
+      {
+        eventId: "event18",
+        occupantName: "Statistics",
+        type: "Lecture",
+        scheduledDate: new Date("2025-09-03T00:00:00.000Z"), // Wednesday
+        startTime: "15:00",
+        endTime: "16:00",
+      },
+      {
+        eventId: "event19",
+        occupantName: "Research Methods",
+        type: "Seminar",
+        scheduledDate: new Date("2025-09-04T00:00:00.000Z"), // Thursday
+        startTime: "10:00",
+        endTime: "11:00",
+      },
+      {
+        eventId: "event20",
+        occupantName: "Project Meeting",
+        type: "Meeting",
+        scheduledDate: new Date("2025-09-05T00:00:00.000Z"), // Friday
+        startTime: "14:00",
+        endTime: "15:00",
       },
     ],
+    managedBy: "Central facilities",
+  },
+  {
+    id: "AB1-G-02",
+    roomName: "Classroom 102",
+    capacity: 30,
+    occupied: 0,
+    hasSubtype: false,
+    occupiedBy: null,
+    roomType: "Classroom",
+    building: "Academic Block 1",
+    floor: "ground",
+    status: "Available",
+    roomArea: "45",
+    occupants: [],
     managedBy: "Central facilities",
   },
 ];
