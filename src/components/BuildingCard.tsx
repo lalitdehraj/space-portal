@@ -37,11 +37,8 @@ const RoomIcon = (props: SVGProps<SVGSVGElement>) => (
 );
 
 const BuildingCard = ({ building, onClick }: BuildingCardProps) => {
-  const isActiveSession = useSelector(
-    (state: any) => state.dataState.isActiveSession
-  );
   let occupancyRate =
-    Math.floor((building.totalOccupiedRooms / building.totalCapacity) * 100) || 0;
+    Math.ceil((building.occupied / building.totalOccupancy) * 100) || 0;
   const occupancyBgClass =
     occupancyRate <= 10
       ? "bg-green-700/50"
@@ -86,19 +83,12 @@ const BuildingCard = ({ building, onClick }: BuildingCardProps) => {
             </div>
           </div>
           {/* Occupancy rate */}
-          {isActiveSession ? (
-            !Number.isNaN(occupancyRate) &&
-            building.totalCapacity !== 0 && (
-              <div className="flex flex-col items-center">
-                <span className="text-[10px]">Occupied</span>
-                <span className="text-lg font-bold">
-                  {`${occupancyRate}%` || "NA"}
-                </span>
-              </div>
-            )
-          ) : (
+          {!Number.isNaN(occupancyRate) && building.totalOccupancy !== 0 && (
             <div className="flex flex-col items-center">
-              <span className="text-[10px]">Session over</span>
+              <span className="text-[10px]">Occupied</span>
+              <span className="text-lg font-bold">
+                {`${occupancyRate}%` || "NA"}
+              </span>
             </div>
           )}
         </div>

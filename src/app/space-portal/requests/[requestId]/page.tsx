@@ -8,6 +8,7 @@ import { useParams, useSearchParams } from "next/navigation";
 import { decrypt } from "@/utils/encryption";
 import { useRouter } from "next/navigation";
 import { formatDate, getTimeDifference } from "@/utils";
+import moment from "moment";
 
 const DetailRow = ({
   label,
@@ -366,7 +367,7 @@ function RequestApprovalForm({
         setRooms([]);
         return;
       }
-      const floorIds = building.floors?.map((f) => f.floorId) || [];
+      const floorIds = building.floors?.map((f) => f.id) || [];
       if (floorIds.length === 0) {
         setRooms([]);
         return;
@@ -374,7 +375,7 @@ function RequestApprovalForm({
       const reqBody = {
         buildingNo: `${buildingId}`,
         floorID: `${selectedFloorId}`,
-        // acadSession: `${acadmeicSession}`,
+        curreentTime: moment().format("HH:MM"), // acadSession: `${acadmeicSession}`,
         // acadYear: `${acadmeicYear}`,
       };
       const response = await callApi<Room[]>(
@@ -456,8 +457,8 @@ function RequestApprovalForm({
                           ? buildings
                               .filter((b) => b.id === selectedBuildingId)[0]
                               .floors.map((f) => (
-                                <option key={f.floorId} value={f.floorId}>
-                                  {f.floorName}
+                                <option key={f.id} value={f.id}>
+                                  {f.name}
                                 </option>
                               ))
                           : null}

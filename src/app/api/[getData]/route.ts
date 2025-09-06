@@ -70,7 +70,6 @@ export async function POST(request: NextRequest) {
   ) {
     const body = await request.json();
     let roomId = body["roomId"];
-    console.log("roomInfo:  ", roomId);
     return response(
       SubRoomsData.filter((room) => {
         return room.parentId === roomId;
@@ -115,9 +114,7 @@ export async function POST(request: NextRequest) {
   ) {
     const body = await request.json();
     let roomId = body["roomID"];
-    console.log("Requested roomId:", roomId);
     let roomInfo = RoomInformation.filter((room) => room.id === roomId);
-    console.log("Found room:", roomInfo[0]);
     return response(roomInfo[0] || RoomInformation[0]);
   }
   if (
@@ -300,29 +297,29 @@ const BuildingsData: Building[] = [
     name: "Academic Block-1",
     totalFloors: 3,
     totalRooms: 180,
-    totalCapacity: 480,
-    totalOccupiedRooms: 300,
+    totalOccupancy: 480,
+    occupied: 300,
     image: "/images/main-building.jpg",
     floors: [
       {
-        floorId: "ground",
-        floorName: "Ground",
+        id: "ground",
+        name: "Ground",
         totalRoomsOnFloor: 60,
-        roomsOccupied: 45,
+        roomOccupied: 45,
         floorArea: "700",
       },
       {
-        floorId: "first",
-        floorName: "First Floor",
+        id: "first",
+        name: "First Floor",
         totalRoomsOnFloor: 60,
-        roomsOccupied: 40,
+        roomOccupied: 40,
         floorArea: "700",
       },
       {
-        floorId: "second",
-        floorName: "Second Floor",
+        id: "second",
+        name: "Second Floor",
         totalRoomsOnFloor: 60,
-        roomsOccupied: 50,
+        roomOccupied: 50,
         floorArea: "700",
       },
     ],
@@ -332,36 +329,36 @@ const BuildingsData: Building[] = [
     name: "Academic Block-2",
     totalFloors: 4,
     totalRooms: 240,
-    totalCapacity: 640,
-    totalOccupiedRooms: 360,
+    totalOccupancy: 640,
+    occupied: 360,
     image: "/images/main-building.jpg",
     floors: [
       {
-        floorId: "ground",
-        floorName: "Ground",
+        id: "ground",
+        name: "Ground",
         totalRoomsOnFloor: 65,
-        roomsOccupied: 40,
+        roomOccupied: 40,
         floorArea: "760",
       },
       {
-        floorId: "first",
-        floorName: "First Floor",
+        id: "first",
+        name: "First Floor",
         totalRoomsOnFloor: 65,
-        roomsOccupied: 50,
+        roomOccupied: 50,
         floorArea: "760",
       },
       {
-        floorId: "second",
-        floorName: "Second Floor",
+        id: "second",
+        name: "Second Floor",
         totalRoomsOnFloor: 55,
-        roomsOccupied: 55,
+        roomOccupied: 55,
         floorArea: "650",
       },
       {
-        floorId: "third",
-        floorName: "Third Floor",
+        id: "third",
+        name: "Third Floor",
         totalRoomsOnFloor: 55,
-        roomsOccupied: 45,
+        roomOccupied: 45,
         floorArea: "650",
       },
     ],
@@ -543,7 +540,7 @@ const RoomInformation: RoomInfo[] = [
     roomArea: "60",
     occupants: [
       {
-        eventId: "event1",
+        Id: "event1",
         occupantName: "Introduction to Physics",
         type: "Lecture",
         scheduledDate: new Date("2025-09-27"), // Monday
@@ -551,7 +548,7 @@ const RoomInformation: RoomInfo[] = [
         endTime: "15:00",
       },
       {
-        eventId: "event2",
+        Id: "event2",
         occupantName: "Software Engineering Lab",
         type: "Lab Session",
         scheduledDate: new Date("2025-09-28"), // Tuesday
@@ -559,7 +556,7 @@ const RoomInformation: RoomInfo[] = [
         endTime: "09:45",
       },
       {
-        eventId: "event3",
+        Id: "event3",
         occupantName: "Introduction to Psychology",
         type: "Seminar",
         scheduledDate: new Date("2025-09-28"), // Wednesday
@@ -567,7 +564,7 @@ const RoomInformation: RoomInfo[] = [
         endTime: "10:30",
       },
       {
-        eventId: "event4",
+        Id: "event4",
         occupantName: "Organic Chemistry",
         type: "Lecture",
         scheduledDate: new Date("2025-09-30"), // Thursday
@@ -575,7 +572,7 @@ const RoomInformation: RoomInfo[] = [
         endTime: "11:00",
       },
       {
-        eventId: "event5",
+        Id: "event5",
         occupantName: "Group Project Meeting",
         type: "Meeting",
         scheduledDate: new Date("2025-09-31"), // Friday
@@ -583,7 +580,7 @@ const RoomInformation: RoomInfo[] = [
         endTime: "17:00",
       },
       {
-        eventId: "event6",
+        Id: "event6",
         occupantName: "Mathematics Tutorial",
         type: "Tutorial",
         scheduledDate: new Date("2025-09-01"), // Saturday
@@ -591,7 +588,7 @@ const RoomInformation: RoomInfo[] = [
         endTime: "16:00",
       },
       {
-        eventId: "event7",
+        Id: "event7",
         occupantName: "Computer Science Lecture",
         type: "Lecture",
         scheduledDate: new Date("2025-09-27"), // Monday
@@ -599,7 +596,7 @@ const RoomInformation: RoomInfo[] = [
         endTime: "12:00",
       },
       {
-        eventId: "event8",
+        Id: "event8",
         occupantName: "Biology Lab",
         type: "Lab Session",
         scheduledDate: new Date("2025-09-28"), // Tuesday
@@ -607,7 +604,7 @@ const RoomInformation: RoomInfo[] = [
         endTime: "16:00",
       },
       {
-        eventId: "event9",
+        Id: "event9",
         occupantName: "English Literature",
         type: "Lecture",
         scheduledDate: new Date("2025-09-29"), // Wednesday
@@ -615,7 +612,7 @@ const RoomInformation: RoomInfo[] = [
         endTime: "11:00",
       },
       {
-        eventId: "event10",
+        Id: "event10",
         occupantName: "Research Discussion",
         type: "Discussion",
         scheduledDate: new Date("2025-09-30"), // Thursday
@@ -624,7 +621,7 @@ const RoomInformation: RoomInfo[] = [
       },
       // Add data for September 1-7, 2025 (current week being displayed)
       {
-        eventId: "event11",
+        Id: "event11",
         occupantName: "Advanced Physics",
         type: "Lecture",
         scheduledDate: new Date("2025-09-01T00:00:00.000Z"), // Monday
@@ -632,7 +629,7 @@ const RoomInformation: RoomInfo[] = [
         endTime: "11:00",
       },
       {
-        eventId: "event12",
+        Id: "event12",
         occupantName: "Calculus Tutorial",
         type: "Tutorial",
         scheduledDate: new Date("2025-09-02T00:00:00.000Z"), // Tuesday
@@ -640,7 +637,7 @@ const RoomInformation: RoomInfo[] = [
         endTime: "15:00",
       },
       {
-        eventId: "event13",
+        Id: "event13",
         occupantName: "Organic Chemistry Lab",
         type: "Lab Session",
         scheduledDate: new Date("2025-09-03T00:00:00.000Z"), // Wednesday
@@ -648,7 +645,7 @@ const RoomInformation: RoomInfo[] = [
         endTime: "11:00",
       },
       {
-        eventId: "event14",
+        Id: "event14",
         occupantName: "Molecular Biology",
         type: "Lecture",
         scheduledDate: new Date("2025-09-04T00:00:00.000Z"), // Thursday
@@ -656,7 +653,7 @@ const RoomInformation: RoomInfo[] = [
         endTime: "14:00",
       },
       {
-        eventId: "event15",
+        Id: "event15",
         occupantName: "Literature Discussion",
         type: "Discussion",
         scheduledDate: new Date("2025-09-05T00:00:00.000Z"), // Friday
@@ -664,7 +661,7 @@ const RoomInformation: RoomInfo[] = [
         endTime: "17:00",
       },
       {
-        eventId: "event16",
+        Id: "event16",
         occupantName: "Computer Science",
         type: "Lecture",
         scheduledDate: new Date("2025-09-01T00:00:00.000Z"), // Monday
@@ -672,7 +669,7 @@ const RoomInformation: RoomInfo[] = [
         endTime: "12:00",
       },
       {
-        eventId: "event17",
+        Id: "event17",
         occupantName: "Data Structures",
         type: "Lab Session",
         scheduledDate: new Date("2025-09-02T00:00:00.000Z"), // Tuesday
@@ -680,7 +677,7 @@ const RoomInformation: RoomInfo[] = [
         endTime: "11:00",
       },
       {
-        eventId: "event18",
+        Id: "event18",
         occupantName: "Statistics",
         type: "Lecture",
         scheduledDate: new Date("2025-09-03T00:00:00.000Z"), // Wednesday
@@ -688,7 +685,7 @@ const RoomInformation: RoomInfo[] = [
         endTime: "16:00",
       },
       {
-        eventId: "event19",
+        Id: "event19",
         occupantName: "Research Methods",
         type: "Seminar",
         scheduledDate: new Date("2025-09-04T00:00:00.000Z"), // Thursday
@@ -696,7 +693,7 @@ const RoomInformation: RoomInfo[] = [
         endTime: "11:00",
       },
       {
-        eventId: "event20",
+        Id: "event20",
         occupantName: "Project Meeting",
         type: "Meeting",
         scheduledDate: new Date("2025-09-05T00:00:00.000Z"), // Friday

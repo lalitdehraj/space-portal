@@ -32,6 +32,9 @@ function AllocationPage() {
   const acadmeicSession = useSelector(
     (state: any) => state.dataState.selectedAcademicSession
   );
+  const isActiveSession = useSelector(
+    (state: any) => state.dataState.isActiveSession
+  );
   // Fetch allocations for selected session/year
   useEffect(() => {
     const fetchAllocations = async () => {
@@ -42,6 +45,7 @@ function AllocationPage() {
           acadYear: selectedAcademicYear,
         }
       );
+      console.log(res.data);
       if (res.success) setAllocations(res.data || []);
     };
     if (selectedAcademicSession && selectedAcademicYear) fetchAllocations();
@@ -72,7 +76,7 @@ function AllocationPage() {
   }, [acadmeicSession, acadmeicYear]);
   //Fetch rooms upon changing building and floor
   useEffect(() => {
-    if (!selectedBuildingId && !selectedFloorId) return;
+    if (!selectedBuildingId || !selectedFloorId) return;
     const fetchRooms = async () => {
       const res = await callApi<Room[]>(
         process.env.NEXT_PUBLIC_GET_ROOMS_LIST || URL_NOT_FOUND,
@@ -90,21 +94,19 @@ function AllocationPage() {
   // Handle add/edit allocation
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const payload = {
-      eventId:"",
+    let payload: any = {
+      buildingId: selectedBuildingId,
       roomId: selectedRoomId,
       programCode: selectedCourseId,
       acadSession: selectedAcademicSession,
       acadYear: selectedAcademicYear,
     };
-    let apiUrl = process.env.NEXT_PUBLIC_INSERT_ROOM_ALLOCATION || URL_NOT_FOUND;
-    if (editAllocation) {
-      apiUrl = process.env.NEXT_PUBLIC_UPDATE_ROOM_ALLOCATION || URL_NOT_FOUND;
-      payload["eventId"] = editAllocation.id!;
-    }
+    let apiUrl =
+      process.env.NEXT_PUBLIC_INSERT_ROOM_ALLOCATION || URL_NOT_FOUND;
+
     const res = await callApi(apiUrl, payload);
     console.log(res);
-    if (res.success) {
+    const updateUI = async () => {
       setShowForm(false);
       setEditAllocation(null);
       const refresh = await callApi<Allocation[]>(
@@ -115,6 +117,21 @@ function AllocationPage() {
         }
       );
       if (refresh.success) setAllocations(refresh.data || []);
+    };
+    if (res.success) {
+      if (res.data === true) {
+        if (editAllocation) {
+          await callApi(
+            process.env.NEXT_PUBLIC_DELETE_ROOM_ALLOCATION || URL_NOT_FOUND,
+            {
+              systemId: editAllocation.systemId,
+            }
+          );
+        }
+        updateUI();
+      } else {
+        alert("Record Already Exist");
+      }
     }
   };
 
@@ -123,10 +140,10 @@ function AllocationPage() {
     setShowForm(true);
     if (allocation) {
       setEditAllocation(allocation);
-      setSelectedBuildingId(allocation.buildingId);
-      setSelectedFloorId(allocation.floorId);
-      setSelectedRoomId(allocation.roomId);
-      setSelectedCourseId(allocation.programCode);
+      setSelectedBuildingId(allocation.blockNo);
+      setSelectedFloorId(allocation.floor);
+      setSelectedRoomId(allocation.roomNo);
+      setSelectedCourseId(allocation.program);
     } else {
       setEditAllocation(null);
       setSelectedBuildingId("");
@@ -142,28 +159,30 @@ function AllocationPage() {
         <h2 className="text-base font-semibold text-gray-800 md:ml-2">
           Room Allocations
         </h2>
-        <button
-          className="px-3 py-2 rounded-lg shadow-md transition duration-300 bg-orange-500 text-white hover:bg-orange-600"
-          onClick={() => openForm()}
-        >
-          Add Allocation
-        </button>
+        {isActiveSession && (
+          <button
+            className="px-3 py-2 rounded-lg shadow-md transition duration-300 bg-orange-500 text-white hover:bg-orange-600"
+            onClick={() => openForm()}
+          >
+            Add Allocation
+          </button>
+        )}
       </div>
 
       {/* Allocations Table */}
       <div className="bg-white rounded-lg shadow-md p-2 border border-gray-200 w-full mt-4">
         <table className="min-w-full text-sm text-gray-700">
           <thead>
-            <tr className="bg-gray-100">
-              <th className="px-4 py-2">Department</th>
+            <tr className="bg-gray-100 text-left">
+              <th className="px-4 py-2">Course</th>
               <th className="px-4 py-2">Room Name</th>
               <th className="px-4 py-2">Room ID</th>
               <th className="px-4 py-2">Session</th>
               <th className="px-4 py-2">Year</th>
-              <th className="px-4 py-2">Edit</th>
+              {isActiveSession && <th className="px-4 py-2">Edit</th>}
             </tr>
           </thead>
-          <tbody>
+          <tbody className="text-[13px]">
             {allocations?.length === 0 ? (
               <tr>
                 <td colSpan={6} className="text-center py-4">
@@ -172,20 +191,28 @@ function AllocationPage() {
               </tr>
             ) : (
               allocations.map((alloc) => (
-                <tr key={alloc.id}>
-                  <td className="px-4 py-2">{alloc.courseName}</td>
-                  <td className="px-4 py-2">{alloc.roomName}</td>
-                  <td className="px-4 py-2">{alloc.roomId}</td>
-                  <td className="px-4 py-2">{alloc.acadSession}</td>
-                  <td className="px-4 py-2">{alloc.acadYear}</td>
+                <tr key={alloc.systemId}>
                   <td className="px-4 py-2">
-                    <button
-                      className="px-2 py-1 rounded bg-orange-500 text-white hover:bg-orange-600"
-                      onClick={() => openForm(alloc)}
-                    >
-                      Edit
-                    </button>
+                    {`${
+                      courses.find((c) => c.code === alloc.program)?.description
+                    } ( ${
+                      courses.find((c) => c.code === alloc.program)?.code
+                    } )`}
                   </td>
+                  <td className="px-4 py-2">{alloc.roomName}</td>
+                  <td className="px-4 py-2">{alloc.roomNo}</td>
+                  <td className="px-4 py-2">{alloc.session}</td>
+                  <td className="px-4 py-2">{alloc.academicYear}</td>
+                  {isActiveSession && (
+                    <td className="px-4 py-2">
+                      <button
+                        className="px-2 py-1 rounded bg-orange-500 text-white hover:bg-orange-600"
+                        onClick={() => openForm(alloc)}
+                      >
+                        Edit
+                      </button>
+                    </td>
+                  )}
                 </tr>
               ))
             )}
@@ -196,7 +223,7 @@ function AllocationPage() {
       {/* Add/Edit Allocation Form */}
       {showForm && (
         <div className="fixed inset-0 z-50 h-screen w-screen bg-[#00000070] flex items-center justify-center text-gray-500">
-          <div className="relative w-full max-w-md bg-white rounded-xl shadow-2xl p-8">
+          <div className="relative w-full max-w-2xl bg-white rounded-xl shadow-2xl p-8">
             <form onSubmit={handleFormSubmit}>
               <h3 className="text-lg font-semibold mb-4">
                 {editAllocation ? "Edit Allocation" : "Add Allocation"}
@@ -234,8 +261,8 @@ function AllocationPage() {
                   {buildings
                     .find((b) => b.id === selectedBuildingId)
                     ?.floors.map((f) => (
-                      <option key={f.floorId} value={f.floorId}>
-                        {f.floorName}
+                      <option key={f.id} value={f.id}>
+                        {f.name}
                       </option>
                     ))}
                 </select>
@@ -259,7 +286,7 @@ function AllocationPage() {
               </div>
               <div className="mb-4">
                 <label className="block text-sm text-gray-700 mb-1">
-                  Department
+                  Program Code
                 </label>
                 <select
                   className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
@@ -267,7 +294,7 @@ function AllocationPage() {
                   onChange={(e) => setSelectedCourseId(e.target.value)}
                   required
                 >
-                  <option value="">Select department</option>
+                  <option value="">Select Course</option>
                   {courses.map((d) => (
                     <option key={d.code} value={d.code}>
                       {d.description}

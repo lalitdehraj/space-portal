@@ -1,10 +1,11 @@
 import React from "react";
 import { addDaysToDate, createDateFromDDMMYYYY } from "@/utils";
+import moment from "moment";
 
 type Occupant = {
   occupantName?: string;
   type?: string;
-  eventId: string;
+  Id: string;
   startTime?: string | Date;
   scheduledDate?: string | Date;
   endTime?: string | Date;
@@ -22,7 +23,7 @@ type WeeklyTimetableProps = {
   academicSessionStartDate: string;
   academicSessionEndDate: string;
   onClickTimeTableSlot: (
-    date: Date,
+    date: string,
     slot: { start: string; end: string }
   ) => void;
 };
@@ -45,7 +46,6 @@ function getOccupantsForSlotWithPercentage(
   const slotStart = toMinutes(slot.start);
   const slotEnd = toMinutes(slot.end);
   const slotDuration = slotEnd - slotStart;
-
   return occupants
     .map((occupant) => {
       if (!occupant.startTime || !occupant.endTime || !occupant.scheduledDate) {
@@ -91,11 +91,22 @@ function WeeklyTimetable({
   academicSessionStartDate,
   academicSessionEndDate,
 }: WeeklyTimetableProps) {
-  // Hourly slots: 09:00–10:00, 10:00–11:00, ..., 16:00–17:00
   const timeSlots = [];
-  for (let h = 9; h < 17; h++) {
-    const start = `${String(h).padStart(2, "0")}:00`;
-    const end = `${String(h + 1).padStart(2, "0")}:00`;
+  for (let m = 9 * 60; m < 18 * 60; m += 45) {
+    const startHours = Math.floor(m / 60);
+    const startMinutes = m % 60;
+
+    const endMinutesTotal = m + 45;
+    const endHours = Math.floor(endMinutesTotal / 60);
+    const endMinutes = endMinutesTotal % 60;
+
+    const start = `${String(startHours).padStart(2, "0")}:${String(
+      startMinutes
+    ).padStart(2, "0")}`;
+    const end = `${String(endHours).padStart(2, "0")}:${String(
+      endMinutes
+    ).padStart(2, "0")}`;
+
     timeSlots.push({ start, end });
   }
 
@@ -137,28 +148,19 @@ function WeeklyTimetable({
     date: Date,
     slot: { start: string; end: string }
   ) => {
-    if (!isWithinAcademicSession(date)) return false;
-
-    // Block assignment for slots in the past (before current time)
-    const now = new Date();
-    const slotDateTimeEnd = new Date(date);
+    // Convert the date and slot end time to a single Moment object
     const [endHour, endMinute] = slot.end.split(":").map(Number);
-    slotDateTimeEnd.setHours(endHour, endMinute, 0, 0);
+    const slotDateTimeEnd = moment(date)
+      .hour(endHour)
+      .minute(endMinute)
+      .second(0)
+      .millisecond(0);
 
-    // If slot ends before now and is today or earlier, block assignment
-    if (
-      date < now ||
-      (date.toDateString() === now.toDateString() && slotDateTimeEnd <= now)
-    ) {
-      return false;
-    }
+    // Get the current time
+    const now = moment();
 
-    const slotOccupants = getOccupantsForSlotWithPercentage(
-      date,
-      slot,
-      occupants
-    );
-    return slotOccupants.length === 0;
+    // Return true if the slot's end time is at or before the current moment
+    return slotDateTimeEnd.isSameOrAfter(now);
   };
 
   // Navigation handlers
@@ -251,7 +253,7 @@ function WeeklyTimetable({
             <tbody className="divide-y divide-gray-200 cursor-pointer">
               {timeSlots.map((slot) => (
                 <tr key={slot.start} className="hover:bg-gray-50">
-                  <td className="px-4 py-4 text-sm font-medium text-gray-700 sticky left-0 bg-white">
+                  <td className="px-4 py-4 text-xs font-medium text-gray-700 sticky left-0 bg-white">
                     {slot.start} - {slot.end}
                   </td>
                   {upcomingDates.map((date) => {
@@ -265,10 +267,12 @@ function WeeklyTimetable({
                     return (
                       <td
                         key={`${date.toISOString()}-${slot.start}`}
-                        className={` border-l border-gray-100 h-16 w-16`}
+                        className={` border-l border-gray-100 h-16 w-16 ${
+                          isAvailable ? "bg-green-50" : "bg-gray-50"
+                        }`}
                         onClick={() => {
                           if (isAvailable) {
-                            onClickTimeTableSlot(date, slot);
+                            onClickTimeTableSlot(moment(date).format("YYYY-MM-DD"), slot);
                           }
                         }}
                       >
@@ -276,9 +280,12 @@ function WeeklyTimetable({
                           <div className="relative h-full text-center w-full flex flex-col">
                             {slotOccupants.map((occupant) => (
                               <div
-                              onClick={()=>{alert(JSON.stringify(occupant))}}
-                                key={occupant.eventId}
-                                className="absolute bg-blue-100 border border-blue-300 rounded-md p-1 text-xs cursor-pointer hover:bg-blue-200 transition-colors h-full w-full"
+                                onClick={(event) => {
+                                  alert(JSON.stringify(occupant));
+                                  event.stopPropagation();
+                                }}
+                                key={occupant.Id}
+                                className="absolute bg-[#69ACFF80] border border-blue-300 rounded-md p-1 text-xs cursor-pointer hover:bg-blue-200 transition-colors h-full w-full overflow-clip"
                                 style={{
                                   top: `${occupant.offset}%`,
                                   height: `${occupant.percentage}%`,
@@ -322,7 +329,9 @@ function WeeklyTimetable({
                             className="text-green-600 text-center justify-center items-center text-xs cursor-pointer hover:bg-green-50 p-1 rounded transition-colors h-full w-full"
                             title="Click to allocate"
                           >
-                            <label>Allocate</label>
+                            <label className="w-full h-full  items-center justify-center flex">
+                              Allocate
+                            </label>
                           </div>
                         ) : (
                           <div className="text-gray-400 text-xs">Past</div>

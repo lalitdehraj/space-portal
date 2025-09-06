@@ -1,3 +1,4 @@
+import { UserProfile } from "@/types";
 import { createSlice } from "@reduxjs/toolkit";
 
 export interface DataState {
@@ -11,6 +12,7 @@ export interface DataState {
   selectedAcademicSessionEndDate: string;
   headerText: string;
   userRole: string;
+  user: UserProfile|null;
   isActiveSession: false;
 }
 const initialState: DataState = {
@@ -25,6 +27,7 @@ const initialState: DataState = {
   selectedRoomId: "",
   headerText: "",
   userRole: "",
+  user: null,
 };
 
 export const dataSlice = createSlice({
@@ -64,6 +67,9 @@ export const dataSlice = createSlice({
     setUserRoleId: (state, action) => {
       state.userRole = action.payload;
     },
+    setUser: (state, action) => {
+      state.user = action.payload;
+    },
   },
 });
 
@@ -79,6 +85,7 @@ export const {
   setIsActiveSession,
   setSelectedRoomId,
   setUserRoleId,
+  setUser,
 } = dataSlice.actions;
 
 export default dataSlice.reducer;

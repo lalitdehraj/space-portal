@@ -14,6 +14,8 @@ import {
 import { callApi } from "@/utils/apiIntercepter";
 import { UserProfile } from "@/types";
 import { URL_NOT_FOUND } from "@/constants";
+import { useDispatch, useSelector } from "react-redux";
+import { setUser } from "@/app/feature/dataSlice";
 
 // Dummy data to simulate API responses for the faculty member's profile
 const dummyFacultyData = {
@@ -64,8 +66,9 @@ const dummyFacultyData = {
 
 function ProfilePage() {
   const { data } = useSession();
+  const dispatcher = useDispatch();
   const userEmail = data?.user?.email;
-  const [user, setUser] = useState<UserProfile | null>(null);
+  const user = useSelector((state: any) => state.dataState.user);
   const [isLoadingUser, setIsLoadingUser] = useState(false);
 
   useEffect(() => {
@@ -81,7 +84,7 @@ function ProfilePage() {
             (u) =>
               u.userEmail.toLowerCase().trim() === email.toLowerCase().trim()
           );
-          setUser(filteredUsers?.[0] || null);
+          dispatcher(setUser(filteredUsers?.[0] || null))
           console.log(response);
         }
       } catch (error) {
@@ -165,8 +168,8 @@ function ProfilePage() {
 
       {/* Main Content Grid */}
       {/* <div className="grid grid-cols-1 md:grid-cols-2 gap-8 hidden"> */}
-        {/* Allocated Spaces Section */}
-        {/* <div className="space-y-4">
+      {/* Allocated Spaces Section */}
+      {/* <div className="space-y-4">
           <h2 className="text-xl font-bold text-gray-800">Allocated Spaces</h2>
           <ul className="space-y-4">
             {allocatedSpaces.map((space) => (
@@ -189,8 +192,8 @@ function ProfilePage() {
             ))}
           </ul>
         </div> */}
-        {/* Pending Requests Section */}
-        {/* <div className="space-y-4">
+      {/* Pending Requests Section */}
+      {/* <div className="space-y-4">
           <h2 className="text-xl font-bold text-gray-800">Recent Requests</h2>
           <ul className="space-y-4">
             {pendingRequests.map((request) => (

@@ -522,7 +522,7 @@ function GenerateReportForm({ onClosePressed, startJob }: FormProps) {
         setRooms([]);
         return;
       }
-      const floorIds = building.floors?.map((f) => f.floorId) || [];
+      const floorIds = building.floors?.map((f) => f.id) || [];
       if (floorIds.length === 0) {
         setRooms([]);
         return;
@@ -577,14 +577,14 @@ function GenerateReportForm({ onClosePressed, startJob }: FormProps) {
     } else if (reportType === "department") {
       const departmentName = buildings
         .find((b) => b.id === selectedBuildingId)
-        ?.floors.find((f) => f.floorId === selectedFloorId)?.floorName;
+        ?.floors.find((f) => f.id === selectedFloorId)?.name;
       fileName = `${
         departmentName || "Department"
       }_${customStartDate}_${customEndDate}`;
     } else if (reportType === "faculty") {
       const departmentName = buildings
         .find((b) => b.id === selectedBuildingId)
-        ?.floors.find((f) => f.floorId === selectedFloorId)?.floorName;
+        ?.floors.find((f) => f.id === selectedFloorId)?.name;
       const facultyName = rooms.find(
         (r) => r.roomId === selectedRoomId
       )?.roomName;
@@ -670,8 +670,8 @@ function GenerateReportForm({ onClosePressed, startJob }: FormProps) {
                       ? buildings
                           .filter((b) => b.id === selectedBuildingId)[0]
                           .floors.map((f) => (
-                            <option key={f.floorId} value={f.floorId}>
-                              {f.floorName}
+                            <option key={f.id} value={f.id}>
+                              {f.name}
                             </option>
                           ))
                       : null}
@@ -715,8 +715,8 @@ function GenerateReportForm({ onClosePressed, startJob }: FormProps) {
                       ? buildings
                           .filter((b) => b.id === selectedBuildingId)[0]
                           .floors.map((f) => (
-                            <option key={f.floorId} value={f.floorId}>
-                              {f.floorName}
+                            <option key={f.id} value={f.id}>
+                              {f.name}
                             </option>
                           ))
                       : null}
@@ -777,7 +777,7 @@ function GenerateReportForm({ onClosePressed, startJob }: FormProps) {
                       <option value="">Select year</option>
                       {academicYearsList?.map((y) => (
                         <option key={y.Code} value={y.Code}>
-                          {y.Description}
+                          {y.Code}
                         </option>
                       ))}
                     </select>

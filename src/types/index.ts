@@ -3,8 +3,8 @@ export interface Building {
   name: string;
   totalFloors: number;
   totalRooms: number;
-  totalCapacity: number;
-  totalOccupiedRooms: number;
+  totalOccupancy: number;
+  occupied: number;
   image: string;
   floors: Floor[];
 }
@@ -18,10 +18,10 @@ export interface Department {
   departmentName: string;
 }
 export interface Floor {
-  floorId: string;
-  floorName: string;
+  id: string;
+  name: string;
   totalRoomsOnFloor: number;
-  roomsOccupied: number;
+  roomOccupied: number;
   floorArea: string;
 }
 
@@ -44,10 +44,11 @@ export interface Room {
 export interface Occupant {
   occupantName?: string;
   type?: string;
-  eventId: string;
-  startTime: Date|string;
+  Id: string;
+  startTime: Date | string;
   scheduledDate?: Date;
-  endTime: Date|string;
+  endTime: Date | string;
+  isEditable?: Boolean;
 }
 
 export interface SearchResult {
@@ -172,18 +173,41 @@ export interface Faculty {
 }
 
 export interface Allocation {
-  id?: string;
-  programCode: string;
-  courseName?: string;
-  buildingId: string;
-  floorId: string;
-  roomId: string;
-  roomName?: string;
-  acadSession: string;
-  acadYear: string;
+  blockNo: string;
+  systemId: string;
+  roomNo: string;
+  floor: string;
+  typeOfCourse: string;
+  roomName: string;
+  facultyCode: string;
+  department: string;
+  classType: string;
+  program: string;
+  section: string;
+  semester: string;
+  session: string;
+  academicYear: string;
 }
 
 export interface Course {
   code: string;
   description: string;
+}
+
+export interface SpaceAllocation {
+  allocationDate: string;
+  startTime: string;
+  endTime: string;
+  purpose?: string; //
+  allocatedRoomID?: string;
+  buildingId?: string;
+  academicSession: string;
+  academicYear: string;
+  allocatedTo: string;
+  isAllocationActive?: Boolean;
+  keyAssigned?: string;
+  remarks?: string;
+  allocatedfrom?: string;
+  allocatedBy?: string;
+  allocatedOnDate?: string;
 }

@@ -82,7 +82,7 @@ export default function Buildings() {
               process.env.NEXT_PUBLIC_GET_ROOMS_LIST || URL_NOT_FOUND,
               {
                 buildingNo: String(b.id),
-                floorID: String(f.floorId),
+                floorID: String(f.id),
                 curreentTime: `${time24h}`,
               }
             );

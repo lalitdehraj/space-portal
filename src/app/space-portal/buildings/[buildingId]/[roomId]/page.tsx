@@ -1,14 +1,16 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { RoomInfo } from "@/types";
+import { RoomInfo, SpaceAllocation } from "@/types";
 import { BuildingSVG } from "@/components/BuildingSvg";
 import { callApi } from "@/utils/apiIntercepter";
 import { URL_NOT_FOUND } from "@/constants";
-import { encrypt, decrypt } from "@/utils/encryption";
+import { decrypt } from "@/utils/encryption";
 import { useSelector } from "react-redux";
 import WeeklyTimetable from "./WeeklyTimetable";
 import AddAssignmentForm from "./AddAssignmentForm";
+import moment from "moment";
+import { Slot } from "@/utils/slotsHelper";
 
 function RoomPage() {
   const params = useParams();
@@ -26,50 +28,109 @@ function RoomPage() {
   const academicSessionEndDate = useSelector(
     (state: any) => state.dataState.selectedAcademicSessionEndDate
   );
-  let roomId = decrypt(params.roomId?.toString() || "");
+  const string = decrypt(params.roomId?.toString() || "");
+  const buildingId = decrypt(params.buildingId?.toString() || "");
+  const roomId = string.split("|")?.[0];
+  const subRoomId = string.split("|")?.[1];
   const [isAllocationFormVisible, setIsAllocationFormVisible] = useState(false);
   const [room, setRoom] = useState<RoomInfo>();
   const [startDate, setStartDate] = useState(() => new Date());
   const [selectedSlot, setSelectedSlot] = useState<{
-    date: Date;
+    date: string;
     start: string;
     end: string;
   } | null>(null);
 
-  useEffect(() => {
+  const fetchRoomInfo = async () => {
     if (
-      !acadmeicYear &&
-      !acadmeicSession &&
-      !academicSessionStartDate &&
+      !roomId ||
+      !acadmeicYear ||
+      !acadmeicSession ||
+      !academicSessionStartDate ||
       !academicSessionEndDate
     )
       return;
-    const fetchRoomInfo = async (roomId: string) => {
-      const requestbody = {
-        roomID: roomId,
-        subroomID: 0,
-        academicYr: acadmeicYear,
-        acadSess: acadmeicSession,
-        startDate: academicSessionStartDate,
-        endDate: academicSessionEndDate,
-      };
-      let response = callApi<RoomInfo>(
-        process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND,
-        requestbody
-      );
-      let res = await response;
-      if (res.success) {
-        let room = res.data;
-        setRoom(room);
-      }
+    const requestbody = {
+      roomID: roomId,
+      subroomID: subRoomId ?? 0,
+      academicYr: acadmeicYear,
+      acadSess: acadmeicSession,
+      startDate: academicSessionStartDate,
+      endDate: academicSessionEndDate,
     };
-    fetchRoomInfo(roomId);
+    let response = callApi<RoomInfo>(
+      process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND,
+      requestbody
+    );
+    let res = await response;
+    if (res.success) {
+      let room = res.data;
+      setRoom(room);
+    }
+  };
+  useEffect(() => {
+    if (
+      !acadmeicYear ||
+      !acadmeicSession ||
+      !academicSessionStartDate ||
+      !academicSessionEndDate
+    ) {
+      return;
+    }
+    fetchRoomInfo();
   }, [
     acadmeicYear,
     acadmeicSession,
     academicSessionStartDate,
     academicSessionEndDate,
   ]);
+
+  const handleTimeTableClick = (
+    date: string,
+    slot: { start: string; end: string }
+  ) => {
+    const slotDate = moment(date);
+    const startSlotTime = moment(slot.start, "HH:mm");
+    const exactSlotStartTime = slotDate
+      .hour(startSlotTime.hour())
+      .minute(startSlotTime.minute());
+    setSelectedSlot({
+      date,
+      start: moment().isSameOrBefore(exactSlotStartTime)
+        ? slot.start
+        : moment().format("HH:mm"),
+      end: slot.end,
+    });
+    setIsAllocationFormVisible(true);
+  };
+
+  const handleSpaceAllocations = async (allocations: SpaceAllocation[]) => {
+    let allSucceeded = true;
+
+    for (const allocation of allocations) {
+      try {
+        const response = await callApi<any>(
+          process.env.NEXT_PUBLIC_INSERT_SPACE_ALLOCATION_ENTRY ||
+            URL_NOT_FOUND,
+          allocation
+        );
+
+        if (!response?.data) {
+          console.warn("Insert failed for allocation:", allocation, response);
+          allSucceeded = false;
+        } else {
+          console.log("Inserted allocation:", response);
+        }
+      } catch (error) {
+        console.error("Error inserting allocation:", allocation, error);
+        allSucceeded = false;
+      }
+    }
+
+    if (allSucceeded) {
+      fetchRoomInfo();
+    }
+  };
 
   const percentage = (room?.occupied || 0) / (room?.capacity || 0);
   const circumference = 2 * Math.PI * 28;
@@ -235,14 +296,7 @@ function RoomPage() {
                     occupants={room.occupants || []}
                     academicSessionStartDate={academicSessionStartDate || ""}
                     academicSessionEndDate={academicSessionEndDate || ""}
-                    onClickTimeTableSlot={(date, slot) => {
-                      setSelectedSlot({
-                        date,
-                        start: slot.start,
-                        end: slot.end,
-                      });
-                      setIsAllocationFormVisible(true);
-                    }}
+                    onClickTimeTableSlot={handleTimeTableClick}
                   />
                 </div>
               </div>
@@ -252,12 +306,13 @@ function RoomPage() {
       </section>
       {isAllocationFormVisible && (
         <AddAssignmentForm
+          buildingId={buildingId}
+          onSuccessfulSlotsCreation={handleSpaceAllocations}
           onClose={() => {
             setIsAllocationFormVisible(false);
           }}
-          // roomOccupants={room.occupants || []}
-          // academicSessionStartDate={academicSessionStartDate || ""}
-          // academicSessionEndDate={academicSessionEndDate || ""}
+          occupants={room.occupants || []}
+          roomId={subRoomId ? subRoomId : roomId}
           initialDate={selectedSlot?.date}
           initialStartTime={selectedSlot?.start}
           initialEndTime={selectedSlot?.end}

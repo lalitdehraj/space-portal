@@ -21,9 +21,7 @@ export default function Buildings() {
   const acadmeicSession = useSelector(
     (state: any) => state.dataState.selectedAcademicSession
   );
-  const isActiveSession = useSelector(
-    (state: any) => state.dataState.isActiveSession
-  );
+
   const encryptAndPush = (id: string) => {
     let encrytedId = encrypt(id);
     router.push(`/space-portal/buildings/${encrytedId}`);

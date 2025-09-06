@@ -59,9 +59,10 @@ export default function Buildings() {
           (building) => building.id === buildingId
         );
         setSelectedBuilding(building);
+        console.log(building);
         if ((building?.floors?.length || 0) > 0) {
           const floor = building?.floors.filter(
-            (f) => f.floorId === selectedFloorId
+            (f) => f.id === selectedFloorId
           );
           setSelectedFloor(
             floor && (floor?.length || 0) > 0 ? floor?.[0] : building?.floors[0]
@@ -80,7 +81,7 @@ export default function Buildings() {
       const time24h = `${hours}:${minutes}`;
       const reqBody = {
         buildingNo: `${buildingId}`,
-        floorID: `${selectedFloor?.floorId}`,
+        floorID: `${selectedFloor?.id}`,
         curreentTime: `${time24h}`,
       };
 
@@ -110,7 +111,10 @@ export default function Buildings() {
     },
     {
       title: "Occupancy",
-      value: selectedFloor?.roomsOccupied,
+      value: `${Math.ceil(
+        (selectedFloor?.roomOccupied || 0) /
+          (selectedBuilding?.totalOccupancy || 1)
+      )}%`,
       iconSrc: "/images/floor-plan.svg",
       alt: "Occupancy icon",
     },
@@ -166,7 +170,7 @@ export default function Buildings() {
   }, [selectedRoom, acadmeicSession, acadmeicYear]);
   const handleFloorClick = (floor: Floor) => {
     setSelectedFloor(floor);
-    dispatcher(setSelectedFloorId(floor.floorId));
+    dispatcher(setSelectedFloorId(floor.id));
   };
 
   const handleRoomClick = (room: Room) => {
@@ -175,11 +179,18 @@ export default function Buildings() {
       setSelectedRoom(room.roomId === selectedRoom?.roomId ? undefined : room);
     } else {
       dispatcher(setSelectedRoomId(""));
-      router.push(
-        `/space-portal/buildings/${encrypt(selectedBuilding?.id)}/${encrypt(
-          room.roomId
-        )}`
-      );
+      if (room.parentId) {
+        router.push(
+          `/space-portal/buildings/${encrypt(buildingId)}/${encrypt(
+            `${room.parentId}|${room.roomId}`
+          )}`
+        );
+      } else
+        router.push(
+          `/space-portal/buildings/${encrypt(buildingId)}/${encrypt(
+            room.roomId
+          )}`
+        );
     }
   };
 
@@ -283,16 +294,16 @@ export default function Buildings() {
             <div className="mt-4 flex gap-2 overflow-x-auto pb-2">
               {selectedBuilding?.floors?.map((floor) => (
                 <button
-                  key={floor.floorId}
+                  key={floor.id}
                   className={`flex items-center rounded-md px-4 py-2 text-xs transition-all ${
-                    selectedFloor?.floorId === floor.floorId
+                    selectedFloor?.id === floor.id
                       ? "bg-[#F26722] text-white shadow-md"
                       : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                   }`}
                   onClick={() => handleFloorClick(floor)}
                 >
                   <FloorSVG className="mr-2 h-4 w-4" />
-                  {floor.floorName}
+                  {floor.name}
                 </button>
               ))}
             </div>
