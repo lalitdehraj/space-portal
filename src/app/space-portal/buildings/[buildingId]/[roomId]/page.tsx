@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { RoomInfo, SpaceAllocation } from "@/types";
+import { Building, Occupant, RoomInfo, SpaceAllocation } from "@/types";
 import { BuildingSVG } from "@/components/BuildingSvg";
 import { callApi } from "@/utils/apiIntercepter";
 import { URL_NOT_FOUND } from "@/constants";
@@ -10,12 +10,12 @@ import { useSelector } from "react-redux";
 import WeeklyTimetable from "./WeeklyTimetable";
 import AddAssignmentForm from "./AddAssignmentForm";
 import moment from "moment";
-import { Slot } from "@/utils/slotsHelper";
 
 function RoomPage() {
   const params = useParams();
   const router = useRouter();
   const userRole = useSelector((state: any) => state.dataState.userRole);
+  const [isManagedByThisUser, setIsManagedByThisUser] = useState(false);
   const acadmeicYear = useSelector(
     (state: any) => state.dataState.selectedAcademicYear
   );
@@ -28,19 +28,49 @@ function RoomPage() {
   const academicSessionEndDate = useSelector(
     (state: any) => state.dataState.selectedAcademicSessionEndDate
   );
+
   const string = decrypt(params.roomId?.toString() || "");
   const buildingId = decrypt(params.buildingId?.toString() || "");
   const roomId = string.split("|")?.[0];
   const subRoomId = string.split("|")?.[1];
+
   const [isAllocationFormVisible, setIsAllocationFormVisible] = useState(false);
-  const [room, setRoom] = useState<RoomInfo>();
+  const [roomInfo, setRoomInfo] = useState<RoomInfo>();
   const [startDate, setStartDate] = useState(() => new Date());
   const [selectedSlot, setSelectedSlot] = useState<{
     date: string;
     start: string;
     end: string;
   } | null>(null);
+  const [allBuildingsData, setAllBuildingsData] = useState<Building[]>([]);
+  const [selectedWeekStart, setSelectedWeekStart] = useState(() =>
+    moment().startOf("isoWeek").toDate()
+  );
 
+  const MAX_WEEKLY_MINUTES = 63 * 60; // adjustable max weekly minutes
+
+  /** Fetch all buildings */
+  useEffect(() => {
+    const fetchBuildings = async () => {
+      if (!acadmeicSession && !acadmeicYear) return;
+      try {
+        const reqBody = {
+          acadSession: `${acadmeicSession}`,
+          acadYear: `${acadmeicYear}`,
+        };
+        const response = await callApi<Building[]>(
+          process.env.NEXT_PUBLIC_GET_BUILDING_LIST || URL_NOT_FOUND,
+          reqBody
+        );
+        if (response.success) setAllBuildingsData(response.data || []);
+      } catch (error) {
+        console.error("Error fetching buildings:", error);
+      }
+    };
+    fetchBuildings();
+  }, [acadmeicSession, acadmeicYear]);
+
+  /** Fetch room info */
   const fetchRoomInfo = async () => {
     if (
       !roomId ||
@@ -58,26 +88,31 @@ function RoomPage() {
       startDate: academicSessionStartDate,
       endDate: academicSessionEndDate,
     };
-    let response = callApi<RoomInfo>(
-      process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND,
-      requestbody
-    );
-    let res = await response;
-    if (res.success) {
-      let room = res.data;
-      setRoom(room);
+    try {
+      const res = await callApi<RoomInfo>(
+        process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND,
+        requestbody
+      );
+      const isAllocationAllowed = res.data?.managedBy?.split("|").some((d) => {
+        return d.toUpperCase() === userRole?.toUpperCase();
+      });
+      console.log(isAllocationAllowed);
+      setIsManagedByThisUser(isAllocationAllowed || false);
+      if (res.success) setRoomInfo(res.data);
+    } catch (error) {
+      console.error("Error fetching room info:", error);
     }
   };
+
   useEffect(() => {
     if (
-      !acadmeicYear ||
-      !acadmeicSession ||
-      !academicSessionStartDate ||
-      !academicSessionEndDate
+      acadmeicYear &&
+      acadmeicSession &&
+      academicSessionStartDate &&
+      academicSessionEndDate
     ) {
-      return;
+      fetchRoomInfo();
     }
-    fetchRoomInfo();
   }, [
     acadmeicYear,
     acadmeicSession,
@@ -85,28 +120,33 @@ function RoomPage() {
     academicSessionEndDate,
   ]);
 
+  /** Handle timetable slot click */
   const handleTimeTableClick = (
     date: string,
     slot: { start: string; end: string }
   ) => {
-    const slotDate = moment(date);
-    const startSlotTime = moment(slot.start, "HH:mm");
-    const exactSlotStartTime = slotDate
-      .hour(startSlotTime.hour())
-      .minute(startSlotTime.minute());
-    setSelectedSlot({
-      date,
-      start: moment().isSameOrBefore(exactSlotStartTime)
-        ? slot.start
-        : moment().format("HH:mm"),
-      end: slot.end,
-    });
-    setIsAllocationFormVisible(true);
+    if (isManagedByThisUser) {
+      const slotDate = moment(date);
+      const startSlotTime = moment(slot.start, "HH:mm");
+      const exactSlotStartTime = slotDate
+        .hour(startSlotTime.hour())
+        .minute(startSlotTime.minute());
+      setSelectedSlot({
+        date,
+        start: moment().isSameOrBefore(exactSlotStartTime)
+          ? slot.start
+          : moment().format("HH:mm"),
+        end: slot.end,
+      });
+      setIsAllocationFormVisible(true);
+    } else {
+      alert("You cannot manage this room !");
+    }
   };
 
+  /** Handle space allocations */
   const handleSpaceAllocations = async (allocations: SpaceAllocation[]) => {
     let allSucceeded = true;
-
     for (const allocation of allocations) {
       try {
         const response = await callApi<any>(
@@ -114,51 +154,75 @@ function RoomPage() {
             URL_NOT_FOUND,
           allocation
         );
-
         if (!response?.data) {
           console.warn("Insert failed for allocation:", allocation, response);
           allSucceeded = false;
-        } else {
-          console.log("Inserted allocation:", response);
         }
       } catch (error) {
         console.error("Error inserting allocation:", allocation, error);
         allSucceeded = false;
       }
     }
-
-    if (allSucceeded) {
-      fetchRoomInfo();
-    }
+    if (allSucceeded) fetchRoomInfo();
   };
 
-  const percentage = (room?.occupied || 0) / (room?.capacity || 0);
+  /** Weekly occupancy calculation based on selected week */
+  const startOfSelectedWeek = moment(selectedWeekStart).startOf("isoWeek");
+  const endOfSelectedWeek = moment(selectedWeekStart).endOf("isoWeek");
+
+  const weeklyOccupants =
+    roomInfo?.occupants?.filter((o: Occupant) => {
+      if (!o.scheduledDate) return false;
+      const scheduled = moment(o.scheduledDate);
+      return scheduled.isBetween(
+        startOfSelectedWeek,
+        endOfSelectedWeek,
+        "day",
+        "[]"
+      );
+    }) || [];
+
+  const weeklyOccupancy = weeklyOccupants.length;
+
+  const totalMinutes = weeklyOccupants.reduce((sum, occupant) => {
+    if (!occupant.startTime || !occupant.endTime) return sum;
+    const start = moment(occupant.startTime, "HH:mm");
+    const end = moment(occupant.endTime, "HH:mm");
+    return sum + Math.max(end.diff(start, "minutes"), 0);
+  }, 0);
+
+  const percentage = (totalMinutes || 0) / MAX_WEEKLY_MINUTES;
   const circumference = 2 * Math.PI * 28;
   const strokeDashoffset = circumference - percentage * circumference;
   const borderColor =
-    room?.occupied === 0
+    roomInfo?.occupied === 0
       ? "text-green-400"
-      : (room?.occupied || 0) >= (room?.capacity || 0) * 0.8
+      : totalMinutes >= MAX_WEEKLY_MINUTES * 0.8
       ? "text-red-500"
       : "text-yellow-400";
 
-  return room ? (
+  return roomInfo ? (
     <>
       <section className="bg-white w-full">
         <div className="flex justify-between">
           <div>
             <h4 className="text-base font-semibold text-gray-800 md:ml-2">
-              {room?.floor?.toUpperCase()} - Room Details
+              {allBuildingsData
+                .filter((b) => b.id === roomInfo.building)?.[0]
+                .floors.filter((f) => f.id === roomInfo.floor)?.[0]
+                .name.toUpperCase()}{" "}
+              - Room Details
             </h4>
             <span className="text-xs font-semibold text-gray-500 md:ml-2">
-              {room.building}
+              {
+                allBuildingsData.filter((b) => b.id === roomInfo.building)?.[0]
+                  ?.name
+              }
             </span>
           </div>
           <button
             className="mt-4 flex h-fit items-center rounded-md bg-[#F26722] px-4 py-2 text-xs text-white shadow-md transition-all hover:bg-[#a5705a] md:mt-0"
-            onClick={() => {
-              router.back();
-            }}
+            onClick={() => router.back()}
           >
             <BuildingSVG className="mr-2 h-4 w-4 fill-white" />
             Back
@@ -173,38 +237,38 @@ function RoomPage() {
                   <div className="flex items-center">
                     <div
                       className={`w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold ${
-                        room?.occupied === 0
+                        weeklyOccupancy === 0
                           ? "bg-green-500"
-                          : room.occupied >= room.capacity * 0.8
+                          : weeklyOccupancy >= 63 * 0.8
                           ? "bg-orange-500"
                           : "bg-yellow-500"
                       }`}
                     >
-                      {room?.roomName?.split(" ")[0].substring(0, 3)}
+                      {roomInfo?.roomName?.split(" ")[0].substring(0, 3)}
                     </div>
                     <div className="ml-4">
                       <h2 className="text font-[500] text-gray-600">
-                        {room.roomName}
+                        {roomInfo.roomName}
                       </h2>
                       <div className="flex items-center mt-1">
                         <span
                           className={`px-2 py-0.5 text-xs rounded-full ${
-                            room.occupied === 0
+                            weeklyOccupancy === 0
                               ? "bg-green-100 text-green-800"
-                              : room.occupied >= room.capacity * 0.8
+                              : weeklyOccupancy >= 63 * 0.8
                               ? "bg-red-100 text-orange-500"
                               : "bg-yellow-100 text-yellow-800"
                           }`}
                         >
-                          {room.occupied === 0
+                          {weeklyOccupancy === 0
                             ? "Available"
-                            : room.occupied >= room.capacity * 0.8
+                            : weeklyOccupancy >= 63 * 0.8
                             ? "High Occupancy"
                             : "Moderate Occupancy"}
                         </span>
                         <span className="mx-2 text-gray-400">•</span>
                         <span className="text-xs text-gray-600">
-                          Room ID: {room.id}
+                          Room ID: {roomInfo.id}
                         </span>
                       </div>
                     </div>
@@ -252,22 +316,33 @@ function RoomPage() {
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
                     <div>
                       <p className="text-sm text-gray-500">Capacity</p>
-                      <p className="text-lg font-semibold">{room.capacity}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-500">Today's Bookings</p>
-                      <p className="text-lg font-semibold">{room.occupied}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-500">Room Area</p>
                       <p className="text-lg font-semibold">
-                        {/* {room.capacity - room.occupied} */}
-                        40
+                        {roomInfo.capacity}
                       </p>
                     </div>
                     <div>
+                      <p className="text-sm text-gray-500">Today's Bookings</p>
+                      <p className="text-lg font-semibold">
+                        {
+                          roomInfo.occupants?.filter(
+                            (o) =>
+                              moment().format("YYYY-MM-DD") ===
+                              moment(new Date(o.scheduledDate)).format(
+                                "YYYY-MM-DD"
+                              )
+                          ).length
+                        }
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500">Room Area</p>
+                      <p className="text-lg font-semibold">{`${roomInfo.roomArea} Sq. ft.`}</p>
+                    </div>
+                    <div>
                       <p className="text-sm text-gray-500">Room Type</p>
-                      <p className="text-lg font-semibold">{room.roomType}</p>
+                      <p className="text-lg font-semibold">
+                        {roomInfo.roomType}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -277,23 +352,27 @@ function RoomPage() {
                     <h3 className="text-lg font-semibold mb-4 text-gray-500">
                       Current Assignment
                     </h3>
-                    {room.managedBy?.split("|").includes(userRole) && (
+                    {roomInfo.managedBy?.split("|").includes(userRole) && (
                       <button
                         className="mt-4 flex h-fit items-center rounded-md bg-[#F26722] px-4 py-2 text-xs text-white shadow-md transition-all hover:bg-[#a5705a] md:mt-0"
-                        onClick={() => {
-                          setIsAllocationFormVisible(true);
-                        }}
+                        onClick={() => setIsAllocationFormVisible(true)}
                       >
                         + Add Allocation
                       </button>
                     )}
                   </div>
 
-                  {/* Replace this table with WeeklyTimetable */}
                   <WeeklyTimetable
                     startDate={startDate}
-                    setStartDate={setStartDate}
-                    occupants={room.occupants || []}
+                    isManagedByThisUser={isManagedByThisUser}
+                    refreshData={() => fetchRoomInfo()}
+                    setStartDate={(date) => {
+                      setStartDate(date);
+                      setSelectedWeekStart(
+                        moment(date).startOf("isoWeek").toDate()
+                      );
+                    }}
+                    occupants={roomInfo.occupants || []}
                     academicSessionStartDate={academicSessionStartDate || ""}
                     academicSessionEndDate={academicSessionEndDate || ""}
                     onClickTimeTableSlot={handleTimeTableClick}
@@ -304,14 +383,13 @@ function RoomPage() {
           </div>
         </div>
       </section>
+
       {isAllocationFormVisible && (
         <AddAssignmentForm
           buildingId={buildingId}
           onSuccessfulSlotsCreation={handleSpaceAllocations}
-          onClose={() => {
-            setIsAllocationFormVisible(false);
-          }}
-          occupants={room.occupants || []}
+          onClose={() => setIsAllocationFormVisible(false)}
+          occupants={roomInfo.occupants || []}
           roomId={subRoomId ? subRoomId : roomId}
           initialDate={selectedSlot?.date}
           initialStartTime={selectedSlot?.start}

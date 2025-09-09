@@ -195,13 +195,16 @@ export default function RequestApprovalPage() {
     };
   }, [filterRef]);
 
-  const handleSort = (header: string, sortOrder: sortingTypes) => {
-    setActiveHeader(tableHeadersList[header]);
-    setSortState(
-      activeHeader === tableHeadersList[header] && sortState === sortOrder
-        ? ""
-        : sortOrder
-    );
+  const handleSort = (header: string) => {
+    if (activeHeader !== tableHeadersList[header]) {
+      setActiveHeader(tableHeadersList[header]);
+      setSortState("asc");
+    } else if (sortState === "asc") {
+      setSortState("desc");
+    } else if (sortState === "desc") {
+      setSortState("");
+      setActiveHeader("");
+    }
   };
 
   const handleFilterChange = (filterType: string, value: string) => {
@@ -349,12 +352,12 @@ export default function RequestApprovalPage() {
                   >
                     <div
                       className="flex items-center"
-                      onClick={() => handleSort(header, "asc")}
+                      onClick={() => handleSort(header)}
                     >
                       {header}
                       <span className="ml-2 flex-none rounded text-gray-400 group-hover:visible invisible">
                         <svg
-                          className={`h-5 w-5 ${
+                          className={`h-3 w-3 ${
                             activeHeader === tableHeadersList[header] &&
                             sortState === "asc"
                               ? "fill-orange-400 visible"
@@ -365,13 +368,12 @@ export default function RequestApprovalPage() {
                           viewBox="0 0 20 20"
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleSort(header, "asc");
                           }}
                         >
                           <path d="M10.707 3.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L9 6.414V17a1 1 0 102 0V6.414l5.293 5.293a1 1 0 001.414-1.414l-7-7z" />
                         </svg>
                         <svg
-                          className={`mt-1 h-5 w-5 ${
+                          className={` h-3 w-3 ${
                             activeHeader === tableHeadersList[header] &&
                             sortState === "desc"
                               ? "fill-orange-400 visible"
@@ -382,7 +384,6 @@ export default function RequestApprovalPage() {
                           viewBox="0 0 20 20"
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleSort(header, "desc");
                           }}
                         >
                           <path d="M9.293 16.707a1 1 0 001.414 0l7-7a1 1 0 00-1.414-1.414L11 13.586V3a1 1 0 10-2 0v10.586l-5.293-5.293a1 1 0 00-1.414 1.414l7 7z" />

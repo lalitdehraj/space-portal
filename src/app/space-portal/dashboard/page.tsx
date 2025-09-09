@@ -20,6 +20,7 @@ import { callApi } from "@/utils/apiIntercepter";
 import { URL_NOT_FOUND } from "@/constants";
 import { useSelector } from "react-redux";
 import { Building, DashboardDataResponse } from "@/types";
+import moment from "moment";
 
 export default function Dashboard() {
   const [data, setData] = useState<DashboardDataResponse | null>(null);
@@ -28,26 +29,39 @@ export default function Dashboard() {
   const acadmeicYear = useSelector(
     (state: any) => state.dataState.selectedAcademicYear
   );
+  const isActiveSession = useSelector(
+    (state: any) => state.dataState.isActiveSession
+  );
+  const sessionStartDate = useSelector(
+    (state: any) => state.dataState.selectedAcademicSessionStartDate
+  );
+  const sessionEndDate = useSelector(
+    (state: any) => state.dataState.selectedAcademicSessionEndDate
+  );
   const acadmeicSession = useSelector(
     (state: any) => state.dataState.selectedAcademicSession
   );
   const [days, setDays] = useState("7");
 
+  const [allBuildingsData, setAllBuildingsData] = useState<Building[]>([]);
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   useEffect(() => {
     const fetchDashboardData = async () => {
       setIsLoadingDashboard(true);
       try {
         const requestBody = {
-          noOfDays: days,
-          acadmeicSession: acadmeicSession,
-          acadmeicYear: acadmeicYear,
+          currentTime: moment().format("HH:mm:ss"),
+          endDate: endDate,
+          startDate: startDate,
+          academicSession: acadmeicSession,
         };
-        let response = callApi<DashboardDataResponse>(
-          process.env.NEXT_PUBLIC_GET_DASHBOARD_DATA || URL_NOT_FOUND,
+        let response = await callApi<DashboardDataResponse>(
+          process.env.NEXT_PUBLIC_DASHBOARD_URL || URL_NOT_FOUND,
           requestBody
         );
-        let res = await response;
-        setData(res.data || null);
+        console.log(response.data);
+        setData(response.data || null);
       } catch (error) {
         console.error("Error fetching dashboard data:", error);
       } finally {
@@ -55,10 +69,31 @@ export default function Dashboard() {
       }
     };
     fetchDashboardData();
-  }, [days, acadmeicYear, acadmeicSession]);
+  }, [startDate, endDate]);
 
-  const [allBuildingsData, setAllBuildingsData] = useState<Building[]>([]);
-
+  useEffect(() => {
+    if (
+      !(
+        days &&
+        acadmeicSession &&
+        acadmeicYear &&
+        sessionEndDate &&
+        sessionEndDate
+      )
+    )
+      return;
+    if (isActiveSession) {
+      setEndDate(moment().format("YYYY-MM-DD"));
+      setStartDate(
+        moment()
+          .subtract(parseInt(days === "7" ? "7" : "30"), "day")
+          .format("YYYY-MM-DD")
+      );
+    } else {
+      setStartDate(sessionStartDate);
+      setEndDate(sessionEndDate);
+    }
+  }, [days, acadmeicSession, acadmeicYear, sessionStartDate, sessionEndDate]);
   useEffect(() => {
     const fetchBuildings = async () => {
       if (!acadmeicSession && !acadmeicYear) return;
@@ -115,10 +150,15 @@ export default function Dashboard() {
     },
     {
       title: "Average Occupancy",
-      value: data?.avgOccupancy,
+      value:
+        Math.ceil(
+          (data?.graphDataPoints?.reduce((sum, g) => {
+            return sum + parseFloat(g.OccupancyRate);
+          }, 0) || 0) * 100
+        ) / 100,
       iconSrc: "/images/seat-outline.svg",
       alt: "Seat icon",
-      extraContent: (
+      extraContent: isActiveSession && (
         <div className="flex items-center">
           <Image
             src="/images/calendar.svg"
@@ -128,6 +168,7 @@ export default function Dashboard() {
             className="mr-2"
           />
           <select
+            value={days}
             onChange={(e) => setDays(e.target.value)}
             className="h-fit w-fit rounded-md bg-gray-100 px-1 py-1 text-[10px] font-light text-gray-700"
           >
@@ -145,7 +186,7 @@ export default function Dashboard() {
     },
     {
       title: "Available Facilities",
-      value: data?.availabeFacilities,
+      value: data?.availableFacilities,
       iconSrc: "/images/cil-library-building.svg",
       alt: "Facility icon",
     },
@@ -166,7 +207,13 @@ export default function Dashboard() {
         </div>
         <ResponsiveContainer width="100%" height={280}>
           <LineChart
-            data={data?.graphData}
+            data={data?.graphDataPoints.map((g) => {
+              return {
+                OccupancyRate:
+                  Math.ceil(parseFloat(g.OccupancyRate) * 100) / 100,
+                time: moment(new Date(g.time)).format("DD-MM"),
+              };
+            })}
             margin={{
               top: 5,
               right: 30,
@@ -190,8 +237,8 @@ export default function Dashboard() {
               axisLine={{ stroke: "#666666" }}
             />
             <Tooltip
-              formatter={(value) => [`${value}%`, "Occupancy Rate"]}
-              labelFormatter={(label) => `Hour: ${label}`}
+              formatter={(value) => [`${value}%`, "OccupancyRate"]}
+              labelFormatter={(label) => `Date: ${label}`}
               contentStyle={{
                 borderRadius: "8px",
                 border: "none",
@@ -201,10 +248,10 @@ export default function Dashboard() {
             />
             <Line
               type="monotone"
-              dataKey="Occupancy Rate"
+              dataKey="OccupancyRate"
               stroke="#3b82f6"
               strokeWidth={2}
-              dot={{ r: 4, fill: "#3b82f6", stroke: "#fff", strokeWidth: 1 }} // Dots on the line
+              dot={{ r: 3, fill: "#3b82f6", stroke: "#fff", strokeWidth: 1 }} // Dots on the line
               activeDot={{
                 r: 6,
                 fill: "#3b82f6",
@@ -251,7 +298,7 @@ export default function Dashboard() {
       {
         id: 3,
         title: "Maintenance Issues",
-        value: "7",
+        value: data?.maintenanceIssues,
         description: "High priority",
         icon: <AlertTriangle className="text-yellow-500" size={24} />,
       },
@@ -405,4 +452,29 @@ export default function Dashboard() {
       </section>
     </div>
   );
+}
+
+
+
+
+type getReportData=  ( roomId:string,startDate:"YYYY-MM-DD",endDate:"YYYY-MM-DD")=>{
+  roomNo:string // room id would be passed here 
+  programName: string// program fetch program name using room allocation,
+  programCode:string// program code using room allocation
+  roomType:string// type of room 
+  facultyName :string// Employee name 
+  employeeId:string//Employee id to which the room is allocated
+  buildingId:string//buildingId of the particular building of that room
+  facultyBlockName:string // in case of faculty block type write name here 
+  keys:string // keys of the room 
+  roomCapacity:string // capacity of that room 
+  occupancyMon:string// in the selected date range find all mondays and calculate the total time in minutes
+  occupancyTues:string// in the selected date range find all tuesdays and calculate the total time in minutes
+  occupancyWed:string// in the selected date range find all wednesdays and calculate the total time in minutes
+  occupancyThus:string// in the selected date range find all thursdays and calculate the total time in minutes
+  occupancyFri:string// in the selected date range find all fridays and calculate the total time in minutes
+  occupancySat:string// in the selected date range find all saturdays and calculate the total time in minutes
+  occupancySun:string// in the selected date range find all sundays and calculate the total time in minutes
+  occupancyWeekly:string// sum up all occupancies above
+  totalOccupancy: string // in our case 9 hour * 60 minutes 
 }

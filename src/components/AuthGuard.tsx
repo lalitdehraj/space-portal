@@ -11,13 +11,14 @@ export default function AuthGuard({ children }: AuthGuardProps) {
   const { data: session, status } = useSession();
   const router = useRouter();
 
-  // useEffect(() => {
-  //   if (status === "loading") return;
+  useEffect(() => {
+    if (status === "loading") return;
 
-  //   if (!session) {
-  //     router.push("/login");
-  //   }
-  // }, [session, status, router]);
+    if (!session) {
+      router.push("/login");
+    }
+      
+  }, [session, status, router]);
 
   if (status === "loading") {
     return (

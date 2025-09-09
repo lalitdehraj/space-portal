@@ -4,6 +4,7 @@ import moment from "moment";
 export type Recurrence = "day" | "week" | "month" | "activeSession" | "custom";
 
 export type Slot = {
+  id:string
   date: string; // YYYY-MM-DD
   start: string; // HH:mm
   end: string; // HH:mm
@@ -146,6 +147,7 @@ export function buildSlotsWithWeekdays(params: {
       }
       while (cursor.isSameOrBefore(rangeEnd, "day")) {
         slots.push({
+          id:`${cursor.format("YYYY-MM-DD")},${startTime},${endTime}`,
           date: cursor.format("YYYY-MM-DD"),
           start: startTime,
           end: endTime,
@@ -161,6 +163,7 @@ export function buildSlotsWithWeekdays(params: {
   let cursor = rangeStart.clone();
   while (cursor.isSameOrBefore(rangeEnd, "day")) {
     slots.push({
+      id:`${cursor.format("YYYY-MM-DD")},${startTime},${endTime}`,
       date: cursor.format("YYYY-MM-DD"),
       start: startTime,
       end: endTime,
@@ -212,6 +215,10 @@ export function checkSlotConflicts(
   return conflicts; // return list of slots that are in conflict
 }
 
+export function areSlotsEqual(a: Slot, b: Slot): boolean {
+    return a.date === b.date && a.start === b.start && a.end === b.end;
+  }
+
 const s = buildSlotsWithWeekdays({
   startDate: "2025-09-04",
   startTime: "09:00",
@@ -221,33 +228,11 @@ const s = buildSlotsWithWeekdays({
 });
 
 const existingSlots: Slot[] = [
-  { date: "2025-09-05", start: "09:15", end: "10:05" },
-  { date: "2025-09-05", start: "10:20", end: "11:00" },
-  { date: "2025-09-05", start: "11:10", end: "11:55" },
-  { date: "2025-09-05", start: "12:05", end: "12:45" },
-  { date: "2025-09-05", start: "14:00", end: "14:40" },
-  { date: "2025-09-05", start: "15:15", end: "16:00" },
-  { date: "2025-09-05", start: "16:20", end: "17:10" },
-  { date: "2025-09-06", start: "09:00", end: "10:00" },
-  { date: "2025-09-06", start: "11:00", end: "11:45" },
-  { date: "2025-09-06", start: "14:10", end: "15:00" },
-  { date: "2025-09-06", start: "15:20", end: "16:00" },
-  { date: "2025-09-06", start: "16:30", end: "17:15" },
+  {id:"2025-09-05,09:15,10:05", date: "2025-09-05", start: "09:15", end: "10:05" },
 ];
 
 const newSlots: Slot[] = [
-  { date: "2025-09-05", start: "09:00", end: "09:20" }, // ✅ no conflict
-  { date: "2025-09-05", start: "09:30", end: "09:50" }, // ❌ conflict (09:15–10:05)
-  { date: "2025-09-05", start: "10:05", end: "10:15" }, // ✅ no conflict
-  { date: "2025-09-05", start: "10:40", end: "10:50" }, // ❌ conflict (10:20–11:00)
-  { date: "2025-09-05", start: "11:00", end: "11:20" }, // ❌ conflict (11:10–11:55)
-  { date: "2025-09-05", start: "12:50", end: "13:20" }, // ✅ no conflict
-  { date: "2025-09-05", start: "14:20", end: "14:30" }, // ❌ conflict (14:00–14:40)
-  { date: "2025-09-05", start: "15:00", end: "15:10" }, // ✅ no conflict
-  { date: "2025-09-05", start: "15:30", end: "15:45" }, // ❌ conflict (15:15–16:00)
-  { date: "2025-09-06", start: "09:30", end: "09:50" }, // ❌ conflict (09:00–10:00)
-  { date: "2025-09-06", start: "10:15", end: "10:45" }, // ✅ no conflict
-  { date: "2025-09-06", start: "11:30", end: "11:50" }, // ❌ conflict (11:00–11:45)
+  { id:"2025-09-05,09:00,09:20",date: "2025-09-05", start: "09:00", end: "09:20" }, // ✅ no conflict
 ];
 
 const conflicts = checkSlotConflicts(newSlots, existingSlots);

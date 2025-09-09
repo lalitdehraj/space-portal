@@ -12,6 +12,7 @@ import {
 } from "@/types";
 import { useSelector } from "react-redux";
 import {
+  areSlotsEqual,
   buildSlotsWithWeekdays,
   checkSlotConflicts,
   Recurrence,
@@ -19,6 +20,7 @@ import {
 } from "@/utils/slotsHelper";
 import { Check, X } from "lucide-react";
 import moment from "moment";
+import { ConflictSlotsList } from "./Conflicts";
 
 type FormProps = {
   buildingId?: string;
@@ -99,11 +101,11 @@ export default function AddAssignmentForm({
   initialEndTime,
   occupants = [],
 }: FormProps) {
-  const acadmeicYear = useSelector(
-    (state: any) => state.dataState.selectedAcademicYear
-  );
   const user: UserProfile | null = useSelector(
     (state: any) => state.dataState.user
+  );
+  const acadmeicYear = useSelector(
+    (state: any) => state.dataState.selectedAcademicYear
   );
   const acadmeicSession = useSelector(
     (state: any) => state.dataState.selectedAcademicSession
@@ -122,7 +124,7 @@ export default function AddAssignmentForm({
     initialDate ? initialDate : ""
   );
   const [endDate, setCustomEndDate] = useState("");
-  const [errorViewVisible, setErrorViewVisible] = useState(false);
+  const [isConflictsViewVisible, setIsConflictsViewVisible] = useState(false);
   const [timeType, setTimeType] = useState("custom");
   const [startTime, setCustomStartTime] = useState(initialStartTime || "");
   const [endTime, setCustomEndTime] = useState(initialEndTime || "");
@@ -206,31 +208,30 @@ export default function AddAssignmentForm({
     }
   }, [timeType]);
 
-  function createSpaceAllocations(slots: Slot[]): SpaceAllocation[]  {
-      return slots.map((slot) => {
-        return {
-          allocationDate: slot.date,
-          startTime: `${slot.start}:00`,
-          endTime: `${slot.end}:00`,
-          keyAssigned: keys,
-          allocatedRoomID: roomId,
-          buildingId: buildingId,
-          academicSession: acadmeicSession,
-          academicYear: acadmeicYear,
-          allocatedTo:
-            departmentOrFaculty === "department"
-              ? selectedDepartment
-              : selectedFaculty,
-          isAllocationActive: true,
-          remarks: remarks,
-          allocatedOnDate: moment().format("YYYY-MM-DD"),
-          allocatedfrom: "Direct Allocation",
-          allocatedBy: user?.userId || "",
-          purpose: "",
-        } as SpaceAllocation;
-      });
-    };
-    
+  function createSpaceAllocations(slots: Slot[]): SpaceAllocation[] {
+    return slots.map((slot) => {
+      return {
+        allocationDate: slot.date,
+        startTime: `${slot.start}:00`,
+        endTime: `${slot.end}:00`,
+        keyAssigned: keys,
+        allocatedRoomID: roomId,
+        buildingId: buildingId,
+        academicSession: acadmeicSession,
+        academicYear: acadmeicYear,
+        allocatedTo:
+          departmentOrFaculty === "department"
+            ? selectedDepartment
+            : selectedFaculty,
+        isAllocationActive: true,
+        remarks: remarks,
+        allocatedOnDate: moment().format("YYYY-MM-DD"),
+        allocatedfrom: "Direct Allocation",
+        allocatedBy: user?.employeeId || "",
+        purpose: "",
+      } as SpaceAllocation;
+    });
+  }
 
   // Basic validation
   const handleSubmit = async (e: any) => {
@@ -307,7 +308,7 @@ export default function AddAssignmentForm({
     setExistingBookedSlots(existingSlots);
 
     if (errors.length === 0 && overlapErrors.length > 0) {
-      setErrorViewVisible(true);
+      setIsConflictsViewVisible(true);
       setOverLaps(overlapErrors);
     } else {
       console.log("Write these allocations to DB", createdSlots);
@@ -328,14 +329,20 @@ export default function AddAssignmentForm({
     console.log("Allocations : ", allocaionSlotsList);
     console.log("Overlaps: ", overlap);
   }, [allocaionSlotsList]);
-  function areSlotsEqual(a: Slot, b: Slot): boolean {
-    return a.date === b.date && a.start === b.start && a.end === b.end;
-  }
+
+  const handleProceedAnyway = () => {
+    const list = allocaionSlotsList.filter((slot) => {
+      return !overLaps.includes(slot);
+    });
+    onSuccessfulSlotsCreation(createSpaceAllocations(list));
+    setIsConflictsViewVisible(false);
+    onClose();
+  };
 
   return (
     <section className="fixed inset-0 z-50 h-screen  w-screen bg-[#00000070] flex items-center justify-center text-gray-500">
       <div className="relative w-full max-w-3xl bg-white rounded-xl shadow-2xl px-8 py-2">
-        {!errorViewVisible && (
+        {!isConflictsViewVisible && (
           <div className="max-h-[80vh] bg-white overflow-y-scroll mr-4 pr-2">
             <button
               onClick={onClose}
@@ -447,7 +454,7 @@ export default function AddAssignmentForm({
                           key={faculty.facultyId}
                           value={faculty.facultyId}
                         >
-                          {faculty.facultyName}
+                          {`${faculty.facultyName} (${faculty.facultyId})`}
                         </option>
                       ))}
                     </select>
@@ -631,12 +638,16 @@ export default function AddAssignmentForm({
             </form>
           </div>
         )}
-        {errorViewVisible && (
+        {isConflictsViewVisible && (
           <div className="max-h-[80vh] bg-white overflow-y-scroll mr-4 pr-2">
             <ConflictSlotsList
+              existingSlots={existingBookedSlots}
               conflicts={overLaps}
-              onViewDay={() => {}}
-              onClose={() => setErrorViewVisible(false)}
+              handleProceedAnyway={handleProceedAnyway}
+              onClose={(allocationPerformed) => {
+                if (allocationPerformed) onClose();
+                setIsConflictsViewVisible(false);
+              }}
               onUpdateSlot={(date, oldSlot, updatedSlot) => {
                 const newList = allocaionSlotsList.map((slot) =>
                   areSlotsEqual(oldSlot, slot) ? updatedSlot : slot
@@ -651,102 +662,104 @@ export default function AddAssignmentForm({
   );
 }
 
-interface ConflictSlotsListProps {
-  conflicts: Slot[];
-  onClose: () => void;
-  onViewDay: (date: string) => void; // callback when user wants to see the schedule
-  onUpdateSlot: (date: string, oldSlot: Slot, updated: Slot) => void; // new callback
-}
+// interface ConflictSlotsListProps {
+//   existingSlots:Slot[]
+//   conflicts: Slot[];
+//   onClose: () => void;
+//   onViewDay: (date: string) => void; // callback when user wants to see the schedule
+//   onUpdateSlot: (date: string, oldSlot: Slot, updated: Slot) => void; // new callback
+// }
 
-const ConflictSlotsList: React.FC<ConflictSlotsListProps> = ({
-  conflicts,
-  onViewDay,
-  onClose,
-  onUpdateSlot,
-}) => {
-  // group conflicts by date
-  const grouped = conflicts.reduce<Record<string, Slot[]>>((acc, slot) => {
-    if (!acc[slot.date]) acc[slot.date] = [];
-    acc[slot.date].push(slot);
-    return acc;
-  }, {});
+// const ConflictSlotsList: React.FC<ConflictSlotsListProps> = ({
+//   existingSlots,
+//   conflicts,
+//   onViewDay,
+//   onClose,
+//   onUpdateSlot,
+// }) => {
+//   // group conflicts by date
+//   const grouped = conflicts.reduce<Record<string, Slot[]>>((acc, slot) => {
+//     if (!acc[slot.date]) acc[slot.date] = [];
+//     acc[slot.date].push(slot);
+//     return acc;
+//   }, {});
 
-  return (
-    <div className="space-y-4 ">
-      <div className="flex flex-row justify-between ">
-        <h2 className="text-lg font-semibold text-red-600  flex items-center gap-2">
-          <Clock className="w-5 h-5" />
-          Conflicting Slots
-        </h2>
-        <X
-          className="w-6 h-6 stroke-gray-500 hover:stroke-gray-700"
-          onClick={onClose}
-        />
-      </div>
-      {Object.entries(grouped).map(([date, slots]) => (
-        <div
-          key={date}
-          className="rounded-lg border border-red-300 bg-red-50 p-4 shadow-sm"
-        >
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-red-700 font-medium">
-              <Calendar className="w-4 h-4" />
-              {date}
-            </div>
-            <button
-              onClick={() => onViewDay(date)}
-              className="flex items-center gap-1 text-sm text-blue-600 hover:underline"
-            >
-              <Eye className="w-4 h-4" />
-              View Day Schedule
-            </button>
-          </div>
+//   return (
+//     <div className="space-y-4 ">
+//       <div className="flex flex-row justify-between ">
+//         <h2 className="text-lg font-semibold text-red-600  flex items-center gap-2">
+//           <Clock className="w-5 h-5" />
+//           Conflicting Slots
+//         </h2>
+//         <X
+//           className="w-6 h-6 stroke-gray-500 hover:stroke-gray-700"
+//           onClick={onClose}
+//         />
+//       </div>
+//       {Object.entries(grouped).map(([date, slots]) => (
+//         <div
+//           key={date}
+//           className="rounded-lg border border-red-300 bg-red-50 p-4 shadow-sm"
+//         >
+//           <div className="flex items-center justify-between">
+//             <div className="flex items-center gap-2 text-red-700 font-medium">
+//               <Calendar className="w-4 h-4" />
+//               {date}
+//             </div>
+//             <button
+//               onClick={() => onViewDay(date)}
+//               className="flex items-center gap-1 text-sm text-blue-600 hover:underline"
+//             >
+//               <Eye className="w-4 h-4" />
+//               View Day Schedule
+//             </button>
+//           </div>
 
-          <ul className="mt-2 space-y-2">
-            {slots.map((slot, i) => {
-              const [start, setStart] = useState(slot.start);
-              const [end, setEnd] = useState(slot.end);
+//           <ul className="mt-2 space-y-2">
+//             {slots.map((slot, i) => {
+//               const [start, setStart] = useState(slot.start);
+//               const [end, setEnd] = useState(slot.end);
 
-              return (
-                <li
-                  key={i}
-                  className="flex items-center gap-2 text-sm text-gray-800 bg-white border border-red-200 px-2 py-1 rounded-md"
-                >
-                  <input
-                    type="time"
-                    value={start}
-                    onChange={(e) => setStart(e.target.value)}
-                    className="border rounded px-1 py-0.5 text-sm"
-                  />
-                  →
-                  <input
-                    type="time"
-                    value={end}
-                    onChange={(e) => setEnd(e.target.value)}
-                    className="border rounded px-1 py-0.5 text-sm"
-                  />
-                  <button
-                    onClick={() =>
-                      onUpdateSlot(date, slot, { ...slot, start, end })
-                    }
-                    className="ml-auto flex items-center gap-1 text-green-600 hover:underline"
-                  >
-                    <Save className="w-4 h-4" />
-                    Save
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      ))}
+//               return (
+//                 <li
+//                   key={i}
+//                   className="flex items-center gap-2 text-sm text-gray-800 bg-white border border-red-200 px-2 py-1 rounded-md"
+//                 >
+//                   <input
+//                     type="time"
+//                     value={start}
+//                     onChange={(e) => setStart(e.target.value)}
+//                     className="border rounded px-1 py-0.5 text-sm"
+//                   />
+//                   →
+//                   <input
+//                     type="time"
+//                     value={end}
+//                     onChange={(e) => setEnd(e.target.value)}
+//                     className="border rounded px-1 py-0.5 text-sm"
+//                   />
+//                   <button
+//                     onClick={() =>
+//                       onUpdateSlot(date, slot, { ...slot, start, end })
+//                     }
+//                     className="ml-auto flex items-center gap-1 text-green-600 hover:underline"
+//                   >
+//                     <Save className="w-4 h-4" />
+//                     Save
+//                   </button>
+//                 </li>
+//               );
+//             })}
+//           </ul>
+//         </div>
+//       ))}
 
-      {conflicts.length === 0 && (
-        <div className="flex flex-row">
-          <p className="text-sm text-gray-500">✅ No conflicts found. </p>
-          <p className="text-sm text-gray-500"> ✅ Allocation successful.</p>
-        </div>
-      )}
-    </div>
-  );
-};
+//       {conflicts.length === 0 && (
+//         <div className="flex flex-row">
+//           <p className="text-sm text-gray-500">✅ No conflicts found. </p>
+//           <p className="text-sm text-gray-500"> ✅ Allocation successful.</p>
+//         </div>
+//       )}
+//     </div>
+//   );
+// };

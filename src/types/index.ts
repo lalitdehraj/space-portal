@@ -9,14 +9,6 @@ export interface Building {
   floors: Floor[];
 }
 
-export interface Faculty {
-  facultyName: string;
-  facultyId: string;
-}
-export interface Department {
-  departmentId: string;
-  departmentName: string;
-}
 export interface Floor {
   id: string;
   name: string;
@@ -46,9 +38,9 @@ export interface Occupant {
   type?: string;
   Id: string;
   startTime: Date | string;
-  scheduledDate?: Date;
+  scheduledDate: Date;
   endTime: Date | string;
-  isEditable?: Boolean;
+  isEditable: string;
 }
 
 export interface SearchResult {
@@ -59,7 +51,7 @@ export interface SearchResult {
 }
 export interface GraphData {
   time: string;
-  "Occupancy Rate": string;
+  OccupancyRate: string;
 }
 export interface DashboardDataResponse {
   totalBuildings: string;
@@ -70,8 +62,8 @@ export interface DashboardDataResponse {
   activeSessions: string;
   maintenanceIssues: string;
   utilizationRequests: string;
-  availabeFacilities: string;
-  graphData: GraphData[];
+  availableFacilities: string;
+  graphDataPoints: GraphData[];
 }
 export interface RoomInfo {
   id: string;
@@ -115,7 +107,7 @@ export type UserProfile = {
   activeSession: string;
   activeYear: string;
   userImage: string;
-  userId: string;
+  employeeId: string;
   userEmail: string;
   userRole: string;
 };

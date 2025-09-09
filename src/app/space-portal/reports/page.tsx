@@ -4,13 +4,30 @@ import Pagination from "@/components/PageNumberIndicator";
 import { callApi } from "@/utils/apiIntercepter";
 import { URL_NOT_FOUND } from "@/constants";
 import { useSelector } from "react-redux";
-import { Building, Report, AcademicSession, AcademicYear, Room } from "@/types";
+import {
+  Building,
+  Report,
+  AcademicSession,
+  AcademicYear,
+  Room,
+  Department,
+  Faculty,
+} from "@/types";
 import { formatDate } from "@/utils";
-import { setAcademicYear } from "@/app/feature/dataSlice";
 import {
   AcademicYearResponse,
   AcademicSessionResponse,
 } from "@/components/Header";
+import moment from "moment";
+
+/**
+ * Key fixes & additions:
+ * - Safe guards on parsing size strings
+ * - Fixed sorting toggle logic (handleSort)
+ * - Added missing state and fetch for departments & faculties
+ * - Send payload keys expected by backend: acadYear & acadSession
+ * - Defensive coding around optional fields to avoid runtime errors
+ */
 
 type ReportsResponse = {
   pageSize: number;
@@ -30,12 +47,14 @@ const tableHeadersList: { [key: string]: keyof Report } = {
 };
 type sortingTypes = "asc" | "desc" | "";
 
-const parseSizeToBytes = (sizeString: string): number => {
-  const [value, unit] = sizeString.split(" ");
-  const numericValue = parseFloat(value);
-  if (isNaN(numericValue)) {
-    return 0;
-  }
+const parseSizeToBytes = (sizeString?: string): number => {
+  if (!sizeString || typeof sizeString !== "string") return 0;
+  const parts = sizeString.trim().split(" ");
+  if (parts.length === 0) return 0;
+  const numericValue = parseFloat(parts[0].replace(",", ""));
+  const unit = parts.length > 1 ? parts[1] : "";
+
+  if (isNaN(numericValue)) return 0;
 
   switch (unit.toUpperCase()) {
     case "KB":
@@ -60,15 +79,9 @@ function sortData(data: Report[], key: keyof Report, sortOrder: sortingTypes) {
 
     let comparison = 0;
     if (key === "size") {
-      const bytesA = parseSizeToBytes(valueA);
-      const bytesB = parseSizeToBytes(valueB);
-      if (bytesA > bytesB) {
-        comparison = 1;
-      } else if (bytesA < bytesB) {
-        comparison = -1;
-      } else {
-        comparison = 0;
-      }
+      const bytesA = parseSizeToBytes(valueA as string);
+      const bytesB = parseSizeToBytes(valueB as string);
+      comparison = bytesA - bytesB;
     } else if (typeof valueA === "string" && typeof valueB === "string") {
       comparison = valueA.localeCompare(valueB);
     } else {
@@ -76,6 +89,8 @@ function sortData(data: Report[], key: keyof Report, sortOrder: sortingTypes) {
         comparison = 1;
       } else if (valueA < valueB) {
         comparison = -1;
+      } else {
+        comparison = 0;
       }
     }
     return sortOrder === "desc" ? comparison * -1 : comparison;
@@ -99,7 +114,7 @@ export default function UtilizationReport() {
     setJobId(data.jobId);
     setReady(false);
 
-    if (data.alreadyExists) {
+    if (data.alreadyExists && data.downloadUrl) {
       window.open(data.downloadUrl, "_blank");
       setReady(true);
     } else {
@@ -111,13 +126,17 @@ export default function UtilizationReport() {
     if (!polling || !jobId) return;
 
     const interval = setInterval(async () => {
-      const res = await fetch(`/api/job-status?jobId=${jobId}`);
-      const data = await res.json();
+      try {
+        const res = await fetch(`/api/job-status?jobId=${jobId}`);
+        const data = await res.json();
 
-      if (data.ready) {
-        setReady(true);
-        setPolling(false);
-        window.open(data.downloadUrl, "_blank");
+        if (data.ready) {
+          setReady(true);
+          setPolling(false);
+          if (data.downloadUrl) window.open(data.downloadUrl, "_blank");
+        }
+      } catch (err) {
+        console.error("Polling error:", err);
       }
     }, 2000);
 
@@ -140,7 +159,8 @@ export default function UtilizationReport() {
   const [pageSize, setPageSize] = useState("10");
 
   function filterData(data: Report[], searchQuery: string) {
-    let filteredBySearch = data.filter((item) => {
+    if (!searchQuery) return data;
+    const filteredBySearch = data.filter((item) => {
       const searchableKeys = Object.values(tableHeadersList);
 
       return searchableKeys.some((key) => {
@@ -153,18 +173,20 @@ export default function UtilizationReport() {
     });
     return filteredBySearch;
   }
+
   useEffect(() => {
-    const filteredList = filterData(reportsList, searchQuery);
-    const sortedList = sortData(
-      filteredList,
-      activeHeader as keyof Report,
+    const filtered = filterData(reportsList, searchQuery);
+    const sorted = sortData(
+      filtered,
+      (activeHeader as keyof Report) || ("id" as keyof Report),
       sortState
     );
-    setFilteredList(sortedList);
+    setFilteredList(sorted);
   }, [reportsList, activeHeader, sortState, searchQuery]);
 
   const [generateReportVisible, setGenerateReportVisible] = useState(false);
   const [totalPages, setTotalPages] = useState(0);
+
   useEffect(() => {
     const fetchReports = async () => {
       setIsLoadingReports(true);
@@ -182,7 +204,8 @@ export default function UtilizationReport() {
         let res = response;
         setTotalPages(res.data?.totalPages || 0);
 
-        setCurruntPage(res.data?.currentPage || 0);
+        // keep current page in sync with server response if provided
+        setCurruntPage(res.data?.currentPage || curruntPage);
         setReportsList(res.data?.reports || []);
       } catch (error) {
         console.error("Error fetching reports:", error);
@@ -191,15 +214,28 @@ export default function UtilizationReport() {
       }
     };
     fetchReports();
+    // We intentionally include curruntPage so pagination works
   }, [acadmeicYear, acadmeicSession, pageSize, curruntPage]);
 
-  const handleSort = (header: string, sortOrder: sortingTypes) => {
-    setActiveHeader(tableHeadersList[header]);
-    setSortState(
-      activeHeader === tableHeadersList[header] && sortState === sortOrder
-        ? ""
-        : sortOrder
-    );
+  // Improved sorting toggle behavior:
+  const handleSort = (header: string, requestedOrder: sortingTypes) => {
+    const key = tableHeadersList[header];
+    if (!key) return;
+
+    if (activeHeader === key) {
+      // cycle: asc -> desc -> none
+      if (sortState === "asc" && requestedOrder === "asc") {
+        setSortState("desc");
+      } else if (sortState === "desc" && requestedOrder === "desc") {
+        setSortState("");
+        setActiveHeader("");
+      } else {
+        setSortState(requestedOrder);
+      }
+    } else {
+      setActiveHeader(String(key));
+      setSortState(requestedOrder);
+    }
   };
 
   const handleDownloadClick = (request: Report) => {
@@ -379,6 +415,7 @@ export default function UtilizationReport() {
                 className="border rounded border-gray-300 p-1"
                 name="rowscount"
                 id="rows"
+                value={pageSize}
               >
                 <option value="10">10</option>
                 <option value="20">20</option>
@@ -393,6 +430,8 @@ export default function UtilizationReport() {
         <GenerateReportForm
           onClosePressed={() => setGenerateReportVisible(false)}
           startJob={startJob} // Pass startJob to the form
+          buildings={[]}
+          // we won't pass buildings here because GenerateReportForm fetches them internally
         />
       )}
     </>
@@ -401,13 +440,16 @@ export default function UtilizationReport() {
 
 type FormProps = {
   onClosePressed: () => void;
-  startJob: (fileName: string) => void; // Add startJob to the props
+  startJob: (fileName: string) => void;
+  buildings?: Building[]; // not used, kept for compatibility
 };
 
 function GenerateReportForm({ onClosePressed, startJob }: FormProps) {
   const [selectedBuildingId, setSelectedBuildingId] = useState<string>("");
-  const [timePeriod, setTimePeriod] = useState<string>("");
+  const [timePeriod, setTimePeriod] = useState<string>("last7");
   const [selectedRoomId, setSelectedRoomId] = useState<string>("");
+  const [selectedFaculty, setSelectedFaculty] = useState<string>("");
+  const [selectedDepartment, setSelectedDepartment] = useState<string>("");
   const [selectedFloorId, setSelectedFloorId] = useState<string>("");
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
@@ -421,68 +463,125 @@ function GenerateReportForm({ onClosePressed, startJob }: FormProps) {
   const [customEndDate, setCustomEndDate] = useState("");
   const [isGenerateDisabled, setIsGenerateDisabled] = useState(true);
   const acadmeicYear = useSelector(
-    (state: any) => state.dataState.academicYear
+    (state: any) => state.dataState.selectedAcademicYear
   );
   const acadmeicSession = useSelector(
-    (state: any) => state.dataState.academicSession
+    (state: any) => state.dataState.selectedAcademicSession
   );
+
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [faculties, setFaculties] = useState<Faculty[]>([]);
 
   useEffect(() => {
     const getAcadmicCalender = async () => {
-      const responseYear = await callApi<AcademicYearResponse>(
-        process.env.NEXT_PUBLIC_GET_ACADMIC_YEARS || URL_NOT_FOUND
-      );
-      if (responseYear.success) {
-        const acadYearsList = responseYear.data?.["Academic Year"]?.reverse();
-        setAcademicYearsList(acadYearsList);
-      }
+      try {
+        const responseYear = await callApi<AcademicYearResponse>(
+          process.env.NEXT_PUBLIC_GET_ACADMIC_YEARS || URL_NOT_FOUND
+        );
+        if (responseYear.success) {
+          const acadYearsList = responseYear.data?.["Academic Year"]?.reverse();
+          setAcademicYearsList(acadYearsList);
+        }
 
-      let responseSession = await callApi<AcademicSessionResponse>(
-        process.env.NEXT_PUBLIC_GET_ACADMIC_SESSIONS || URL_NOT_FOUND
-      );
+        let responseSession = await callApi<AcademicSessionResponse>(
+          process.env.NEXT_PUBLIC_GET_ACADMIC_SESSIONS || URL_NOT_FOUND
+        );
 
-      if (responseSession.success) {
-        console.log(responseSession.data?.["Academic Session"]);
-        setAcademicSessionsList(responseSession.data?.["Academic Session"]);
+        if (responseSession.success) {
+          setAcademicSessionsList(responseSession.data?.["Academic Session"]);
+        }
+      } catch (err) {
+        console.error("Error fetching academic calendar:", err);
       }
     };
     getAcadmicCalender();
   }, []);
+
   useEffect(() => {
     const fetchBuildings = async () => {
-      const reqBody = {
-        acadSession: `${acadmeicSession}`,
-        acadYear: `${acadmeicYear}`,
-      };
+      try {
+        const reqBody = {
+          acadSession: `${acadmeicSession}`,
+          acadYear: `${acadmeicYear}`,
+        };
 
-      const response = await callApi<Building[]>(
-        process.env.NEXT_PUBLIC_GET_BUILDING_LIST || URL_NOT_FOUND,
-        reqBody
-      );
-      if (response.success) {
-        setBuildings(response.data || []);
+        const response = await callApi<Building[]>(
+          process.env.NEXT_PUBLIC_GET_BUILDING_LIST || URL_NOT_FOUND,
+          reqBody
+        );
+        if (response.success) {
+          setBuildings(response.data || []);
+        }
+      } catch (err) {
+        console.error("Error fetching buildings:", err);
       }
     };
     fetchBuildings();
   }, [acadmeicSession, acadmeicYear]);
+
+  // fetch departments & faculties (endpoints are optional; set env vars if available)
+  useEffect(() => {
+    if (!reportType) return;
+    if (reportType === "department") {
+      const fetchDepartments = async () => {
+        const response = await callApi<Department[]>(
+          process.env.NEXT_PUBLIC_GET_FACULTY_OR_DEPARTMENT || URL_NOT_FOUND,
+          {
+            filterValue: reportType.toUpperCase().trim(),
+          }
+        );
+        if (response.success && response.data) {
+          setDepartments(response.data);
+        }
+      };
+      fetchDepartments();
+    } else {
+      const fetchFaculties = async () => {
+        const response = await callApi<Faculty[]>(
+          process.env.NEXT_PUBLIC_GET_FACULTY_OR_DEPARTMENT || URL_NOT_FOUND,
+          {
+            filterValue: reportType.toUpperCase().trim(),
+          }
+        );
+        if (response.success && response.data) {
+          setFaculties(response.data);
+        }
+      };
+      fetchFaculties();
+    }
+  }, [reportType]);
+
   useEffect(() => {
     if (timePeriod === "last7") {
-      const endDate = new Date();
-      const startDate = new Date();
-      startDate.setDate(endDate.getDate() - 7);
-      setCustomStartDate(startDate.toISOString().split("T")[0]);
-      setCustomEndDate(endDate.toISOString().split("T")[0]);
+      const endDate = moment();
+      const startDate = moment().subtract(7, "days");
+      setCustomStartDate(startDate.format("YYYY-MM-DD"));
+      setCustomEndDate(endDate.format("YYYY-MM-DD"));
     } else if (timePeriod === "last30") {
-      const endDate = new Date();
-      const startDate = new Date();
-      startDate.setDate(endDate.getDate() - 30);
-      setCustomStartDate(startDate.toISOString().split("T")[0]);
-      setCustomEndDate(endDate.toISOString().split("T")[0]);
-    } else if (timePeriod !== "custom") {
+      const endDate = moment();
+      const startDate = moment().subtract(30, "days");
+      setCustomStartDate(startDate.format("YYYY-MM-DD"));
+      setCustomEndDate(endDate.format("YYYY-MM-DD"));
+    } else if (timePeriod === "active") {
+      // let backend resolve the active session range
+      setCustomStartDate("");
+      setCustomEndDate("");
+    } else if (timePeriod === "year") {
+      // controlled by academic year dropdown
+      setCustomStartDate("");
+      setCustomEndDate("");
+    } else if (timePeriod === "session") {
+      // controlled by academic session dropdown
+      setCustomStartDate("");
+      setCustomEndDate("");
+    } else if (timePeriod === "custom") {
+      // do not reset here → user will pick manually
+    } else {
       setCustomStartDate("");
       setCustomEndDate("");
     }
   }, [timePeriod]);
+
   useEffect(() => {
     let isValid = true;
 
@@ -493,13 +592,15 @@ function GenerateReportForm({ onClosePressed, startJob }: FormProps) {
       (!selectedBuildingId || !selectedRoomId)
     ) {
       isValid = false;
-    } else if (
-      (reportType === "department" || reportType === "faculty") &&
-      !selectedFloorId
-    ) {
+    } else if (reportType === "department" && !selectedDepartment) {
+      isValid = false;
+    } else if (reportType === "faculty" && !selectedFaculty) {
       isValid = false;
     }
 
+    if (timePeriod === "") {
+      isValid = false;
+    }
     if (timePeriod === "custom" && (!customStartDate || !customEndDate)) {
       isValid = false;
     }
@@ -522,23 +623,25 @@ function GenerateReportForm({ onClosePressed, startJob }: FormProps) {
         setRooms([]);
         return;
       }
-      const floorIds = building.floors?.map((f) => f.id) || [];
-      if (floorIds.length === 0) {
+      // try to fetch rooms; if API not present, keep rooms empty
+      try {
+        const reqBody = {
+          buildingNo: `${buildingId}`,
+          floorID: `${selectedFloorId}`,
+          curreentTime: moment().format("HH:mm"),
+        };
+        const response = await callApi<Room[]>(
+          process.env.NEXT_PUBLIC_GET_ROOMS_LIST || URL_NOT_FOUND,
+          reqBody
+        );
+        if (response && response.success) setRooms(response.data || []);
+        else setRooms([]);
+      } catch (err) {
+        console.error("Error fetching rooms", err);
         setRooms([]);
-        return;
       }
-      const reqBody = {
-        buildingNo: `${buildingId}`,
-        floorID: `${selectedFloorId}`,
-        // acadSession: `${acadmeicSession}`,
-        // acadYear: `${acadmeicYear}`,
-      };
-      const response = await callApi<Room[]>(
-        process.env.NEXT_PUBLIC_GET_ROOMS_LIST || URL_NOT_FOUND,
-        reqBody
-      );
-      setRooms(response.data || []);
     };
+
     if (selectedBuildingId) {
       fetchRoomsForBuilding(selectedBuildingId);
       setSelectedRoomId("");
@@ -553,54 +656,63 @@ function GenerateReportForm({ onClosePressed, startJob }: FormProps) {
     buildings,
     selectedFloorId,
   ]);
+
   useEffect(() => {
     setSelectedBuildingId("");
     setSelectedFloorId("");
     setSelectedRoomId("");
+    setSelectedDepartment("");
+    setSelectedFaculty("");
   }, [reportType]);
 
   useEffect(() => {}, [timePeriod]);
-  const handleSubmit = () => {
-    let fileName = "";
 
-    if (reportType === "building" && selectedBuildingId) {
-      const building = buildings.find((b) => b.id === selectedBuildingId);
-      fileName = `${
-        building?.name || "Building"
-      }_${customStartDate}_${customEndDate}`;
-    } else if (reportType === "room" && selectedBuildingId && selectedRoomId) {
-      const building = buildings.find((b) => b.id === selectedBuildingId);
-      const room = rooms.find((r) => r.roomId === selectedRoomId);
-      fileName = `${building?.name || "Building"}_${
-        room?.roomName || "Room"
-      }_${customStartDate}_${customEndDate}`;
-    } else if (reportType === "department") {
-      const departmentName = buildings
-        .find((b) => b.id === selectedBuildingId)
-        ?.floors.find((f) => f.id === selectedFloorId)?.name;
-      fileName = `${
-        departmentName || "Department"
-      }_${customStartDate}_${customEndDate}`;
-    } else if (reportType === "faculty") {
-      const departmentName = buildings
-        .find((b) => b.id === selectedBuildingId)
-        ?.floors.find((f) => f.id === selectedFloorId)?.name;
-      const facultyName = rooms.find(
-        (r) => r.roomId === selectedRoomId
-      )?.roomName;
-      fileName = `${departmentName || "Department"}_${
-        facultyName || "Faculty"
-      }_${customStartDate}_${customEndDate}`;
-    } else {
-      fileName = `Report_${customStartDate}_${customEndDate}`;
+  const handleSubmit = async () => {
+    // determine start & end date
+    let startDate = customStartDate;
+    let endDate = customEndDate;
+
+    if (timePeriod === "last7") {
+      startDate = moment().subtract(6, "day").format("YYYY-MM-DD");
+      endDate = moment().format("YYYY-MM-DD");
+    } else if (timePeriod === "last30") {
+      startDate = moment().subtract(29, "day").format("YYYY-MM-DD");
+      endDate = moment().format("YYYY-MM-DD");
+    } else if (
+      timePeriod === "active" ||
+      timePeriod === "year" ||
+      timePeriod === "session"
+    ) {
+      startDate = "";
+      endDate = "";
     }
 
-    console.log("Generated File Name:", fileName);
+    let fileName = "";
+    if (reportType === "room") {
+      fileName = `room_${selectedRoomId}_${acadmeicYear}_${acadmeicSession}`;
+    } else if (reportType === "building") {
+      fileName = `building_${selectedBuildingId}_${acadmeicYear}_${acadmeicSession}`;
+    } else if (reportType === "department") {
+      fileName = `department_${selectedDepartment}_${acadmeicYear}_${acadmeicSession}`;
+    } else if (reportType === "faculty") {
+      fileName = `faculty_${selectedFaculty}_${acadmeicYear}_${acadmeicSession}`;
+    }
 
-    startJob(fileName);
-
-    onClosePressed();
+    await callApi("/api/start-job", {
+      fileKey: fileName,
+      roomID: selectedRoomId,
+      reportType,
+      buildingId: selectedBuildingId,
+      departmentId: selectedDepartment,
+      facultyId: selectedFaculty,
+      subroomID: 0,
+      academicYr: acadmeicYear,
+      acadSess: acadmeicSession,
+      startDate,
+      endDate,
+    });
   };
+
   return (
     <section className="fixed inset-0 z-50 h-screen w-screen bg-[#00000070] flex items-center justify-center text-gray-500">
       <div className="relative w-full max-w-3xl bg-white rounded-xl shadow-2xl p-6 transform transition-all duration-300 ease-in-out scale-95 md:scale-100">
@@ -697,31 +809,29 @@ function GenerateReportForm({ onClosePressed, startJob }: FormProps) {
                 </div>
               </div>
             )}
-            {(reportType === "department" || reportType === "faculty") && (
+            {
               <div className="flex flex-col md:flex-row md:space-x-4">
-                <div className="w-full mt-4 md:mt-0">
-                  <label className="block text-sm text-gray-700 mb-1">
-                    Department
-                  </label>
-                  <select
-                    className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
-                    value={selectedFloorId}
-                    onChange={(e) => setSelectedFloorId(e.target.value)}
-                    disabled={!selectedBuildingId}
-                  >
-                    <option value="">Select department</option>
-                    {buildings.filter((b) => b.id === selectedBuildingId)
-                      .length > 0
-                      ? buildings
-                          .filter((b) => b.id === selectedBuildingId)[0]
-                          .floors.map((f) => (
-                            <option key={f.id} value={f.id}>
-                              {f.name}
-                            </option>
-                          ))
-                      : null}
-                  </select>
-                </div>
+                {reportType === "department" && (
+                  <div className="w-full mt-4 md:mt-0">
+                    <label className="block text-sm text-gray-700 mb-1">
+                      Department
+                    </label>
+                    <select
+                      className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
+                      value={selectedDepartment}
+                      onChange={(e) => {
+                        setSelectedDepartment(e.target.value);
+                      }}
+                    >
+                      <option value="">Select department</option>
+                      {departments.map((f) => (
+                        <option key={f.departmentId} value={f.departmentId}>
+                          {f.departmentName}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 {reportType === "faculty" && (
                   <div className="w-full mt-4 md:mt-0">
                     <label className="block text-sm text-gray-700 mb-1">
@@ -729,21 +839,20 @@ function GenerateReportForm({ onClosePressed, startJob }: FormProps) {
                     </label>
                     <select
                       className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
-                      value={selectedRoomId}
-                      onChange={(e) => setSelectedRoomId(e.target.value)}
-                      disabled={!selectedFloorId}
+                      value={selectedFaculty}
+                      onChange={(e) => setSelectedFaculty(e.target.value)}
                     >
                       <option value="">Select faculty</option>
-                      {rooms.map((r) => (
-                        <option key={r.roomId} value={r.roomId}>
-                          {r.roomName}
+                      {faculties.map((r) => (
+                        <option key={r.facultyId} value={r.facultyId}>
+                          {`${r.facultyName} ( ${r.facultyId} )`}
                         </option>
                       ))}
                     </select>
                   </div>
                 )}
               </div>
-            )}
+            }
             {timePeriod !== "custom" ? (
               <div className="flex flex-col md:flex-row md:space-x-4">
                 <div className="md:w-1/2 w-full">
@@ -756,11 +865,11 @@ function GenerateReportForm({ onClosePressed, startJob }: FormProps) {
                     onChange={(e) => setTimePeriod(e.target.value)}
                   >
                     <option value="">Select Duration</option>
+                    <option value={"last7"}>Last 7 Days</option>
+                    <option value={"last30"}>Last 30 Days</option>
                     <option value={"active"}>Active Session</option>
                     <option value={"year"}>Academic Year</option>
                     <option value={"session"}>Academic Session</option>
-                    <option value={"last30"}>Last 30 Days</option>
-                    <option value={"last7"}>Last 7 Days</option>
                     <option value={"custom"}>Custom Duration</option>
                   </select>
                 </div>

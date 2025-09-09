@@ -120,7 +120,7 @@ const SideNav: FC<SideNavProps> = ({ onClose }) => {
           onClick={() => {
             router.push("/space-portal/dashboard");
           }}
-          src="/images/manipal-complete-logo.png"
+          src="https://jaipur.manipal.edu/img/manipal-university-jaipur-logo-01.svg"
           alt="Manipal University Jaipur Logo"
           className="h-[52px] w-[160px] mt-6 mb-6 object-contain"
         />

@@ -20,7 +20,7 @@ export default function Buildings() {
   let [buildings, setBuildings] = useState<Building[]>();
   const [selectedFloor, setSelectedFloor] = useState<Floor | null>(null);
   const [roomsList, setRoomsList] = useState<Room[]>([]);
-  const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
+  const [selectedRoom, setSelectedRoom] = useState<Room>();
   const [subRooms, setSubRooms] = useState<Room[]>([]);
   const [isLoadingBuildings, setIsLoadingBuildings] = useState(false);
   const [isLoadingRooms, setIsLoadingRooms] = useState(false);
@@ -71,6 +71,7 @@ export default function Buildings() {
 
     const fetchRooms = async () => {
       setIsLoadingRooms(true);
+      if (!buildings || !role) return;
       try {
         const now = new Date();
         const hours = now.getHours().toString().padStart(2, "0");
@@ -169,16 +170,23 @@ export default function Buildings() {
   };
 
   const handleRoomClick = (room: Room) => {
-    console.log(room);
     if (room.hasSubroom) {
-      setSelectedRoom(room.roomId === selectedRoom?.roomId ? null : room);
-      fetchSubrooms(room);
+      // dispatcher(setSelectedRoomId(room.roomId));
+      setSelectedRoom(room.roomId === selectedRoom?.roomId ? undefined : room);
     } else {
-      router.push(
-        `/space-portal/buildings/${encrypt(room.parentId || "b")}/${encrypt(
-          room.roomId
-        )}`
-      );
+      // dispatcher(setSelectedRoomId(""));
+      if (room.parentId) {
+        router.push(
+          `/space-portal/buildings/${encrypt(room.buildingId)}/${encrypt(
+            `${room.parentId}|${room.roomId}`
+          )}`
+        );
+      } else
+        router.push(
+          `/space-portal/buildings/${encrypt(room.buildingId)}/${encrypt(
+            room.roomId
+          )}`
+        );
     }
   };
 
@@ -199,19 +207,19 @@ export default function Buildings() {
         room.roomId.toLowerCase().includes(searchQuery.toLowerCase())
       );
     });
-    searchRooms.length > 0
+    searchRooms?.length > 0
       ? searchRooms?.forEach((room, index) => {
           items.push(
             <RoomCard
               room={room}
-              key={`${room.buildingId}${room.roomId}`}
+              key={`${room.buildingId}${room.roomId}${index}`}
               isExpanded={selectedRoom?.roomId === room.roomId}
               onClick={(room) => handleRoomClick(room)}
             />
           );
           const currentRowIndex = Math.floor(index / cardsPerRow);
           const isLastCardInRow = (index + 1) % cardsPerRow === 0;
-          const isLastCardOverall = index === filteredRooms.length - 1;
+          const isLastCardOverall = index === searchRooms.length - 1;
 
           if (
             selectedRoom !== null &&
@@ -220,7 +228,7 @@ export default function Buildings() {
           ) {
             items.push(
               <div
-                key={`details-${selectedRoom.roomId}`}
+                key={`details-${selectedRoom?.roomId}`}
                 className="
                 col-span-full bg-gray-50 p-8 rounded-xl shadow-inner
                 border border-gray-200
@@ -233,9 +241,9 @@ export default function Buildings() {
                 }}
               >
                 <h4 className="flex justify-between text-normal text-gray-700 mb-2">
-                  {selectedRoom.roomName}
+                  {selectedRoom?.roomName}
                   <button
-                    onClick={() => setSelectedRoom(null)}
+                    onClick={() => setSelectedRoom(undefined)}
                     className="px-2 py-1 bg-orange-500 text-white rounded-lg text-xs hover:bg-orange-600 transition-colors duration-300"
                   >
                     Close &times;
@@ -267,7 +275,11 @@ export default function Buildings() {
             );
           }
         })
-      : items.push(<div className="text-gray-600">No rooms found </div>);
+      : items.push(
+          <div key={"No Room Found"} className="text-gray-600">
+            No rooms found{" "}
+          </div>
+        );
 
     return items;
   };

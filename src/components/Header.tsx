@@ -1,5 +1,6 @@
 "use client";
-import React, { cache, useEffect, useRef, useState } from "react";
+
+import React, { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { callApi } from "@/utils/apiIntercepter";
 import moment from "moment";
@@ -9,6 +10,8 @@ import {
   AcademicYear,
   SearchResults,
   UserProfile,
+  Building,
+  Room,
 } from "@/types";
 import { URL_NOT_FOUND } from "@/constants";
 import { useDispatch, useSelector } from "react-redux";
@@ -18,11 +21,14 @@ import {
   setAcademicSessionStartDate,
   setAcademicYearId,
   setIsActiveSession,
+  setUser,
   setUserRoleId,
 } from "@/app/feature/dataSlice";
 import { useRouter } from "next/navigation";
 import { encrypt } from "@/utils/encryption";
 import { signOut, useSession } from "next-auth/react";
+import { AdvancedSearch } from "./SearchBar";
+import path from "path";
 
 export type AcademicYearResponse = {
   "Academic Year": AcademicYear[];
@@ -30,58 +36,108 @@ export type AcademicYearResponse = {
 export type AcademicSessionResponse = {
   "Academic Session": AcademicSession[];
 };
+
 export default function Header() {
   const router = useRouter();
   const dispatcher = useDispatch();
-  const [academicYearsList, setAcademicYearsList] = useState<AcademicYear[]>();
-  const [academicSessionsList, setAcademicSessionsList] =
-    useState<AcademicSession[]>();
   const { data } = useSession();
-  useEffect(() => {
-    const fetchUserRoles = async () => {
-      const response = await callApi<UserProfile[]>(
-        process.env.NEXT_PUBLIC_GET_USER || URL_NOT_FOUND
-      );
-      if (response.success) {
-        const user = response.data?.filter(
-          (u) => u.userEmail.toLowerCase() === data?.user?.email?.toLowerCase()
-        );
-        if (user && user.length > 0) {
-          dispatcher(setUserRoleId(user[0].userRole));
-          dispatcher(setAcademicYearId(user[0].activeYear));
-          dispatcher(setAcademicSessionId(user[0].activeSession));
-        }
-      }
-    };
-    fetchUserRoles();
-  }, []);
+
+  // redux values
   const academicYear = useSelector(
     (state: any) => state.dataState.selectedAcademicYear
   );
+  const acadSession = useSelector(
+    (state: any) => state.dataState.selectedAcademicSession
+  );
+
+  // Local state
+  const [academicYearsList, setAcademicYearsList] = useState<
+    AcademicYear[] | undefined
+  >();
+  const [academicSessionsList, setAcademicSessionsList] = useState<
+    AcademicSession[] | undefined
+  >();
+  const [sessionsPerYear, setSessionsPerYear] = useState<string[]>();
+
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const [searchText, setSearchText] = useState("");
+  const [searchResults, setSearchResults] = useState<SearchResults | null>(
+    null
+  );
+  const [searchLoading, setSearchLoading] = useState(false);
+
+  // Lazy-load buildings & rooms on first focus
+  const [isLoadedBuildingsRooms, setIsLoadedBuildingsRooms] = useState(false);
+  const [buildingsList, setBuildingsList] = useState<Building[]>([]);
+  const [allRooms, setAllRooms] = useState<Room[]>([]);
+  const [loadingBuildingsRooms, setLoadingBuildingsRooms] = useState(false);
+
+  // advanced search placeholder toggle
+  const [showAdvancedSearch, setShowAdvancedSearch] = useState(false);
+
+  // profile dropdown
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+
+  // refs for outside click detection
+  const filterRef = useRef<HTMLDivElement>(null);
+  const profileRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const fetchUserRoles = async () => {
+      if (!data?.user?.email) return;
+      try {
+        const response = await callApi<UserProfile[]>(
+          process.env.NEXT_PUBLIC_GET_USER || URL_NOT_FOUND
+        );
+        if (response.success) {
+          const user = response.data?.filter(
+            (u) =>
+              u.userEmail.toLowerCase() === data?.user?.email?.toLowerCase()
+          );
+          console.log(data.user, user, response.data);
+          if (user && user.length > 0) {
+            dispatcher(setUserRoleId(user[0].userRole));
+            dispatcher(setUser(user[0]));
+            dispatcher(setAcademicYearId(user[0].activeYear));
+            dispatcher(setAcademicSessionId(user[0].activeSession));
+          } else {
+            router.push("/login");
+          }
+        }
+      } catch (err) {
+        console.error("fetchUserRoles error:", err);
+      }
+    };
+    fetchUserRoles();
+  }, [data?.user?.email]);
 
   useEffect(() => {
     const getAcadmicCalender = async () => {
-      const responseYear = await callApi<AcademicYearResponse>(
-        process.env.NEXT_PUBLIC_GET_ACADMIC_YEARS || URL_NOT_FOUND
-      );
-      if (responseYear.success) {
-        const acadYearsList = responseYear.data?.["Academic Year"]?.reverse();
-        setAcademicYearsList(acadYearsList);
-      }
+      try {
+        const responseYear = await callApi<AcademicYearResponse>(
+          process.env.NEXT_PUBLIC_GET_ACADMIC_YEARS || URL_NOT_FOUND
+        );
+        if (responseYear.success) {
+          const acadYearsList = responseYear.data?.["Academic Year"]?.reverse();
+          setAcademicYearsList(acadYearsList);
+        }
 
-      let responseSession = await callApi<AcademicSessionResponse>(
-        process.env.NEXT_PUBLIC_GET_ACADMIC_SESSIONS || URL_NOT_FOUND
-      );
-
-      if (responseSession.success) {
-        setAcademicSessionsList(responseSession.data?.["Academic Session"]);
+        const responseSession = await callApi<AcademicSessionResponse>(
+          process.env.NEXT_PUBLIC_GET_ACADMIC_SESSIONS || URL_NOT_FOUND
+        );
+        if (responseSession.success) {
+          setAcademicSessionsList(
+            responseSession.data?.["Academic Session"] || []
+          );
+        }
+      } catch (err) {
+        console.error("getAcadmicCalender error:", err);
       }
     };
     getAcadmicCalender();
   }, []);
 
-  const [sessionsPerYear, setSessionsPerYear] = useState<string[]>();
-
+  // build sessionsPerYear based on selected academicYear
   useEffect(() => {
     if (!academicYear || !academicSessionsList || !academicYearsList) return;
     const filteredList = academicSessionsList?.filter(
@@ -98,17 +154,18 @@ export default function Header() {
     }
     setSessionsPerYear(Array.from(unique.keys()) || []);
   }, [academicYear, academicSessionsList, academicYearsList]);
-  const acadSession = useSelector(
-    (state: any) => state.dataState.selectedAcademicSession
-  );
+
+  // when academicYear changes set a default session (preserve original behavior)
   useEffect(() => {
     if (!academicYearsList) return;
-    let currentSession = academicSessionsList?.filter(
+    const currentSession = academicSessionsList?.filter(
       (s) => s["Academic Year"] === academicYear
     )?.[0];
-
     dispatcher(setAcademicSessionId(currentSession?.Code));
-  }, [academicYear]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [academicYear, academicSessionsList, academicYearsList]);
+
+  // set session start/end and isActiveSession (preserve original behavior)
   useEffect(() => {
     if (!acadSession && !academicSessionsList) return;
     const currentSession = academicSessionsList?.find(
@@ -121,9 +178,9 @@ export default function Header() {
     const today = moment();
     const isActiveSession = today.isBetween(startDate, endDate, "day", "[]");
     dispatcher(setIsActiveSession(isActiveSession));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [acadSession, academicSessionsList, academicYear]);
-  const [isSearchFocused, setIsSearchFocused] = useState(false);
-  const filterRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -131,15 +188,13 @@ export default function Header() {
         !filterRef.current.contains(event.target as Node)
       ) {
         setIsSearchFocused(false);
+        setShowAdvancedSearch(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [filterRef]);
-  const profileRef = useRef<HTMLDivElement>(null);
-  const [isProfileOpen, setIsProfileOpen] = useState(false);
+
   useEffect(() => {
     const handleClickOutsideProfile = (event: MouseEvent) => {
       if (
@@ -150,14 +205,87 @@ export default function Header() {
       }
     };
     document.addEventListener("mousedown", handleClickOutsideProfile);
-    return () => {
+    return () =>
       document.removeEventListener("mousedown", handleClickOutsideProfile);
-    };
   }, [profileRef]);
-  const [searchText, setSearchText] = useState("");
-  const [searchResults, setSearchResults] = useState<SearchResults | null>(
-    null
-  );
+
+  const handleSearchFocus = async () => {
+    setIsSearchFocused(true);
+    // toggle advanced search off if opening simple search
+    setShowAdvancedSearch(false);
+
+    if (isLoadedBuildingsRooms) return;
+
+    // ensure we have academic year/session — backend expects them
+    if (!academicYear || !acadSession) {
+      // still mark loaded so we don't attempt repeatedly, but keep empty lists
+      setIsLoadedBuildingsRooms(true);
+      return;
+    }
+
+    setLoadingBuildingsRooms(true);
+
+    try {
+      const buildingsResponse = await callApi<Building[]>(
+        process.env.NEXT_PUBLIC_GET_BUILDING_LIST || URL_NOT_FOUND,
+        {
+          acadSession: `${acadSession}`,
+          acadYear: `${academicYear}`,
+        }
+      );
+
+      if (!buildingsResponse.success || !buildingsResponse.data) {
+        setBuildingsList([]);
+        setAllRooms([]);
+        setLoadingBuildingsRooms(false);
+        setIsLoadedBuildingsRooms(true);
+        return;
+      }
+
+      const buildings = buildingsResponse.data || [];
+      setBuildingsList(buildings);
+
+      // aggregate rooms
+      const aggregatedRooms: Room[] = [];
+
+      // We'll fetch floors in parallel per building to be faster, but keep it typed
+      for (const building of buildings) {
+        if (!building.floors || building.floors.length === 0) continue;
+
+        const floorPromises = building.floors.map((floor) =>
+          callApi<Room[]>(
+            process.env.NEXT_PUBLIC_GET_ROOMS_LIST || URL_NOT_FOUND,
+            {
+              buildingNo: building.id,
+              floorID: floor.id,
+              // using moment for consistent time format
+              curreentTime: moment().format("HH:mm"),
+            }
+          )
+        );
+
+        // wait for all floors of this building
+        const floorResponses = await Promise.all(floorPromises);
+
+        for (const floorRes of floorResponses) {
+          if (floorRes && (floorRes as any).success && (floorRes as any).data) {
+            // types: callApi returns { success, data, ...}
+            aggregatedRooms.push(...((floorRes as any).data as Room[]));
+          }
+        }
+      }
+
+      setAllRooms(aggregatedRooms);
+      setIsLoadedBuildingsRooms(true);
+    } catch (error) {
+      console.error("Error fetching buildings/rooms:", error);
+      setBuildingsList([]);
+      setAllRooms([]);
+      setIsLoadedBuildingsRooms(true);
+    } finally {
+      setLoadingBuildingsRooms(false);
+    }
+  };
 
   useEffect(() => {
     if (searchText.trim() === "") {
@@ -165,72 +293,134 @@ export default function Header() {
       return;
     }
 
-    const timerId = setTimeout(() => {
-      const fetchSearchResults = async (text: string) => {
-        const response = await callApi<SearchResults>(
-          process.env.NEXT_PUBLIC_GET_SEARCH || URL_NOT_FOUND,
-          {
-            searchKey: text,
-          }
-        );
-        setSearchResults(response.data || null);
-      };
+    setSearchLoading(true);
+    const timer = setTimeout(async () => {
+      try {
+        if (isLoadedBuildingsRooms) {
+          // local filtering
+          const q = searchText.toLowerCase();
 
-      fetchSearchResults(searchText);
+          const filteredBuildings: SearchResult[] = buildingsList
+            .filter((b) => b.name?.toLowerCase().includes(q))
+            .map((b) => ({
+              buildingId: b.id,
+              name: b.name,
+              type: "building",
+            }));
+
+          const filteredRooms: SearchResult[] = allRooms
+            .filter(
+              (r) =>
+                r.roomName?.toLowerCase().includes(q) ||
+                r.roomId?.toLowerCase().includes(q)
+            )
+            .map((r) => ({
+              buildingId: (r as any).buildingId || (r as any).building, // defensive
+              roomId: r.roomId,
+              name: r.roomName,
+              type: "room",
+            }));
+
+          setSearchResults({
+            buildings: filteredBuildings,
+            rooms: filteredRooms,
+          });
+          setSearchLoading(false);
+        } else {
+          // fallback to original search API
+          const response = await callApi<SearchResults>(
+            process.env.NEXT_PUBLIC_GET_SEARCH || URL_NOT_FOUND,
+            {
+              searchKey: searchText,
+            }
+          );
+          setSearchResults(response.data || { buildings: [], rooms: [] });
+          setSearchLoading(false);
+        }
+      } catch (err) {
+        console.error("search error:", err);
+        setSearchResults({ buildings: [], rooms: [] });
+        setSearchLoading(false);
+      }
     }, 300);
 
-    return () => {
-      clearTimeout(timerId);
-    };
-  }, [searchText]);
-  const handleListClick = (result: SearchResult) => {
-    result.type === "building"
-      ? router.push(`/space-portal/buildings/${encrypt(result.buildingId)}`)
-      : router.push(
-          `/space-portal/buildings/${encrypt(result.buildingId)}/${encrypt(
-            result.roomId
-          )}`
-        );
+    return () => clearTimeout(timer);
+  }, [searchText, isLoadedBuildingsRooms, buildingsList, allRooms]);
 
+  const handleListClick = (result: SearchResult) => {
+    if (result.type === "building") {
+      router.push(`/space-portal/buildings/${encrypt(result.buildingId)}`);
+    } else {
+      router.push(
+        `/space-portal/buildings/${encrypt(result.buildingId)}/${encrypt(
+          result.roomId || ""
+        )}`
+      );
+    }
     setSearchText("");
     setIsSearchFocused(false);
+    setShowAdvancedSearch(false);
   };
 
   return (
     <header className="flex w-full items-center justify-between bg-white px-4 py-2 shadow-sm md:px-6">
-      <div className="relative mr-4 flex-1 max-w-sm" ref={filterRef}>
+      <div className="relative mr-4 flex-1 max-w-md" ref={filterRef}>
         <input
           type="text"
           placeholder="Search"
           value={searchText}
-          onClick={() => setIsSearchFocused(true)}
+          onClick={handleSearchFocus}
+          onFocus={handleSearchFocus}
           onChange={(e) => setSearchText(e.target.value)}
-          className="w-full rounded-lg border border-[#EBEDF2] bg-[#F5F6F8] py-2 pl-12 pr-4 text-sm text-gray-700 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-300"
+          className="w-full rounded-lg border border-[#EBEDF2] bg-[#F5F6F8] py-2 pl-12 pr-12 text-sm text-gray-700 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-300"
           aria-label="Search"
         />
+
         <img
           src="/images/search-normal.svg"
           alt="Search icon"
           className="h-[20px] w-[20px] absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
         />
+
+        {/* Advanced search icon inside the search bar */}
+        <button
+          type="button"
+          title="Advanced Search"
+          onClick={() => {
+            setShowAdvancedSearch((p) => !p);
+            // also open main search area
+            setIsSearchFocused(true);
+          }}
+          className="absolute right-3 top-1/2 -translate-y-1/2 p-1"
+        >
+          <img
+            src="/images/bx-filter-alt.svg"
+            alt="Filter"
+            className="h-5 w-5"
+          />
+        </button>
+
+        {/* Simple search dropdown */}
         {isSearchFocused && (
           <>
-            {(searchText !== "" &&
-              (searchResults?.buildings.length || 0) > 0) ||
-            (searchResults?.rooms.length || 0) > 0 ? (
-              <div className="absolute pt-4 top-full left-0 w-full bg-white border max-h-80 overflow-y-auto border-gray-200 rounded-lg shadow-lg z-10">
-                {(searchResults?.buildings.length || 0) > 0 && (
+            {searchLoading || loadingBuildingsRooms ? (
+              <div className="absolute top-full left-0 w-full bg-white border border-gray-200 rounded-lg shadow-lg mt-1 px-4 py-3 text-sm text-gray-500 z-20">
+                Loading...
+              </div>
+            ) : searchResults &&
+              (searchResults.buildings.length > 0 ||
+                searchResults.rooms.length > 0) ? (
+              <div className="absolute pt-4 top-full left-0 w-full bg-white border max-h-80 overflow-y-auto border-gray-200 rounded-lg shadow-lg z-20">
+                {searchResults.buildings.length > 0 && (
                   <>
                     <span className="flex items-center ml-2 text-gray-500">
                       Buildings
                     </span>
                     <ul className="py-2">
-                      {searchResults?.buildings.map((result, index) => (
+                      {searchResults.buildings.map((result, index) => (
                         <li
-                          key={index}
-                          onClick={() => {
-                            handleListClick(result);
-                          }}
+                          key={`b-${index}`}
+                          onClick={() => handleListClick(result)}
                           className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer"
                         >
                           {result.name}
@@ -239,18 +429,16 @@ export default function Header() {
                     </ul>
                   </>
                 )}
-                {(searchResults?.rooms.length || 0) > 0 && (
+                {searchResults.rooms.length > 0 && (
                   <>
-                    <span className=" flex items-center ml-2 text-gray-500">
+                    <span className="flex items-center ml-2 text-gray-500">
                       Rooms
                     </span>
                     <ul className="py-2">
-                      {searchResults?.rooms.map((result, index) => (
+                      {searchResults.rooms.map((result, index) => (
                         <li
-                          key={index}
-                          onClick={() => {
-                            handleListClick(result);
-                          }}
+                          key={`r-${index}`}
+                          onClick={() => handleListClick(result)}
                           className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer"
                         >
                           {result.name}
@@ -261,7 +449,7 @@ export default function Header() {
                 )}
               </div>
             ) : searchText === "" ? null : (
-              <div className="absolute top-full left-0 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg z-10 overflow-hidden">
+              <div className="absolute top-full left-0 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg z-20 overflow-hidden">
                 <p className="px-4 py-2 text-sm text-gray-500 text-center">
                   No results found.
                 </p>
@@ -269,9 +457,14 @@ export default function Header() {
             )}
           </>
         )}
+
+        {/* Advanced Search placeholder */}
+        {showAdvancedSearch && (
+          <AdvancedSearch onClose={() => setShowAdvancedSearch(false)} />
+        )}
       </div>
 
-      <div className="flex items-center space-x-2 md:space-x-4 ">
+      <div className="flex items-center space-x-2 md:space-x-4">
         <select
           value={useSelector(
             (state: any) => state.dataState.selectedAcademicSession
@@ -289,6 +482,7 @@ export default function Header() {
             </option>
           ))}
         </select>
+
         <select
           value={academicYear}
           className="hidden rounded-md  px-2 py-2 text-xs text-gray-700 focus:outline-none md:block"

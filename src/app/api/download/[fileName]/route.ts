@@ -6,7 +6,7 @@ export async function GET(
   req: NextRequest,
   context: { params: Promise<{ fileName: string }> }
 ) {
-  const params = await context.params
+  const params = await context.params;
   const filePath = path.join(process.cwd(), "reports", params.fileName);
 
   if (!fs.existsSync(filePath)) {

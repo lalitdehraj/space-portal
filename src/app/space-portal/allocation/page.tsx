@@ -3,7 +3,7 @@ import { URL_NOT_FOUND } from "@/constants";
 import { Room, Allocation, Course, Building } from "@/types";
 import { callApi } from "@/utils/apiIntercepter";
 import moment from "moment";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useSelector } from "react-redux";
 
 function AllocationPage() {
@@ -26,6 +26,7 @@ function AllocationPage() {
   const [selectedCourseId, setSelectedCourseId] = useState("");
   const [selectedFloorId, setSelectedFloorId] = useState("");
   const [selectedBuildingId, setSelectedBuildingId] = useState("");
+
   const acadmeicYear = useSelector(
     (state: any) => state.dataState.selectedAcademicYear
   );
@@ -35,6 +36,9 @@ function AllocationPage() {
   const isActiveSession = useSelector(
     (state: any) => state.dataState.isActiveSession
   );
+
+  const [searchQuery, setSearchQuery] = useState("");
+
   // Fetch allocations for selected session/year
   useEffect(() => {
     const fetchAllocations = async () => {
@@ -45,13 +49,12 @@ function AllocationPage() {
           acadYear: selectedAcademicYear,
         }
       );
-      console.log(res.data);
       if (res.success) setAllocations(res.data || []);
     };
     if (selectedAcademicSession && selectedAcademicYear) fetchAllocations();
   }, [selectedAcademicSession, selectedAcademicYear]);
 
-  //fetch building and course
+  // Fetch buildings and courses
   useEffect(() => {
     const fetchBuildings = async () => {
       const res = await callApi<Building[]>(
@@ -61,7 +64,6 @@ function AllocationPage() {
           acadYear: `${acadmeicYear}`,
         }
       );
-      console.log(res.data);
       if (res.success) setBuildings(res.data || []);
     };
 
@@ -71,10 +73,12 @@ function AllocationPage() {
       );
       if (res.success) setCourses(res?.data?.programCode || []);
     };
+
     if (acadmeicSession && acadmeicYear) fetchBuildings();
     fetchCourses();
   }, [acadmeicSession, acadmeicYear]);
-  //Fetch rooms upon changing building and floor
+
+  // Fetch rooms upon changing building and floor
   useEffect(() => {
     if (!selectedBuildingId || !selectedFloorId) return;
     const fetchRooms = async () => {
@@ -105,7 +109,7 @@ function AllocationPage() {
       process.env.NEXT_PUBLIC_INSERT_ROOM_ALLOCATION || URL_NOT_FOUND;
 
     const res = await callApi(apiUrl, payload);
-    console.log(res);
+
     const updateUI = async () => {
       setShowForm(false);
       setEditAllocation(null);
@@ -118,6 +122,7 @@ function AllocationPage() {
       );
       if (refresh.success) setAllocations(refresh.data || []);
     };
+
     if (res.success) {
       if (res.data === true) {
         if (editAllocation) {
@@ -153,6 +158,27 @@ function AllocationPage() {
     }
   };
 
+  // Filtered allocations based on search query
+  const filteredAllocations = useMemo(() => {
+    if (!searchQuery.trim()) return allocations;
+
+    return allocations.filter((alloc) => {
+      const courseDesc =
+        courses.find((c) => c.code === alloc.program)?.description || "";
+      const courseCode =
+        courses.find((c) => c.code === alloc.program)?.code || "";
+      const query = searchQuery.toLowerCase();
+
+      return (
+        courseDesc.toLowerCase().includes(query) ||
+        courseCode.toLowerCase().includes(query) ||
+        alloc.roomNo.toLowerCase().includes(query) ||
+        alloc.session.toLowerCase().includes(query) ||
+        alloc.academicYear.toLowerCase().includes(query)
+      );
+    });
+  }, [allocations, courses, searchQuery]);
+
   return (
     <div>
       <div className="flex flex-col md:flex-row justify-between mb-4">
@@ -160,12 +186,21 @@ function AllocationPage() {
           Room Allocations
         </h2>
         {isActiveSession && (
-          <button
-            className="px-3 py-2 rounded-lg shadow-md transition duration-300 bg-orange-500 text-white hover:bg-orange-600"
-            onClick={() => openForm()}
-          >
-            Add Allocation
-          </button>
+          <div className="flex items-center space-x-4">
+            <input
+              type="text"
+              placeholder="Search"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="border border-gray-300 rounded-md py-1 px-2 text-sm focus:outline-none text-gray-700 focus:ring-1 focus:ring-orange-500"
+            />
+            <button
+              className="px-3 py-2 rounded-lg shadow-md transition duration-300 bg-orange-500 text-white hover:bg-orange-600"
+              onClick={() => openForm()}
+            >
+              Add Allocation
+            </button>
+          </div>
         )}
       </div>
 
@@ -183,14 +218,14 @@ function AllocationPage() {
             </tr>
           </thead>
           <tbody className="text-[13px]">
-            {allocations?.length === 0 ? (
+            {filteredAllocations.length === 0 ? (
               <tr>
                 <td colSpan={6} className="text-center py-4">
                   No allocations found.
                 </td>
               </tr>
             ) : (
-              allocations.map((alloc) => (
+              filteredAllocations.map((alloc) => (
                 <tr key={alloc.systemId}>
                   <td className="px-4 py-2">
                     {`${
