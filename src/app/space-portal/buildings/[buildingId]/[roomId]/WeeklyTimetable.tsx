@@ -22,6 +22,7 @@ type WeeklyTimetableProps = {
   refreshData: () => void;
 };
 
+let unique = 0;
 function WeeklyTimetable({
   occupants,
   isManagedByThisUser,
@@ -156,8 +157,9 @@ function WeeklyTimetable({
             className="px-3 py-1 rounded bg-gray-200 text-gray-700 hover:bg-gray-300"
             onClick={handlePrevWeek}
             disabled={
-              sessionStartDate &&
-              clampedStartDate.getTime() === sessionStartDate.getTime()
+              (sessionStartDate &&
+                clampedStartDate.getTime() === sessionStartDate.getTime()) ??
+              true
             }
           >
             Previous
@@ -183,9 +185,10 @@ function WeeklyTimetable({
             className="px-3 py-1 rounded bg-gray-200 text-gray-700 hover:bg-gray-300"
             onClick={handleNextWeek}
             disabled={
-              sessionEndDate &&
-              upcomingDates[upcomingDates.length - 1]?.toDateString() ===
-                sessionEndDate.toDateString()
+              (sessionEndDate &&
+                upcomingDates[upcomingDates.length - 1]?.toDateString() ===
+                  sessionEndDate.toDateString()) ??
+              true
             }
           >
             Next
@@ -197,7 +200,10 @@ function WeeklyTimetable({
           <table className="w-full text-left min-w-[900px] border-collapse">
             <thead className="bg-white sticky top-0 z-10 shadow-sm">
               <tr>
-                <th className="px-4 py-3 text-sm font-medium text-gray-500 w-24">
+                <th
+                  key={"time"}
+                  className="px-4 py-3 text-sm font-medium text-gray-500 w-24"
+                >
                   Time
                 </th>
                 {upcomingDates.map((date, index) => (
@@ -220,7 +226,10 @@ function WeeklyTimetable({
             <tbody>
               <tr>
                 {/* Time column */}
-                <td className="align-top bg-white sticky left-0 px-2 border-r border-gray-200">
+                <td
+                  key={"time-column"}
+                  className="align-top bg-white sticky left-0 px-2 border-r border-gray-200"
+                >
                   {timeSlots.map((slot) => (
                     <div
                       key={slot.start}
@@ -296,8 +305,8 @@ function WeeklyTimetable({
                               {occupant.occupantName}
                             </div>
                             <div className="text-blue-600 text-[11px] truncate">
-                              {occupant.type} • {occupant.startTime} -
-                              {occupant.endTime}
+                              {occupant.type} • {`${occupant.startTime}`} -
+                              {`${occupant.endTime}`}
                             </div>
                           </div>
                         );

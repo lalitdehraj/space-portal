@@ -63,6 +63,7 @@ export default function RoomCard({
     (state: any) => state.dataState.selectedAcademicSession
   );
 
+  const [totalOccupants, setTotalOccupants] = useState<number>(0);
   const [occupancyPercent, setOccupancyPercent] = useState<number>(0);
   const [loading, setLoading] = useState<boolean>(true);
 
@@ -79,8 +80,8 @@ export default function RoomCard({
           ? moment().endOf("week").format("YYYY-MM-DD")
           : moment(academicSessionEndDate).format("YYYY-MM-DD");
         const requestBody = {
-          roomID: room.hasSubroom ? room.parentId : room.roomId,
-          subroomID: room.hasSubroom ? room.roomId : 0,
+          roomID: room.parentId ? room.parentId : room.roomId,
+          subroomID: room.parentId ? room.roomId : 0,
           academicYr: acadmeicYear,
           acadSess: acadmeicSession,
           startDate,
@@ -95,6 +96,7 @@ export default function RoomCard({
         if (response.success && response.data) {
           const room = response.data;
 
+          setTotalOccupants(response.data.occupants?.length || 0);
           // Determine date range
           const startDate = isActiveSession
             ? moment().startOf("week")
@@ -156,7 +158,7 @@ export default function RoomCard({
               Capacity: {room.roomCapactiy}
             </p>
             <p className="text-[10px] text-gray-500">
-              Total Bookings: {room.occupied}
+              {isActiveSession ? "Weeks" : "Total"} Bookings: {totalOccupants}
             </p>
           </div>
           <div

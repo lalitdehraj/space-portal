@@ -182,8 +182,6 @@ function RoomPage() {
       );
     }) || [];
 
-  const weeklyOccupancy = weeklyOccupants.length;
-
   const totalMinutes = weeklyOccupants.reduce((sum, occupant) => {
     if (!occupant.startTime || !occupant.endTime) return sum;
     const start = moment(occupant.startTime, "HH:mm");
@@ -191,9 +189,9 @@ function RoomPage() {
     return sum + Math.max(end.diff(start, "minutes"), 0);
   }, 0);
 
-  const percentage = (totalMinutes || 0) / MAX_WEEKLY_MINUTES;
+  const weeklyOccupancy = ((totalMinutes || 0) / MAX_WEEKLY_MINUTES) * 100;
   const circumference = 2 * Math.PI * 28;
-  const strokeDashoffset = circumference - percentage * circumference;
+  const strokeDashoffset = circumference - weeklyOccupancy * circumference;
   const borderColor =
     roomInfo?.occupied === 0
       ? "text-green-400"
@@ -209,8 +207,8 @@ function RoomPage() {
             <h4 className="text-base font-semibold text-gray-800 md:ml-2">
               {allBuildingsData
                 .filter((b) => b.id === roomInfo.building)?.[0]
-                .floors.filter((f) => f.id === roomInfo.floor)?.[0]
-                .name.toUpperCase()}{" "}
+                ?.floors?.filter((f) => f.id === roomInfo.floor)?.[0]
+                .name.toUpperCase()}
               - Room Details
             </h4>
             <span className="text-xs font-semibold text-gray-500 md:ml-2">
@@ -244,11 +242,13 @@ function RoomPage() {
                           : "bg-yellow-500"
                       }`}
                     >
-                      {roomInfo?.roomName?.split(" ")[0].substring(0, 3)}
+                      {roomInfo.roomName
+                        ? roomInfo?.roomName?.substring(0, 3)
+                        : roomInfo?.id?.split(" ")[0].substring(0, 3)}
                     </div>
                     <div className="ml-4">
                       <h2 className="text font-[500] text-gray-600">
-                        {roomInfo.roomName}
+                        {roomInfo.roomName ? roomInfo?.roomName : roomInfo?.id}
                       </h2>
                       <div className="flex items-center mt-1">
                         <span
@@ -303,7 +303,7 @@ function RoomPage() {
                             />
                           </svg>
                           <div className="absolute inset-0 flex items-center justify-center font-bold text-lg text-gray-500">
-                            {Math.round(percentage * 100)}%
+                            {Math.round(weeklyOccupancy)}%
                           </div>
                         </div>
                       </div>
@@ -386,11 +386,9 @@ function RoomPage() {
 
       {isAllocationFormVisible && (
         <AddAssignmentForm
-          buildingId={buildingId}
           onSuccessfulSlotsCreation={handleSpaceAllocations}
           onClose={() => setIsAllocationFormVisible(false)}
-          occupants={roomInfo.occupants || []}
-          roomId={subRoomId ? subRoomId : roomId}
+          roomInfo={roomInfo}
           initialDate={selectedSlot?.date}
           initialStartTime={selectedSlot?.start}
           initialEndTime={selectedSlot?.end}

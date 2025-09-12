@@ -34,12 +34,15 @@ export interface Room {
 }
 
 export interface Occupant {
+  occupantId?: string;
   occupantName?: string;
   type?: string;
   Id: string;
-  startTime: Date | string;
+  department?: string;
+  facultyCode?: string;
+  startTime: string;
   scheduledDate: Date;
-  endTime: Date | string;
+  endTime: string;
   isEditable: string;
 }
 
@@ -73,7 +76,6 @@ export interface RoomInfo {
   occupants?: Occupant[];
   occupiedBy: string | null;
   building?: string;
-  buildingId?: string;
   hasSubtype: boolean;
   roomType: string;
   parentId?: string;
@@ -159,6 +161,13 @@ export interface Department {
   departmentId: string;
   departmentName: string;
 }
+export interface Employee {
+  employeeCode: string;
+  employeeName: string;
+  departmentCode: string;
+  facultyCode: string;
+  programCode: string;
+}
 export interface Faculty {
   facultyId: string;
   facultyName: string;
@@ -181,7 +190,7 @@ export interface Allocation {
   academicYear: string;
 }
 
-export interface Course {
+export interface Program {
   code: string;
   description: string;
 }
@@ -193,6 +202,7 @@ export interface SpaceAllocation {
   purpose?: string; //
   allocatedRoomID?: string;
   buildingId?: string;
+  subRoom?: string;
   academicSession: string;
   academicYear: string;
   allocatedTo: string;

@@ -669,23 +669,23 @@ function GenerateReportForm({ onClosePressed, startJob }: FormProps) {
 
   const handleSubmit = async () => {
     // determine start & end date
-    let startDate = customStartDate;
-    let endDate = customEndDate;
+    // let startDate = customStartDate;
+    // let endDate = customEndDate;
 
-    if (timePeriod === "last7") {
-      startDate = moment().subtract(6, "day").format("YYYY-MM-DD");
-      endDate = moment().format("YYYY-MM-DD");
-    } else if (timePeriod === "last30") {
-      startDate = moment().subtract(29, "day").format("YYYY-MM-DD");
-      endDate = moment().format("YYYY-MM-DD");
-    } else if (
-      timePeriod === "active" ||
-      timePeriod === "year" ||
-      timePeriod === "session"
-    ) {
-      startDate = "";
-      endDate = "";
-    }
+    // if (timePeriod === "last7") {
+    //   startDate = moment().subtract(6, "day").format("YYYY-MM-DD");
+    //   endDate = moment().format("YYYY-MM-DD");
+    // } else if (timePeriod === "last30") {
+    //   startDate = moment().subtract(29, "day").format("YYYY-MM-DD");
+    //   endDate = moment().format("YYYY-MM-DD");
+    // } else if (
+    //   timePeriod === "active" ||
+    //   timePeriod === "year" ||
+    //   timePeriod === "session"
+    // ) {
+    //   startDate = "";
+    //   endDate = "";
+    // }
 
     let fileName = "";
     if (reportType === "room") {
@@ -708,8 +708,8 @@ function GenerateReportForm({ onClosePressed, startJob }: FormProps) {
       subroomID: 0,
       academicYr: acadmeicYear,
       acadSess: acadmeicSession,
-      startDate,
-      endDate,
+      startDate: "2025-09-15", //startDate,
+      endDate: "2025-09-21", //endDate,
     });
   };
 

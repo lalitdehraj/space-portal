@@ -40,6 +40,7 @@ export default function Buildings() {
 
   useEffect(() => {
     const fetchBuildings = async () => {
+      if (!acadmeicSession || !acadmeicYear) return;
       setIsLoadingBuildings(true);
       try {
         const reqBody = {
@@ -148,33 +149,30 @@ export default function Buildings() {
         .includes(removeSpaces(selectedRoomType).toLowerCase())
     );
   });
-
-  const fetchSubrooms = async (room: Room) => {
-    if (!room) return;
-    setIsLoadingSubrooms(true);
-    try {
+  useEffect(() => {
+    const fetchSubrooms = async () => {
+      if (!selectedRoom) return;
       const requestBody = {
-        roomId: room.roomId,
+        roomID: selectedRoom?.roomId,
+        buildingNo: selectedRoom.buildingId,
+        acadSess: acadmeicSession,
+        acadYr: acadmeicYear,
       };
       let response = callApi<Room[]>(
         process.env.NEXT_PUBLIC_GET_SUBROOMS_LIST || URL_NOT_FOUND,
         requestBody
       );
       let res = await response;
+      console.log(res);
       setSubRooms(res.data || []);
-    } catch (error) {
-      console.error("Error fetching subrooms:", error);
-    } finally {
-      setIsLoadingSubrooms(false);
-    }
-  };
-
+    };
+    fetchSubrooms();
+  }, [selectedRoom, acadmeicSession, acadmeicYear]);
   const handleRoomClick = (room: Room) => {
     if (room.hasSubroom) {
-      // dispatcher(setSelectedRoomId(room.roomId));
       setSelectedRoom(room.roomId === selectedRoom?.roomId ? undefined : room);
     } else {
-      // dispatcher(setSelectedRoomId(""));
+      setSelectedRoom(undefined);
       if (room.parentId) {
         router.push(
           `/space-portal/buildings/${encrypt(room.buildingId)}/${encrypt(

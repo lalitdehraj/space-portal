@@ -2,30 +2,15 @@ import React, { useState, useEffect } from "react";
 import { callApi } from "@/utils/apiIntercepter";
 import { URL_NOT_FOUND } from "@/constants";
 import { Clock, Calendar, Eye, Save } from "lucide-react";
-import {
-  Department,
-  Faculty,
-  Occupant,
-  RoomInfo,
-  SpaceAllocation,
-  UserProfile,
-} from "@/types";
+import { Department, Employee, Faculty, Occupant, RoomInfo, SpaceAllocation, UserProfile } from "@/types";
 import { useSelector } from "react-redux";
-import {
-  areSlotsEqual,
-  buildSlotsWithWeekdays,
-  checkSlotConflicts,
-  Recurrence,
-  Slot,
-} from "@/utils/slotsHelper";
+import { areSlotsEqual, buildSlotsWithWeekdays, checkSlotConflicts, Recurrence, Slot } from "@/utils/slotsHelper";
 import { Check, X } from "lucide-react";
 import moment from "moment";
 import { ConflictSlotsList } from "./Conflicts";
 
 type FormProps = {
-  buildingId?: string;
-  roomId: string;
-  subroomId?: string;
+  roomInfo: RoomInfo;
   onClose: () => void;
   onSuccessfulSlotsCreation: (allocations: SpaceAllocation[]) => void;
   initialDate?: string;
@@ -36,13 +21,7 @@ type FormProps = {
 
 const WEEK_DAYS = ["Mon", "Tues", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-function WeekdaySelector({
-  value,
-  onChange,
-}: {
-  value: string[];
-  onChange: (v: string[]) => void;
-}) {
+function WeekdaySelector({ value, onChange }: { value: string[]; onChange: (v: string[]) => void }) {
   return (
     <div className="flex gap-2 flex-wrap">
       {WEEK_DAYS.map((day) => {
@@ -51,16 +30,8 @@ function WeekdaySelector({
           <button
             type="button"
             key={day}
-            className={`flex items-center gap-1 px-2 py-1 rounded transition ${
-              isSelected
-                ? "bg-orange-500 text-white"
-                : "bg-gray-100 text-gray-700"
-            }`}
-            onClick={() =>
-              onChange(
-                isSelected ? value.filter((d) => d !== day) : [...value, day]
-              )
-            }
+            className={`flex items-center gap-1 px-2 py-1 rounded transition ${isSelected ? "bg-orange-500 text-white" : "bg-gray-100 text-gray-700"}`}
+            onClick={() => onChange(isSelected ? value.filter((d) => d !== day) : [...value, day])}
           >
             {isSelected && <Check size={14} strokeWidth={3} />}
             <span>{day}</span>
@@ -81,89 +52,48 @@ for (let m = 9 * 60; m < 18 * 60; m += 45) {
   const endHours = Math.floor(endMinutesTotal / 60);
   const endMinutes = endMinutesTotal % 60;
 
-  const start = `${String(startHours).padStart(2, "0")}:${String(
-    startMinutes
-  ).padStart(2, "0")}`;
-  const end = `${String(endHours).padStart(2, "0")}:${String(
-    endMinutes
-  ).padStart(2, "0")}`;
+  const start = `${String(startHours).padStart(2, "0")}:${String(startMinutes).padStart(2, "0")}`;
+  const end = `${String(endHours).padStart(2, "0")}:${String(endMinutes).padStart(2, "0")}`;
 
   defaultTimeSlots.push({ start, end });
 }
 
 export default function AddAssignmentForm({
-  buildingId,
-  roomId,
+  roomInfo,
   onClose,
   onSuccessfulSlotsCreation: onSuccessfulSlotsCreation,
   initialDate,
   initialStartTime,
   initialEndTime,
-  occupants = [],
 }: FormProps) {
-  const user: UserProfile | null = useSelector(
-    (state: any) => state.dataState.user
-  );
-  const acadmeicYear = useSelector(
-    (state: any) => state.dataState.selectedAcademicYear
-  );
-  const acadmeicSession = useSelector(
-    (state: any) => state.dataState.selectedAcademicSession
-  );
-  const academicSessionEndDate = useSelector(
-    (state: any) => state.dataState.selectedAcademicSessionEndDate
-  );
-  const [departmentOrFaculty, setDepartmentOrFaculty] = useState("");
-  const [selectedDepartment, setSelectedDepartment] = useState("");
-  const [selectedFaculty, setSelectedFaculty] = useState("");
+  const user: UserProfile | null = useSelector((state: any) => state.dataState.user);
+  const acadmeicYear = useSelector((state: any) => state.dataState.selectedAcademicYear);
+  const acadmeicSession = useSelector((state: any) => state.dataState.selectedAcademicSession);
+  const academicSessionEndDate = useSelector((state: any) => state.dataState.selectedAcademicSessionEndDate);
   const [purpose, setPurpose] = useState("");
   const [keys, setKeys] = useState("");
   const [remarks, setRemarks] = useState("");
   const [dateType, setDateType] = useState<Recurrence>("day");
-  const [startDate, setCustomStartDate] = useState(
-    initialDate ? initialDate : ""
-  );
+  const [startDate, setCustomStartDate] = useState(initialDate ? initialDate : "");
   const [endDate, setCustomEndDate] = useState("");
   const [isConflictsViewVisible, setIsConflictsViewVisible] = useState(false);
   const [timeType, setTimeType] = useState("custom");
+  const [employeeId, setEmployeeId] = useState("");
   const [startTime, setCustomStartTime] = useState(initialStartTime || "");
   const [endTime, setCustomEndTime] = useState(initialEndTime || "");
   const [selectedDays, setSelectedDays] = useState<string[]>([]);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
-  const [departments, setDepartments] = useState<Department[]>([]);
-  const [faculties, setFaculties] = useState<Faculty[]>([]);
+  const [employeesList, setEmployeesList] = useState<Employee[]>([]);
 
-  // For fetching departments
   useEffect(() => {
-    if (!departmentOrFaculty) return;
-    if (departmentOrFaculty === "department") {
-      const fetchDepartments = async () => {
-        const response = await callApi<Department[]>(
-          process.env.NEXT_PUBLIC_GET_FACULTY_OR_DEPARTMENT || URL_NOT_FOUND,
-          {
-            filterValue: departmentOrFaculty.toUpperCase().trim(),
-          }
-        );
-        if (response.success && response.data) {
-          setDepartments(response.data);
-        }
-      };
-      fetchDepartments();
-    } else {
-      const fetchFaculties = async () => {
-        const response = await callApi<Faculty[]>(
-          process.env.NEXT_PUBLIC_GET_FACULTY_OR_DEPARTMENT || URL_NOT_FOUND,
-          {
-            filterValue: departmentOrFaculty.toUpperCase().trim(),
-          }
-        );
-        if (response.success && response.data) {
-          setFaculties(response.data);
-        }
-      };
-      fetchFaculties();
-    }
-  }, [departmentOrFaculty]);
+    const fetchEmployees = async () => {
+      const { data: employees } = await callApi<Employee[]>(process.env.NEXT_PUBLIC_GET_EMPLOYEES || URL_NOT_FOUND, {
+        employeeCode: "",
+      });
+      if (employees) setEmployeesList(employees);
+    };
+    fetchEmployees();
+  }, []);
 
   useEffect(() => {
     // Fill slot details if provided
@@ -215,14 +145,12 @@ export default function AddAssignmentForm({
         startTime: `${slot.start}:00`,
         endTime: `${slot.end}:00`,
         keyAssigned: keys,
-        allocatedRoomID: roomId,
-        buildingId: buildingId,
+        subRoom: roomInfo.parentId ? roomInfo.id : 0,
+        allocatedRoomID: roomInfo.parentId ? roomInfo.parentId : roomInfo.id,
+        buildingId: roomInfo.building,
         academicSession: acadmeicSession,
         academicYear: acadmeicYear,
-        allocatedTo:
-          departmentOrFaculty === "department"
-            ? selectedDepartment
-            : selectedFaculty,
+        allocatedTo: employeeId,
         isAllocationActive: true,
         remarks: remarks,
         allocatedOnDate: moment().format("YYYY-MM-DD"),
@@ -237,24 +165,16 @@ export default function AddAssignmentForm({
   const handleSubmit = async (e: any) => {
     e.preventDefault();
     const errors: string[] = [];
-    if (!departmentOrFaculty) errors.push("Department/Faculty is required.");
-    if (departmentOrFaculty === "department" && !selectedDepartment)
-      errors.push("Department is required.");
-    if (departmentOrFaculty === "faculty" && !selectedFaculty)
-      errors.push("Faculty is required.");
+    if (!employeeId) errors.push("Employee is required.");
     if (!startDate) errors.push("Start Date is required.");
-    if (dateType === "custom" && !endDate)
-      errors.push("End Date is required for custom range.");
+    if (dateType === "custom" && !endDate) errors.push("End Date is required for custom range.");
     if (!startTime) errors.push("Start Time is required.");
     if (!endTime) errors.push("End Time is required.");
 
     const slotDate = moment(startDate);
     const startSlotTime = moment(startTime, "HH:mm");
-    const exactSlotStartTime = slotDate
-      .hour(startSlotTime.hour())
-      .minute(startSlotTime.minute());
-    if (exactSlotStartTime.isBefore(moment()))
-      errors.push("Start time is in past.");
+    const exactSlotStartTime = slotDate.hour(startSlotTime.hour()).minute(startSlotTime.minute());
+    if (exactSlotStartTime.isBefore(moment())) errors.push("Start time is in past.");
     if (startTime >= endTime) errors.push("End time must be after start time.");
 
     if (errors.length > 0) {
@@ -274,17 +194,14 @@ export default function AddAssignmentForm({
 
     const fetchExistingSlots = async () => {
       const requestbody = {
-        roomID: roomId,
-        subroomID: 0,
+        roomID: `${roomInfo.parentId ? roomInfo.parentId : roomInfo.id}`,
+        subroomID: `${roomInfo.parentId ? roomInfo.id : 0}`,
         academicYr: acadmeicYear,
         acadSess: acadmeicSession,
         startDate: moment().format("YYYY-MM-DD"),
         endDate: academicSessionEndDate,
       };
-      const response = await callApi<RoomInfo>(
-        process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND,
-        requestbody
-      );
+      const response = await callApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, requestbody);
       if (response.success) {
         return response.data?.occupants;
       } else {
@@ -344,23 +261,9 @@ export default function AddAssignmentForm({
       <div className="relative w-full max-w-3xl bg-white rounded-xl shadow-2xl px-8 py-2">
         {!isConflictsViewVisible && (
           <div className="max-h-[80vh] bg-white overflow-y-scroll mr-4 pr-2">
-            <button
-              onClick={onClose}
-              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
-              aria-label="Close"
-            >
-              <svg
-                className="h-6 w-6"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M6 18L18 6M6 6l12 12"
-                />
+            <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600" aria-label="Close">
+              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
             <h2 className="font-semibold text-gray-700 mb-6">Allocate Room</h2>
@@ -377,104 +280,38 @@ export default function AddAssignmentForm({
               {/* Department or Faculty */}
               <div className="flex flex-row gap-4">
                 <div className="flex-1">
-                  <label
-                    htmlFor="dept-faculty"
-                    className="block text-xs font-medium text-gray-700"
-                  >
+                  <label htmlFor="dept-faculty" className="block text-xs font-medium text-gray-700">
                     Select Department or Faculty
                   </label>
                   <select
                     id="dept-faculty"
                     name="dept-faculty"
                     className="mt-1 block text-sm w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
-                    value={departmentOrFaculty}
+                    value={employeeId}
                     onChange={(e) => {
-                      setDepartmentOrFaculty(e.target.value);
+                      setEmployeeId(e.target.value);
                     }}
                     required
                   >
                     <option value="" disabled>
                       Select an option
                     </option>
-                    <option value="department">Department</option>
-                    <option value="faculty">Faculty</option>
+                    {employeesList.map((e: Employee) => (
+                      <option value={e.employeeCode} key={e.employeeCode}>{`${e.employeeName} (${e.employeeCode})`}</option>
+                    ))}
                   </select>
                 </div>
-                {departmentOrFaculty === "department" && (
-                  <div className="flex-1">
-                    <label
-                      htmlFor="department"
-                      className="block text-xs font-medium text-gray-700"
-                    >
-                      Select Department
-                    </label>
-                    <select
-                      id="department"
-                      name="department"
-                      className="mt-1 block text-sm w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
-                      value={selectedDepartment}
-                      onChange={(e) => setSelectedDepartment(e.target.value)}
-                      required
-                    >
-                      <option value="" disabled>
-                        Select a department
-                      </option>
-                      {departments.map((dept) => (
-                        <option
-                          key={dept.departmentId}
-                          value={dept.departmentId}
-                        >
-                          {`${dept.departmentName} ( ${dept.departmentId} )`}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-                {departmentOrFaculty === "faculty" && (
-                  <div className="flex-1">
-                    <label
-                      htmlFor="faculty"
-                      className="block text-xs font-medium text-gray-700"
-                    >
-                      Select Faculty
-                    </label>
-                    <select
-                      id="faculty"
-                      name="faculty"
-                      className="mt-1 block w-full text-sm px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
-                      value={selectedFaculty}
-                      onChange={(e) => setSelectedFaculty(e.target.value)}
-                      required
-                    >
-                      <option value="" disabled>
-                        Select a faculty
-                      </option>
-                      {faculties.map((faculty) => (
-                        <option
-                          key={faculty.facultyId}
-                          value={faculty.facultyId}
-                        >
-                          {`${faculty.facultyName} (${faculty.facultyId})`}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
               </div>
               {/* Date Selection */}
               <div>
                 {dateType !== "custom" ? (
                   <div className="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-4 w-full">
                     <div className="flex flex-col space-y-4 md:space-y-0 md:space-x-4 w-1/2">
-                      <label className="block text-sm text-gray-700">
-                        Date Type
-                      </label>
+                      <label className="block text-sm text-gray-700">Date Type</label>
                       <select
                         className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
                         value={dateType}
-                        onChange={(e) =>
-                          setDateType(e.target.value as Recurrence)
-                        }
+                        onChange={(e) => setDateType(e.target.value as Recurrence)}
                       >
                         <option value="day">Day</option>
                         <option value="week">Week</option>
@@ -483,13 +320,9 @@ export default function AddAssignmentForm({
                         <option value="custom">Custom Range</option>
                       </select>
                     </div>
-                    {(dateType === "day" ||
-                      dateType === "week" ||
-                      dateType === "month") && (
+                    {(dateType === "day" || dateType === "week" || dateType === "month") && (
                       <div className="w-full md:w-1/2 mt-1">
-                        <label className="block text-xs text-gray-500">
-                          Start Date
-                        </label>
+                        <label className="block text-xs text-gray-500">Start Date</label>
                         <input
                           type="date"
                           min={moment().format("YYYY-MM-DD")}
@@ -504,9 +337,7 @@ export default function AddAssignmentForm({
                 ) : (
                   <div className="flex flex-col md:flex-row md:space-x-4">
                     <div className="md:w-1/2 w-full">
-                      <label className="block text-sm text-gray-700 mb-1">
-                        Start Date
-                      </label>
+                      <label className="block text-sm text-gray-700 mb-1">Start Date</label>
                       <input
                         type="date"
                         className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
@@ -517,9 +348,7 @@ export default function AddAssignmentForm({
                       />
                     </div>
                     <div className="md:w-1/2 w-full mt-4 md:mt-0">
-                      <label className="block text-sm text-gray-700 mb-1">
-                        End Date
-                      </label>
+                      <label className="block text-sm text-gray-700 mb-1">End Date</label>
                       <input
                         type="date"
                         className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
@@ -544,13 +373,8 @@ export default function AddAssignmentForm({
                 )}
                 {dateType !== "day" && (
                   <div className="mt-4">
-                    <label className="block text-sm text-gray-700 mb-1">
-                      Recurrence
-                    </label>
-                    <WeekdaySelector
-                      value={selectedDays}
-                      onChange={setSelectedDays}
-                    />
+                    <label className="block text-sm text-gray-700 mb-1">Recurrence</label>
+                    <WeekdaySelector value={selectedDays} onChange={setSelectedDays} />
                   </div>
                 )}
               </div>
@@ -572,9 +396,7 @@ export default function AddAssignmentForm({
                 {timeType === "custom" && (
                   <div className="flex flex-col md:flex-row md:space-x-4">
                     <div className="md:w-1/2 w-full">
-                      <label className="block text-xs text-gray-500 mb-1">
-                        Start Time
-                      </label>
+                      <label className="block text-xs text-gray-500 mb-1">Start Time</label>
                       <input
                         type="time"
                         className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
@@ -583,9 +405,7 @@ export default function AddAssignmentForm({
                       />
                     </div>
                     <div className="md:w-1/2 w-full mt-4 md:mt-0">
-                      <label className="block text-xs text-gray-500 mb-1">
-                        End Time
-                      </label>
+                      <label className="block text-xs text-gray-500 mb-1">End Time</label>
                       <input
                         type="time"
                         className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
@@ -628,10 +448,7 @@ export default function AddAssignmentForm({
                 />
               </div>
               <div className="flex justify-center">
-                <button
-                  type="submit"
-                  className="px-3 py-2 bg-[#F26722] text-white rounded-lg shadow-md hover:bg-[#a5705a] transition duration-300 mb-6"
-                >
+                <button type="submit" className="px-3 py-2 bg-[#F26722] text-white rounded-lg shadow-md hover:bg-[#a5705a] transition duration-300 mb-6">
                   Allocate
                 </button>
               </div>
@@ -649,9 +466,7 @@ export default function AddAssignmentForm({
                 setIsConflictsViewVisible(false);
               }}
               onUpdateSlot={(date, oldSlot, updatedSlot) => {
-                const newList = allocaionSlotsList.map((slot) =>
-                  areSlotsEqual(oldSlot, slot) ? updatedSlot : slot
-                );
+                const newList = allocaionSlotsList.map((slot) => (areSlotsEqual(oldSlot, slot) ? updatedSlot : slot));
                 setAllocationSlotsList(newList);
               }}
             />

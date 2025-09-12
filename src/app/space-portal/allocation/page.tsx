@@ -1,6 +1,6 @@
 "use client";
 import { URL_NOT_FOUND } from "@/constants";
-import { Room, Allocation, Course, Building } from "@/types";
+import { Room, Allocation, Program, Building } from "@/types";
 import { callApi } from "@/utils/apiIntercepter";
 import moment from "moment";
 import React, { useState, useEffect, useMemo } from "react";
@@ -17,7 +17,7 @@ function AllocationPage() {
   const [allocations, setAllocations] = useState<Allocation[]>([]);
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
-  const [courses, setCourses] = useState<Course[]>([]);
+  const [courses, setCourses] = useState<Program[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [editAllocation, setEditAllocation] = useState<Allocation | null>(null);
 

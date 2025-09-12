@@ -1,7 +1,7 @@
 import {
   Allocation,
   Building,
-  Course,
+  Program,
   Room,
   RoomInfo,
   RoomRequestTable,
@@ -179,7 +179,7 @@ export async function POST(request: NextRequest) {
   } else return response({ error: "return from end" });
 }
 
-const Courses: Course[] = [
+const Courses: Program[] = [
   {
     code: "BTECH-008",
     description: "BTECH in Computer Science",
