@@ -5,6 +5,7 @@ import { addDaysToDate } from "@/utils";
 import moment from "moment";
 import { Occupant } from "@/types";
 import AllocationDetailsModal from "@/components/AllocationDetailsModal";
+import UpdateSlotModal from "@/components/UpdateSlotModal";
 import { callApi } from "@/utils/apiIntercepter";
 import { URL_NOT_FOUND } from "@/constants";
 
@@ -107,6 +108,8 @@ function WeeklyTimetable({
 
   const [selectedOccupant, setSelectedOccupant] =
     React.useState<Occupant | null>(null);
+  const [showUpdateModal, setShowUpdateModal] =
+    React.useState<boolean>(false);
 
   /** Navigation */
   const handlePrevWeek = () => {
@@ -146,6 +149,16 @@ function WeeklyTimetable({
       setSelectedOccupant(null);
       refreshData();
     }
+  };
+
+  const handleUpdate = () => {
+    setShowUpdateModal(true);
+  };
+
+  const handleUpdateSuccess = () => {
+    setShowUpdateModal(false);
+    setSelectedOccupant(null);
+    refreshData();
   };
 
   return (
@@ -324,7 +337,19 @@ function WeeklyTimetable({
           occupant={selectedOccupant}
           isManagedByThisUser={isManagedByThisUser}
           onDelete={handleDelete}
+          onUpdate={handleUpdate}
           onClose={() => setSelectedOccupant(null)}
+        />
+      )}
+
+      {showUpdateModal && selectedOccupant && (
+        <UpdateSlotModal
+          occupant={selectedOccupant}
+          occupants={occupants}
+          onClose={() => setShowUpdateModal(false)}
+          onUpdate={handleUpdateSuccess}
+          academicSessionStartDate={academicSessionStartDate}
+          academicSessionEndDate={academicSessionEndDate}
         />
       )}
     </div>

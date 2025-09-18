@@ -1,5 +1,5 @@
 import React from "react";
-import { X, Trash2 } from "lucide-react";
+import { X, Trash2, Edit3, Eye } from "lucide-react";
 import moment from "moment";
 import { Occupant } from "@/types";
 
@@ -7,6 +7,7 @@ type AllocationDetailsModalProps = {
   occupant: Occupant | null; // occupant data to show
   onClose: () => void; // close modal
   onDelete: (id: string) => void; // delete callback
+  onUpdate: () => void; // update callback
   isManagedByThisUser: Boolean;
 };
 
@@ -15,8 +16,16 @@ export default function AllocationDetailsModal({
   onClose,
   isManagedByThisUser,
   onDelete,
+  onUpdate,
 }: AllocationDetailsModalProps) {
   if (!occupant) return null;
+
+  // Check if the slot is fully elapsed (past slot)
+  const isSlotFullyElapsed = () => {
+    const now = moment();
+    const slotEnd = moment(`${moment(occupant.scheduledDate).format("YYYY-MM-DD")} ${occupant.endTime}`);
+    return now.isAfter(slotEnd);
+  };
 
   return (
     <section className="fixed inset-0 z-50 h-screen w-screen bg-[#00000070] flex items-center justify-center text-gray-600">
@@ -74,15 +83,26 @@ export default function AllocationDetailsModal({
               onClick={onClose}
               className="px-4 py-2 bg-gray-200 rounded-lg text-gray-700 hover:bg-gray-300 transition"
             >
-              Cancel
+              {isSlotFullyElapsed() ? "Close" : "Cancel"}
             </button>
-            <button
-              onClick={() => onDelete(occupant.Id)}
-              className="px-4 py-2 bg-orange-500 text-white rounded-lg flex items-center gap-2 hover:bg-orange-600 transition"
-            >
-              <Trash2 className="w-4 h-4" />
-              Delete
-            </button>
+            {!isSlotFullyElapsed() && (
+              <>
+                <button
+                  onClick={onUpdate}
+                  className="px-4 py-2 bg-orange-500 text-white rounded-lg flex items-center gap-2 hover:bg-orange-600 transition"
+                >
+                  <Edit3 className="w-4 h-4" />
+                  Update
+                </button>
+                <button
+                  onClick={() => onDelete(occupant.Id)}
+                  className="px-4 py-2 bg-orange-500 text-white rounded-lg flex items-center gap-2 hover:bg-orange-600 transition"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Un-allocate
+                </button>
+              </>
+            )}
           </div>
         )}
       </div>

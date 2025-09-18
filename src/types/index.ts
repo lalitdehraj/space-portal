@@ -200,6 +200,7 @@ export interface SpaceAllocation {
   startTime: string;
   endTime: string;
   purpose?: string; //
+  type?: string;
   allocatedRoomID?: string;
   buildingId?: string;
   subRoom?: string;

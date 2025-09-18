@@ -72,6 +72,7 @@ export default function AddAssignmentForm({
   const [keys, setKeys] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [remarks, setRemarks] = useState("");
+  const [allocationType, setAllocationType] = useState("");
   const [dateType, setDateType] = useState<Recurrence>("day");
   const [startDate, setCustomStartDate] = useState(initialDate ? initialDate : "");
   const [endDate, setCustomEndDate] = useState("");
@@ -213,6 +214,7 @@ export default function AddAssignmentForm({
         allocatedfrom: "Direct Allocation",
         allocatedBy: user?.employeeId || "",
         purpose: purpose,
+        type: allocationType,
       } as SpaceAllocation;
     });
   }
@@ -237,6 +239,7 @@ export default function AddAssignmentForm({
     if (!keys) errors.push("Keys must be entered.");
     if (!purpose) errors.push("Purpose must be entered.");
     if (!remarks) errors.push("Remarks must be entered.");
+    if (!allocationType) errors.push("Type must be selected.");
     console.log(keys);
     if (errors.length > 0) {
       setValidationErrors(errors);
@@ -244,7 +247,7 @@ export default function AddAssignmentForm({
     } else {
       setValidationErrors([]);
     }
-  }, [employeeId, startDate, endDate, startTime, endTime, keys, purpose, remarks, selectedDays]);
+  }, [employeeId, startDate, endDate, startTime, endTime, keys, purpose, remarks, selectedDays, allocationType]);
 
   useEffect(() => {
     if (!startDate || !endDate || !startTime || !endTime) {
@@ -520,24 +523,42 @@ export default function AddAssignmentForm({
             </div>
             {/* Keys & Remarks */}
             <div>
-              <label className="block text-sm text-gray-700">Purpose</label>
-              <input
+              <label className="block text-sm text-gray-700">Type</label>
+              <select
                 className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
-                type="text"
-                placeholder="Assigned Key numbers e.g.: 002,005"
-                value={purpose}
-                onChange={(e) => setPurpose(e.target.value)}
-              />
+                value={allocationType}
+                onChange={(e) => setAllocationType(e.target.value)}
+              >
+                <option value="" disabled>
+                  Select Type
+                </option>
+                <option value="Lecture">Lecture</option>
+                <option value="Seminar">Seminar</option>
+                <option value="Meeting">Meeting</option>
+                <option value="Activity">Activity</option>
+              </select>
             </div>
-            <div>
-              <label className="block text-sm text-gray-700">Keys</label>
-              <input
-                className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
-                type="text"
-                placeholder="Assigned Key numbers e.g.: 002,005"
-                value={keys}
-                onChange={(e) => setKeys(e.target.value)}
-              />
+            <div className="flex flex-col md:flex-row md:space-x-4 space-y-4 md:space-y-0">
+              <div className="flex-1">
+                <label className="block text-sm text-gray-700">Purpose</label>
+                <input
+                  className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
+                  type="text"
+                  placeholder="Enter purpose of allocation"
+                  value={purpose}
+                  onChange={(e) => setPurpose(e.target.value)}
+                />
+              </div>
+              <div className="flex-1">
+                <label className="block text-sm text-gray-700">Keys</label>
+                <input
+                  className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
+                  type="text"
+                  placeholder="Assigned Key numbers e.g.: 002,005"
+                  value={keys}
+                  onChange={(e) => setKeys(e.target.value)}
+                />
+              </div>
             </div>
             <div className="mb-6">
               <label className="block text-sm text-gray-700">Remarks</label>
