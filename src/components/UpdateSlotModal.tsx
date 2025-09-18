@@ -269,8 +269,8 @@ export default function UpdateSlotModal({
       const updateData = {
         allocationEntNo: occupant.Id,
         scheduledDate: selectedDate,
-        startTime: startTime,
-        endTime: endTime,
+        startTime: `${startTime}:00`,
+        endTime: `${endTime}:00`,
         isAllocationActive: true,
         remarks:remarks,
       };

@@ -143,6 +143,10 @@ function WeeklyTimetable({
       {
         allocationEntNo: id,
         isAllocationActive: false,
+        startTime: selectedOccupant?.startTime ? moment(selectedOccupant.startTime, "HH:mm").format("HH:mm:ss") : "",
+        endTime: selectedOccupant?.endTime ? moment(selectedOccupant.endTime, "HH:mm").format("HH:mm:ss") : "",
+        remarks: "",
+        scheduledDate: selectedOccupant?.scheduledDate ? moment(selectedOccupant.scheduledDate).format("YYYY-MM-DD") : "",
       }
     );
     if (response.success) {
