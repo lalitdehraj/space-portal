@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { callApi } from "@/utils/apiIntercepter";
 import { URL_NOT_FOUND } from "@/constants";
-import { Clock, Calendar, Eye, Save } from "lucide-react";
-import { Department, Employee, Faculty, Occupant, RoomInfo, SpaceAllocation, UserProfile } from "@/types";
+import { Employee, Occupant, RoomInfo, SpaceAllocation, UserProfile } from "@/types";
 import { useSelector } from "react-redux";
 import { areSlotsEqual, buildSlotsWithWeekdays, checkSlotConflicts, Recurrence, Slot } from "@/utils/slotsHelper";
 import { Check, X } from "lucide-react";
@@ -16,7 +15,6 @@ type FormProps = {
   initialDate?: string;
   initialStartTime?: string;
   initialEndTime?: string;
-  occupants?: Occupant[];
 };
 
 const WEEK_DAYS = ["Mon", "Tues", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -72,6 +70,7 @@ export default function AddAssignmentForm({
   const academicSessionEndDate = useSelector((state: any) => state.dataState.selectedAcademicSessionEndDate);
   const [purpose, setPurpose] = useState("");
   const [keys, setKeys] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
   const [remarks, setRemarks] = useState("");
   const [dateType, setDateType] = useState<Recurrence>("day");
   const [startDate, setCustomStartDate] = useState(initialDate ? initialDate : "");
@@ -81,9 +80,18 @@ export default function AddAssignmentForm({
   const [employeeId, setEmployeeId] = useState("");
   const [startTime, setCustomStartTime] = useState(initialStartTime || "");
   const [endTime, setCustomEndTime] = useState(initialEndTime || "");
+  const [timeSlot, setTimeSlot] = useState("");
   const [selectedDays, setSelectedDays] = useState<string[]>([]);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [employeesList, setEmployeesList] = useState<Employee[]>([]);
+  const [allocationSlotsList, setAllocationSlotsList] = useState<Slot[]>([]);
+  const [existingBookedSlots, setExistingBookedSlots] = useState<Slot[]>([]);
+  const [isValidationVisible, setIsValidationVisible] = useState(false);
+  const [type, setType] = useState(false);
+  const [slotGroups, setSlotGroups] = useState<{ resolved: Slot[]; unresolved: Slot[] }>({
+    resolved: [],
+    unresolved: [],
+  });
 
   useEffect(() => {
     const fetchEmployees = async () => {
@@ -135,8 +143,56 @@ export default function AddAssignmentForm({
     } else if (timeType === "secondHalf") {
       setCustomStartTime("13:30");
       setCustomEndTime("18:00");
+    } else if (timeType === "slots") {
+      switch (timeSlot) {
+        case "1": {
+          setCustomStartTime("09:00");
+          setCustomEndTime("10:00");
+          break;
+        }
+        case "2": {
+          setCustomStartTime("10:00");
+          setCustomEndTime("11:00");
+          break;
+        }
+        case "3": {
+          setCustomStartTime("11:00");
+          setCustomEndTime("12:00");
+          break;
+        }
+        case "4": {
+          setCustomStartTime("12:00");
+          setCustomEndTime("13:00");
+          break;
+        }
+        case "5": {
+          setCustomStartTime("13:00");
+          setCustomEndTime("14:00");
+          break;
+        }
+        case "6": {
+          setCustomStartTime("14:00");
+          setCustomEndTime("15:00");
+          break;
+        }
+        case "7": {
+          setCustomStartTime("15:00");
+          setCustomEndTime("16:00");
+          break;
+        }
+        case "8": {
+          setCustomStartTime("16:00");
+          setCustomEndTime("17:00");
+          break;
+        }
+        case "9": {
+          setCustomStartTime("17:00");
+          setCustomEndTime("18:00");
+          break;
+        }
+      }
     }
-  }, [timeType]);
+  }, [timeType, timeSlot]);
 
   function createSpaceAllocations(slots: Slot[]): SpaceAllocation[] {
     return slots.map((slot) => {
@@ -156,16 +212,18 @@ export default function AddAssignmentForm({
         allocatedOnDate: moment().format("YYYY-MM-DD"),
         allocatedfrom: "Direct Allocation",
         allocatedBy: user?.employeeId || "",
-        purpose: "",
+        purpose: purpose,
       } as SpaceAllocation;
     });
   }
 
-  // Basic validation
-  const handleSubmit = async (e: any) => {
-    e.preventDefault();
+  useEffect(() => {
     const errors: string[] = [];
+    if (timeType === "slots" && !timeSlot) {
+      errors.push("Please select a time slot.");
+    }
     if (!employeeId) errors.push("Employee is required.");
+    if (dateType !== "day" && selectedDays.length === 0) errors.push("Please select week days");
     if (!startDate) errors.push("Start Date is required.");
     if (dateType === "custom" && !endDate) errors.push("End Date is required for custom range.");
     if (!startTime) errors.push("Start Time is required.");
@@ -180,6 +238,30 @@ export default function AddAssignmentForm({
     if (errors.length > 0) {
       setValidationErrors(errors);
       return;
+    } else {
+      setValidationErrors([]);
+    }
+  }, [employeeId, startDate, endDate, startTime, endTime, keys, purpose, remarks, selectedDays]);
+
+  useEffect(() => {
+    if (!startDate || !endDate || !startTime || !endTime) {
+      setAllocationSlotsList([]);
+      return;
+    }
+    if (dateType !== "day" && selectedDays.length === 0) {
+      setAllocationSlotsList([]);
+      return;
+    }
+    const slotDate = moment(startDate);
+    const startSlotTime = moment(startTime, "HH:mm");
+    const exactSlotStartTime = slotDate.hour(startSlotTime.hour()).minute(startSlotTime.minute());
+    if (exactSlotStartTime.isBefore(moment())) {
+      setAllocationSlotsList([]);
+      return;
+    }
+    if (startTime >= endTime) {
+      setAllocationSlotsList([]);
+      return;
     }
     // Generate allocations and check overlap
     const createdSlots = buildSlotsWithWeekdays({
@@ -191,26 +273,7 @@ export default function AddAssignmentForm({
       respectSessionEndDate: true,
       endTime: endTime,
     });
-
-    const fetchExistingSlots = async () => {
-      const requestbody = {
-        roomID: `${roomInfo.parentId ? roomInfo.parentId : roomInfo.id}`,
-        subroomID: `${roomInfo.parentId ? roomInfo.id : 0}`,
-        academicYr: acadmeicYear,
-        acadSess: acadmeicSession,
-        startDate: moment().format("YYYY-MM-DD"),
-        endDate: academicSessionEndDate,
-      };
-      const response = await callApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, requestbody);
-      if (response.success) {
-        return response.data?.occupants;
-      } else {
-        const occ: Occupant[] = [];
-        return occ;
-      }
-    };
-    const existingOccupants = await fetchExistingSlots();
-    const existingSlots = existingOccupants?.map((o) => {
+    const existingSlots = roomInfo.occupants?.map((o) => {
       return {
         date: moment(o.scheduledDate).format("YYYY-MM-DD"),
         start: o.startTime,
@@ -218,363 +281,285 @@ export default function AddAssignmentForm({
       };
     }) as Slot[];
     const overlapErrors = checkSlotConflicts(createdSlots, existingSlots);
-    console.log("Errors  ", errors);
-    console.log("Allocations  ", createdSlots);
-    console.log("overlaps ", overlapErrors);
     setAllocationSlotsList(createdSlots);
     setExistingBookedSlots(existingSlots);
+    // setConflictingSlots(overlapErrors || []);
 
-    if (errors.length === 0 && overlapErrors.length > 0) {
+    if (overlapErrors.length > 0) {
       setIsConflictsViewVisible(true);
-      setOverLaps(overlapErrors);
     } else {
-      console.log("Write these allocations to DB", createdSlots);
-      onSuccessfulSlotsCreation(createSpaceAllocations(createdSlots));
-      onClose();
+      setIsConflictsViewVisible(false);
     }
-  };
-  const [overLaps, setOverLaps] = useState<Slot[]>([]);
-  const [allocaionSlotsList, setAllocationSlotsList] = useState<Slot[]>([]);
-  const [existingBookedSlots, setExistingBookedSlots] = useState<Slot[]>([]);
+  }, [startDate, endDate, startTime, endTime, selectedDays]);
 
-  useEffect(() => {
-    if (!allocaionSlotsList) return;
-    const overlap = checkSlotConflicts(allocaionSlotsList, existingBookedSlots);
-    setOverLaps(overlap);
-    if (overlap.length > 0) return;
-    onSuccessfulSlotsCreation(createSpaceAllocations(allocaionSlotsList));
-    console.log("Allocations : ", allocaionSlotsList);
-    console.log("Overlaps: ", overlap);
-  }, [allocaionSlotsList]);
-
-  const handleProceedAnyway = () => {
-    const list = allocaionSlotsList.filter((slot) => {
-      return !overLaps.includes(slot);
-    });
-    onSuccessfulSlotsCreation(createSpaceAllocations(list));
-    setIsConflictsViewVisible(false);
-    onClose();
+  // Basic validation
+  const handleAllocate = () => {
+    setIsValidationVisible(true);
+    if (validationErrors.length === 0) {
+      if (slotGroups.unresolved.length > 0) {
+        const confirmProceed = window.confirm(
+          `⚠️ Some slots are still in conflict:\n${slotGroups.unresolved
+            .map((s) => `${s.date} ${s.start} → ${s.end}`)
+            .join("\n")}\n\nDo you want to proceed anyway?`
+        );
+        if (confirmProceed) {
+          console.log(slotGroups, allocationSlotsList);
+          onSuccessfulSlotsCreation(createSpaceAllocations(slotGroups.resolved));
+          setIsConflictsViewVisible(false);
+        }
+      } else {
+        console.log(slotGroups, allocationSlotsList);
+        onSuccessfulSlotsCreation(createSpaceAllocations(slotGroups.resolved));
+      }
+      setSuccessMessage("Slots allocated successfully!");
+      setTimeout(() => {
+        onClose();
+      }, 1500);
+    }
   };
 
   return (
     <section className="fixed inset-0 z-50 h-screen  w-screen bg-[#00000070] flex items-center justify-center text-gray-500">
-      <div className="relative w-full max-w-3xl bg-white rounded-xl shadow-2xl px-8 py-2">
-        {!isConflictsViewVisible && (
-          <div className="max-h-[80vh] bg-white overflow-y-scroll mr-4 pr-2">
-            <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600" aria-label="Close">
-              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-            <h2 className="font-semibold text-gray-700 mb-6">Allocate Room</h2>
-            {validationErrors.length > 0 && (
-              <div className="bg-red-100 border border-red-300 text-red-700 rounded p-2 mb-4">
-                <ul className="text-sm list-disc ml-4">
-                  {validationErrors.map((err, idx) => (
-                    <li key={idx}>{err}</li>
+      <div className="max-h-[80vh] relative w-full max-w-2xl bg-white rounded-xl shadow-2xl px-8 py-2 flex flex-col">
+        <div className="flex justify-between items-center mb-2">
+          <h2 className="font-semibold text-gray-700  mt-2 mb-4">Allocate Room</h2>
+          <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600" aria-label="Close">
+            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <div>
+          {successMessage && (
+            <div className="bg-green-100 border border-green-300 text-green-700 rounded p-2 mb-2">
+              <p className="text-sm">{successMessage}</p>
+            </div>
+          )}
+          {validationErrors.length > 0 && isValidationVisible && (
+            <div className="relative bg-red-100 border border-red-300 text-red-700 rounded p-2 mb-2">
+              {/* Close Icon aligned top-right */}
+              <button onClick={() => setIsValidationVisible(false)} className="absolute top-1 right-1 text-red-700 hover:text-red-900">
+                <X size={16} />
+              </button>
+
+              <ul className="text-sm list-disc ml-4 pr-6">
+                {validationErrors.map((err, idx) => (
+                  <li key={idx}>{err}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+
+        <div className=" flex-1 overflow-y-auto">
+          <form className="space-y-4">
+            {/* Department or Faculty */}
+            <div className="flex flex-row gap-4">
+              <div className="flex-1">
+                <label htmlFor="dept-faculty" className="block text-xs font-medium text-gray-700">
+                  Select Employee
+                </label>
+                <select
+                  id="dept-faculty"
+                  name="dept-faculty"
+                  className="mt-1 block text-sm w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
+                  value={employeeId}
+                  onChange={(e) => {
+                    setEmployeeId(e.target.value);
+                  }}
+                >
+                  <option value="" disabled>
+                    Select an option
+                  </option>
+                  {employeesList.map((e: Employee) => (
+                    <option value={e.employeeCode} key={e.employeeCode}>{`${e.employeeName} (${e.employeeCode})`}</option>
                   ))}
-                </ul>
+                </select>
               </div>
-            )}
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Department or Faculty */}
-              <div className="flex flex-row gap-4">
-                <div className="flex-1">
-                  <label htmlFor="dept-faculty" className="block text-xs font-medium text-gray-700">
-                    Select Department or Faculty
-                  </label>
-                  <select
-                    id="dept-faculty"
-                    name="dept-faculty"
-                    className="mt-1 block text-sm w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
-                    value={employeeId}
-                    onChange={(e) => {
-                      setEmployeeId(e.target.value);
-                    }}
-                    required
-                  >
-                    <option value="" disabled>
-                      Select an option
-                    </option>
-                    {employeesList.map((e: Employee) => (
-                      <option value={e.employeeCode} key={e.employeeCode}>{`${e.employeeName} (${e.employeeCode})`}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              {/* Date Selection */}
-              <div>
-                {dateType !== "custom" ? (
-                  <div className="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-4 w-full">
-                    <div className="flex flex-col space-y-4 md:space-y-0 md:space-x-4 w-1/2">
-                      <label className="block text-sm text-gray-700">Date Type</label>
-                      <select
-                        className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
-                        value={dateType}
-                        onChange={(e) => setDateType(e.target.value as Recurrence)}
-                      >
-                        <option value="day">Day</option>
-                        <option value="week">Week</option>
-                        <option value="month">Month</option>
-                        <option value="activeSession">Active Session</option>
-                        <option value="custom">Custom Range</option>
-                      </select>
-                    </div>
-                    {(dateType === "day" || dateType === "week" || dateType === "month") && (
-                      <div className="w-full md:w-1/2 mt-1">
-                        <label className="block text-xs text-gray-500">Start Date</label>
-                        <input
-                          type="date"
-                          min={moment().format("YYYY-MM-DD")}
-                          max={academicSessionEndDate}
-                          className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
-                          value={startDate}
-                          onChange={(e) => setCustomStartDate(e.target.value)}
-                        />
-                      </div>
-                    )}
+            </div>
+            {/* Date Selection */}
+            <div>
+              {dateType !== "custom" ? (
+                <div className="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-4 w-full">
+                  <div className="flex flex-col space-y-4 md:space-y-0 md:space-x-4 w-1/2">
+                    <label className="block text-sm text-gray-700">Date Type</label>
+                    <select
+                      className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
+                      value={dateType}
+                      onChange={(e) => setDateType(e.target.value as Recurrence)}
+                    >
+                      <option value="day">Day</option>
+                      <option value="week">Week</option>
+                      <option value="month">Month</option>
+                      <option value="activeSession">Active Session</option>
+                      <option value="custom">Custom Range</option>
+                    </select>
                   </div>
-                ) : (
-                  <div className="flex flex-col md:flex-row md:space-x-4">
-                    <div className="md:w-1/2 w-full">
-                      <label className="block text-sm text-gray-700 mb-1">Start Date</label>
+                  {(dateType === "day" || dateType === "week" || dateType === "month") && (
+                    <div className="w-full md:w-1/2 mt-1">
+                      <label className="block text-xs text-gray-500">Start Date</label>
                       <input
                         type="date"
-                        className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
-                        value={startDate}
                         min={moment().format("YYYY-MM-DD")}
                         max={academicSessionEndDate}
+                        className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
+                        value={startDate}
                         onChange={(e) => setCustomStartDate(e.target.value)}
                       />
                     </div>
-                    <div className="md:w-1/2 w-full mt-4 md:mt-0">
-                      <label className="block text-sm text-gray-700 mb-1">End Date</label>
-                      <input
-                        type="date"
-                        className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
-                        value={endDate}
-                        onChange={(e) => setCustomEndDate(e.target.value)}
-                      />
-                    </div>
-                    <div className="mt-3 md:mt-0 flex items-end">
-                      <button
-                        type="button"
-                        className="px-3 py-2 text-xs bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200"
-                        onClick={() => {
-                          setDateType("day");
-                          setCustomStartDate("");
-                          setCustomEndDate("");
-                        }}
-                      >
-                        Reset
-                      </button>
-                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="flex flex-col md:flex-row md:space-x-4">
+                  <div className="md:w-1/2 w-full">
+                    <label className="block text-sm text-gray-700 mb-1">Start Date</label>
+                    <input
+                      type="date"
+                      className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
+                      value={startDate}
+                      min={moment().format("YYYY-MM-DD")}
+                      max={academicSessionEndDate}
+                      onChange={(e) => setCustomStartDate(e.target.value)}
+                    />
                   </div>
-                )}
-                {dateType !== "day" && (
-                  <div className="mt-4">
-                    <label className="block text-sm text-gray-700 mb-1">Recurrence</label>
-                    <WeekdaySelector value={selectedDays} onChange={setSelectedDays} />
+                  <div className="md:w-1/2 w-full mt-4 md:mt-0">
+                    <label className="block text-sm text-gray-700 mb-1">End Date</label>
+                    <input
+                      type="date"
+                      className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
+                      value={endDate}
+                      onChange={(e) => setCustomEndDate(e.target.value)}
+                    />
                   </div>
-                )}
-              </div>
-              {/* Time Selection */}
-              <div>
+                  <div className="mt-3 md:mt-0 flex items-end">
+                    <button
+                      type="button"
+                      className="px-3 py-2 text-xs bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200"
+                      onClick={() => {
+                        setDateType("day");
+                        setCustomStartDate("");
+                        setCustomEndDate("");
+                      }}
+                    >
+                      Reset
+                    </button>
+                  </div>
+                </div>
+              )}
+              {dateType !== "day" && (
+                <div className="mt-4">
+                  <label className="block text-sm text-gray-700 mb-1">Recurrence</label>
+                  <WeekdaySelector value={selectedDays} onChange={setSelectedDays} />
+                </div>
+              )}
+            </div>
+            {/* Time Selection */}
+            <div className="flex space-x-4 items-end">
+              <div className="block w-full">
                 <label className="block text-sm text-gray-700">Time</label>
-                <div className="flex space-x-4">
+                <select
+                  className="block w-full h-fit px-3 py-2 text-sm border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
+                  value={timeType}
+                  onChange={(e) => setTimeType(e.target.value)}
+                >
+                  <option value="custom">Custom Range</option>
+                  <option value="slots">Select from Slots</option>
+                  <option value="firstHalf">First Half</option>
+                  <option value="secondHalf">Second Half</option>
+                  <option value="fullDay">Full Day</option>
+                </select>
+              </div>
+              {timeType === "slots" && (
+                <div className="block w-full">
+                  <label className="block text-[10px] text-gray-500">Select Slot</label>
                   <select
+                    onChange={(e) => setTimeSlot(e.target.value)}
+                    value={timeSlot}
                     className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
-                    value={timeType}
-                    onChange={(e) => setTimeType(e.target.value)}
                   >
-                    <option value="custom">Custom Range</option>
-                    <option value="firstHalf">First Half</option>
-                    <option value="secondHalf">Second Half</option>
-                    <option value="fullDay">Full Day</option>
+                    <option value="0" disabled={timeSlot !== "0"}>
+                      Select Slot
+                    </option>
+                    <option value="1">09:00 - 10:00</option>
+                    <option value="2">10:00 - 11:00</option>
+                    <option value="3">11:00 - 12:00</option>
+                    <option value="4">12:00 - 13:00</option>
+                    <option value="5">13:00 - 14:00</option>
+                    <option value="6">14:00 - 15:00</option>
+                    <option value="7">15:00 - 16:00</option>
+                    <option value="8">16:00 - 17:00</option>
+                    <option value="9">17:00 - 18:00</option>
                   </select>
                 </div>
-                {timeType === "custom" && (
-                  <div className="flex flex-col md:flex-row md:space-x-4">
-                    <div className="md:w-1/2 w-full">
-                      <label className="block text-xs text-gray-500 mb-1">Start Time</label>
-                      <input
-                        type="time"
-                        className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
-                        value={startTime}
-                        onChange={(e) => setCustomStartTime(e.target.value)}
-                      />
-                    </div>
-                    <div className="md:w-1/2 w-full mt-4 md:mt-0">
-                      <label className="block text-xs text-gray-500 mb-1">End Time</label>
-                      <input
-                        type="time"
-                        className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
-                        value={endTime}
-                        onChange={(e) => setCustomEndTime(e.target.value)}
-                      />
-                    </div>
+              )}
+              {timeType === "custom" && (
+                <div className="flex flex-col md:flex-row md:space-x-2 w-full ">
+                  <div className="md:w-1/2 w-full">
+                    <label className="block text-[10px] text-gray-500">Start Time</label>
+                    <input
+                      type="time"
+                      className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
+                      value={startTime}
+                      onChange={(e) => setCustomStartTime(e.target.value)}
+                    />
                   </div>
-                )}
-              </div>
-              {/* Keys & Remarks */}
-              <div>
-                <label className="block text-sm text-gray-700">Purpose</label>
-                <input
-                  className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
-                  type="text"
-                  placeholder="Assigned Key numbers e.g.: 002,005"
-                  value={purpose}
-                  onChange={(e) => setPurpose(e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="block text-sm text-gray-700">Keys</label>
-                <input
-                  className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
-                  type="text"
-                  placeholder="Assigned Key numbers e.g.: 002,005"
-                  value={keys}
-                  onChange={(e) => setKeys(e.target.value)}
-                />
-              </div>
-              <div className="mb-6">
-                <label className="block text-sm text-gray-700">Remarks</label>
-                <textarea
-                  className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
-                  rows={3}
-                  placeholder="Remarks"
-                  value={remarks}
-                  onChange={(e) => setRemarks(e.target.value)}
-                />
-              </div>
-              <div className="flex justify-center">
-                <button type="submit" className="px-3 py-2 bg-[#F26722] text-white rounded-lg shadow-md hover:bg-[#a5705a] transition duration-300 mb-6">
-                  Allocate
-                </button>
-              </div>
-            </form>
-          </div>
-        )}
-        {isConflictsViewVisible && (
-          <div className="max-h-[80vh] bg-white overflow-y-scroll mr-4 pr-2">
-            <ConflictSlotsList
-              existingSlots={existingBookedSlots}
-              conflicts={overLaps}
-              handleProceedAnyway={handleProceedAnyway}
-              onClose={(allocationPerformed) => {
-                if (allocationPerformed) onClose();
-                setIsConflictsViewVisible(false);
-              }}
-              onUpdateSlot={(date, oldSlot, updatedSlot) => {
-                const newList = allocaionSlotsList.map((slot) => (areSlotsEqual(oldSlot, slot) ? updatedSlot : slot));
-                setAllocationSlotsList(newList);
-              }}
-            />
-          </div>
-        )}
+                  <div className="md:w-1/2 w-full mt-4 md:mt-0">
+                    <label className="block text-[10px] text-gray-500">End Time</label>
+                    <input
+                      type="time"
+                      className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
+                      value={endTime}
+                      onChange={(e) => setCustomEndTime(e.target.value)}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+            {/* Keys & Remarks */}
+            <div>
+              <label className="block text-sm text-gray-700">Purpose</label>
+              <input
+                className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
+                type="text"
+                placeholder="Assigned Key numbers e.g.: 002,005"
+                value={purpose}
+                onChange={(e) => setPurpose(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="block text-sm text-gray-700">Keys</label>
+              <input
+                className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
+                type="text"
+                placeholder="Assigned Key numbers e.g.: 002,005"
+                value={keys}
+                onChange={(e) => setKeys(e.target.value)}
+              />
+            </div>
+            <div className="mb-6">
+              <label className="block text-sm text-gray-700">Remarks</label>
+              <textarea
+                className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
+                rows={3}
+                placeholder="Remarks"
+                value={remarks}
+                onChange={(e) => setRemarks(e.target.value)}
+              />
+            </div>
+          </form>
+        </div>
+        {/* Footer (optional, stays pinned) */}
+        <div className="flex justify-center py-2">
+          <button onClick={handleAllocate} className="px-3 py-2 bg-[#F26722] text-white rounded-lg shadow-md hover:bg-[#a5705a] transition duration-300 mb-6">
+            Allocate
+          </button>
+        </div>
+      </div>
+      <div>
+        <div className={`max-h-[80vh] bg-white ml-2 p-2 rounded-md ${isConflictsViewVisible ? " block " : " hidden "}`}>
+          <ConflictSlotsList existingSlots={existingBookedSlots} createdSlots={allocationSlotsList} onSlotGroupsChange={setSlotGroups} />
+        </div>
       </div>
     </section>
   );
 }
-
-// interface ConflictSlotsListProps {
-//   existingSlots:Slot[]
-//   conflicts: Slot[];
-//   onClose: () => void;
-//   onViewDay: (date: string) => void; // callback when user wants to see the schedule
-//   onUpdateSlot: (date: string, oldSlot: Slot, updated: Slot) => void; // new callback
-// }
-
-// const ConflictSlotsList: React.FC<ConflictSlotsListProps> = ({
-//   existingSlots,
-//   conflicts,
-//   onViewDay,
-//   onClose,
-//   onUpdateSlot,
-// }) => {
-//   // group conflicts by date
-//   const grouped = conflicts.reduce<Record<string, Slot[]>>((acc, slot) => {
-//     if (!acc[slot.date]) acc[slot.date] = [];
-//     acc[slot.date].push(slot);
-//     return acc;
-//   }, {});
-
-//   return (
-//     <div className="space-y-4 ">
-//       <div className="flex flex-row justify-between ">
-//         <h2 className="text-lg font-semibold text-red-600  flex items-center gap-2">
-//           <Clock className="w-5 h-5" />
-//           Conflicting Slots
-//         </h2>
-//         <X
-//           className="w-6 h-6 stroke-gray-500 hover:stroke-gray-700"
-//           onClick={onClose}
-//         />
-//       </div>
-//       {Object.entries(grouped).map(([date, slots]) => (
-//         <div
-//           key={date}
-//           className="rounded-lg border border-red-300 bg-red-50 p-4 shadow-sm"
-//         >
-//           <div className="flex items-center justify-between">
-//             <div className="flex items-center gap-2 text-red-700 font-medium">
-//               <Calendar className="w-4 h-4" />
-//               {date}
-//             </div>
-//             <button
-//               onClick={() => onViewDay(date)}
-//               className="flex items-center gap-1 text-sm text-blue-600 hover:underline"
-//             >
-//               <Eye className="w-4 h-4" />
-//               View Day Schedule
-//             </button>
-//           </div>
-
-//           <ul className="mt-2 space-y-2">
-//             {slots.map((slot, i) => {
-//               const [start, setStart] = useState(slot.start);
-//               const [end, setEnd] = useState(slot.end);
-
-//               return (
-//                 <li
-//                   key={i}
-//                   className="flex items-center gap-2 text-sm text-gray-800 bg-white border border-red-200 px-2 py-1 rounded-md"
-//                 >
-//                   <input
-//                     type="time"
-//                     value={start}
-//                     onChange={(e) => setStart(e.target.value)}
-//                     className="border rounded px-1 py-0.5 text-sm"
-//                   />
-//                   →
-//                   <input
-//                     type="time"
-//                     value={end}
-//                     onChange={(e) => setEnd(e.target.value)}
-//                     className="border rounded px-1 py-0.5 text-sm"
-//                   />
-//                   <button
-//                     onClick={() =>
-//                       onUpdateSlot(date, slot, { ...slot, start, end })
-//                     }
-//                     className="ml-auto flex items-center gap-1 text-green-600 hover:underline"
-//                   >
-//                     <Save className="w-4 h-4" />
-//                     Save
-//                   </button>
-//                 </li>
-//               );
-//             })}
-//           </ul>
-//         </div>
-//       ))}
-
-//       {conflicts.length === 0 && (
-//         <div className="flex flex-row">
-//           <p className="text-sm text-gray-500">✅ No conflicts found. </p>
-//           <p className="text-sm text-gray-500"> ✅ Allocation successful.</p>
-//         </div>
-//       )}
-//     </div>
-//   );
-// };

@@ -1,15 +1,6 @@
 "use client";
 import React, { useEffect, useState } from "react";
-import {
-  RoomRequestTable,
-  RoomRequest,
-  Building,
-  Room,
-  SpaceAllocation,
-  Occupant,
-  RoomInfo,
-  UserProfile,
-} from "@/types";
+import { RoomRequestTable, RoomRequest, Building, Room, SpaceAllocation, Occupant, RoomInfo, UserProfile } from "@/types";
 import { callApi } from "@/utils/apiIntercepter";
 import { URL_NOT_FOUND } from "@/constants";
 import { useSelector } from "react-redux";
@@ -21,13 +12,7 @@ import moment from "moment";
 import { areSlotsEqual, checkSlotConflicts, Slot } from "@/utils/slotsHelper";
 import { ConflictSlotsList } from "../../buildings/[buildingId]/[roomId]/Conflicts";
 
-const DetailRow = ({
-  label,
-  value,
-}: {
-  label: string;
-  value?: string | null;
-}) => (
+const DetailRow = ({ label, value }: { label: string; value?: string | null }) => (
   <div className="flex justify-between items-center border-b border-gray-200 pb-0.5">
     <span className="text-gray-900 font-[550] text-sm">{label}:</span>
     <span className="text-gray-700 text-sm">{value || "N/A"}</span>
@@ -96,32 +81,21 @@ export default function RequestInfoPage() {
   const params = useParams();
   const router = useRouter();
   const requestId = decrypt(params.requestId?.toString() || "");
-  const acadmeicYear = useSelector(
-    (state: any) => state.dataState.selectedAcademicYear
-  );
-  const acadmeicSession = useSelector(
-    (state: any) => state.dataState.selectedAcademicSession
-  );
+  const acadmeicYear = useSelector((state: any) => state.dataState.selectedAcademicYear);
+  const acadmeicSession = useSelector((state: any) => state.dataState.selectedAcademicSession);
   const [requestData, setRequestData] = useState<RoomRequest | null>(null);
   const searchParams = useSearchParams();
 
   const fetchRoomsRequest = async () => {
     const pageSize = searchParams.get("limit");
     const curruntPage = searchParams.get("offSet");
-    let response = await callApi<RoomRequestTable>(
-      `${process.env.NEXT_PUBLIC_GET_REQUEST_LIST}` || URL_NOT_FOUND,
-      {
-        limit: pageSize,
-        offset: curruntPage,
-        acadSess: acadmeicSession,
-        acadYr: acadmeicYear,
-      }
-    );
-    setRequestData(
-      response.data?.requests.filter(
-        (request) => request.requestID === requestId
-      )[0] || null
-    );
+    let response = await callApi<RoomRequestTable>(`${process.env.NEXT_PUBLIC_GET_REQUEST_LIST}` || URL_NOT_FOUND, {
+      limit: pageSize,
+      offset: curruntPage,
+      acadSess: acadmeicSession,
+      acadYr: acadmeicYear,
+    });
+    setRequestData(response.data?.requests.filter((request) => request.requestID === requestId)[0] || null);
   };
 
   useEffect(() => {
@@ -168,9 +142,7 @@ export default function RequestInfoPage() {
   return (
     <div>
       <div className="flex flex-col md:flex-row justify-between">
-        <h2 className="text-base font-semibold text-gray-800 md:ml-2">
-          {`Request No. ${requestID ? `${requestID}` : ""}`}
-        </h2>
+        <h2 className="text-base font-semibold text-gray-800 md:ml-2">{`Request No. ${requestID ? `${requestID}` : ""}`}</h2>
         <button
           className="mt-4 flex h-fit items-center rounded-md bg-[#F26722] px-4 py-2 text-xs text-white shadow-md transition-all hover:bg-[#a5705a] md:mt-0"
           onClick={() => router.back()}
@@ -184,35 +156,18 @@ export default function RequestInfoPage() {
           <div className="space-y-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 w-full">
               <DetailRow label="Requested By" value={employeeName} />
-              <DetailRow
-                label="Employee Department"
-                value={employeeDepartment}
-              />
+              <DetailRow label="Employee Department" value={employeeDepartment} />
               <DetailRow label="Room Type" value={requestedRoomType} />
               <div className="flex justify-between items-center border-b pb-0.5 border-gray-200">
-                <span className="text-gray-900 font-[550] text-sm">
-                  Status:
-                </span>
-                <span
-                  className={`text-gray-700 text-sm py-0.5 px-2 rounded-2xl ${
-                    initialStatus ? getStatusClass(initialStatus) : ""
-                  }`}
-                >
+                <span className="text-gray-900 font-[550] text-sm">Status:</span>
+                <span className={`text-gray-700 text-sm py-0.5 px-2 rounded-2xl ${initialStatus ? getStatusClass(initialStatus) : ""}`}>
                   {initialStatus || "N/A"}
                 </span>
               </div>
               <DetailRow label="Purpose" value={purpose} />
               <div className="flex justify-between items-center border-b pb-0.5 border-gray-200">
-                <span className="text-gray-900 font-[550] text-sm">
-                  Priority:
-                </span>
-                <span
-                  className={`text-gray-700 text-sm py-0.5 px-2 rounded-2xl ${
-                    priority ? getPriorityClass(priority) : ""
-                  }`}
-                >
-                  {priority || "N/A"}
-                </span>
+                <span className="text-gray-900 font-[550] text-sm">Priority:</span>
+                <span className={`text-gray-700 text-sm py-0.5 px-2 rounded-2xl ${priority ? getPriorityClass(priority) : ""}`}>{priority || "N/A"}</span>
               </div>
               {startDate && endDate && (
                 <DetailRow
@@ -220,76 +175,33 @@ export default function RequestInfoPage() {
                   value={
                     recurrence?.split(",")?.[0] === "0"
                       ? formatDate(startDate).split(" ")?.[0]
-                      : `${formatDate(startDate).split(" ")?.[0]} - ${
-                          formatDate(endDate).split(" ")?.[0]
-                        }`
+                      : `${formatDate(startDate).split(" ")?.[0]} - ${formatDate(endDate).split(" ")?.[0]}`
                   }
                 />
               )}
               <DetailRow label="Time" value={`${startTime} - ${endTime}`} />
-              {duration && (
-                <DetailRow
-                  label="Duration"
-                  value={`${duration.hours} hour ${duration.minutes} minutes`}
-                />
-              )}
-              {recurrence && (
-                <DetailRow
-                  label="Recurrence"
-                  value={getRecurranceString(recurrence)}
-                />
-              )}
-              {requestDate && (
-                <DetailRow
-                  label="Requested on"
-                  value={formatDate(requestDate).split(" ")?.[0]}
-                />
-              )}
-              {isApproved && (
-                <DetailRow label="Allocated Room" value={allocatedRoomID} />
-              )}
-              {isApproved && (
-                <DetailRow label="Approved By" value={approvedBy} />
-              )}
-              {isApproved && (
-                <DetailRow label="Approval Date" value={approvalDate} />
-              )}
-              {isRejected && (
-                <DetailRow label="Rejection Reason" value={description} />
-              )}
-              {isRejected && (
-                <DetailRow label="Rejected By" value={approvedBy} />
-              )}
-              {isRejected && (
-                <DetailRow label="Rejection Date" value={approvalDate} />
-              )}
+              {duration && <DetailRow label="Duration" value={`${duration.hours} hour ${duration.minutes} minutes`} />}
+              {recurrence && <DetailRow label="Recurrence" value={getRecurranceString(recurrence)} />}
+              {requestDate && <DetailRow label="Requested on" value={formatDate(requestDate).split(" ")?.[0]} />}
+              {isApproved && <DetailRow label="Allocated Room" value={allocatedRoomID} />}
+              {isApproved && <DetailRow label="Approved By" value={approvedBy} />}
+              {isApproved && <DetailRow label="Approval Date" value={approvalDate} />}
+              {isRejected && <DetailRow label="Rejection Reason" value={description} />}
+              {isRejected && <DetailRow label="Rejected By" value={approvedBy} />}
+              {isRejected && <DetailRow label="Rejection Date" value={approvalDate} />}
             </div>
 
             <div className="flex flex-row gap-8">
               {purposeDesc && (
                 <div className="w-full flex flex-col">
-                  <label className="text-sm text-gray-900 font-[550] mb-2">
-                    Purpose Description
-                  </label>
-                  <textarea
-                    value={purposeDesc}
-                    disabled={true}
-                    rows={3}
-                    className="text-sm p-2 border border-gray-200 rounded-sm"
-                  />
+                  <label className="text-sm text-gray-900 font-[550] mb-2">Purpose Description</label>
+                  <textarea value={purposeDesc} disabled={true} rows={3} className="text-sm p-2 border border-gray-200 rounded-sm" />
                 </div>
               )}
               {(isApproved || isRejected) && description && (
                 <div className="w-full flex flex-col">
-                  <label className="text-sm text-gray-900 font-[550] mb-2">
-                    {isApproved ? "Remarks" : "Rejection Reason"}
-                  </label>
-                  <textarea
-                    rows={3}
-                    value={description}
-                    disabled={true}
-                    className="text-sm p-2 border border-gray-200 rounded-sm"
-                  />
+                  <label className="text-sm text-gray-900 font-[550] mb-2">{isApproved ? "Remarks" : "Rejection Reason"}</label>
+                  <textarea rows={3} value={description} disabled={true} className="text-sm p-2 border border-gray-200 rounded-sm" />
                 </div>
               )}
             </div>
@@ -335,24 +247,11 @@ type FormProps = {
   onRequestApproval: () => void;
 };
 
-function RequestApprovalForm({
-  isApproved,
-  requestData,
-  onClosePressed,
-  onRequestApproval,
-}: FormProps) {
-  const user: UserProfile | null = useSelector(
-    (state: any) => state.dataState.user
-  );
-  const acadmeicYear = useSelector(
-    (state: any) => state.dataState.selectedAcademicYear
-  );
-  const acadmeicSession = useSelector(
-    (state: any) => state.dataState.selectedAcademicSession
-  );
-  const academicSessionEndDate = useSelector(
-    (state: any) => state.dataState.selectedAcademicSessionEndDate
-  );
+function RequestApprovalForm({ isApproved, requestData, onClosePressed, onRequestApproval }: FormProps) {
+  const user: UserProfile | null = useSelector((state: any) => state.dataState.user);
+  const acadmeicYear = useSelector((state: any) => state.dataState.selectedAcademicYear);
+  const acadmeicSession = useSelector((state: any) => state.dataState.selectedAcademicSession);
+  const academicSessionEndDate = useSelector((state: any) => state.dataState.selectedAcademicSessionEndDate);
 
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [selectedBuildingId, setSelectedBuildingId] = useState<string>("");
@@ -370,10 +269,7 @@ function RequestApprovalForm({
   useEffect(() => {
     const fetchBuildings = async () => {
       const reqBody = { acadSession: acadmeicSession, acadYear: acadmeicYear };
-      const response = await callApi<Building[]>(
-        process.env.NEXT_PUBLIC_GET_BUILDING_LIST || URL_NOT_FOUND,
-        reqBody
-      );
+      const response = await callApi<Building[]>(process.env.NEXT_PUBLIC_GET_BUILDING_LIST || URL_NOT_FOUND, reqBody);
       if (response.success) setBuildings(response.data || []);
     };
     fetchBuildings();
@@ -391,38 +287,22 @@ function RequestApprovalForm({
         floorID: selectedFloorId,
         curreentTime: moment().format("HH:mm"),
       };
-      const response = await callApi<Room[]>(
-        process.env.NEXT_PUBLIC_GET_ROOMS_LIST || URL_NOT_FOUND,
-        reqBody
-      );
+      const response = await callApi<Room[]>(process.env.NEXT_PUBLIC_GET_ROOMS_LIST || URL_NOT_FOUND, reqBody);
       setRooms(response.data || []);
     };
     if (selectedBuildingId) {
       fetchRoomsForBuilding(selectedBuildingId);
       setSelectedRoomId("");
     } else setRooms([]);
-  }, [
-    selectedBuildingId,
-    selectedFloorId,
-    buildings,
-    acadmeicSession,
-    acadmeicYear,
-  ]);
+  }, [selectedBuildingId, selectedFloorId, buildings, acadmeicSession, acadmeicYear]);
 
   // Create slots from recurrence
-  function createSlotsFromRecurrence(
-    startDate: string,
-    endDate: string,
-    startTime: string,
-    endTime: string,
-    recurrence: string
-  ): Slot[] {
+  function createSlotsFromRecurrence(startDate: string, endDate: string, startTime: string, endTime: string, recurrence: string): Slot[] {
     const DATE_FMT = "YYYY-MM-DD";
     if (!startDate || !startTime || !endTime) return [];
     const start = moment(new Date(startDate), DATE_FMT, true);
     const last = moment(new Date(endDate), DATE_FMT, true);
-    if (!start.isValid() || !last.isValid() || last.isBefore(start, "day"))
-      return [];
+    if (!start.isValid() || !last.isValid() || last.isBefore(start, "day")) return [];
     const tFormats = ["HH:mm:ss", "H:mm:ss"];
     const startTimeMoment = moment(startTime, tFormats, true);
     const endTimeMoment = moment(endTime, tFormats, true);
@@ -431,11 +311,7 @@ function RequestApprovalForm({
     const recurrenceList = (recurrence || "").split(",").map((r) => r.trim());
     const hasRecurrence = recurrenceList.some((r) => r !== "0");
     const slots: Slot[] = [];
-    const makeId = (m: moment.Moment) =>
-      `${m.format("YYYYMMDD")}_${startTime.replace(/:/g, "")}_${endTime.replace(
-        /:/g,
-        ""
-      )}`;
+    const makeId = (m: moment.Moment) => `${m.format("YYYYMMDD")}_${startTime.replace(/:/g, "")}_${endTime.replace(/:/g, "")}`;
     if (!hasRecurrence) {
       slots.push({
         date: start.format(DATE_FMT),
@@ -445,15 +321,9 @@ function RequestApprovalForm({
       });
       return slots;
     }
-    const recurrenceDays = recurrenceList
-      .map(Number)
-      .filter((n) => !isNaN(n) && n >= 1 && n <= 7);
+    const recurrenceDays = recurrenceList.map(Number).filter((n) => !isNaN(n) && n >= 1 && n <= 7);
     if (recurrenceDays.length === 0) return [];
-    for (
-      let current = start.clone();
-      current.isSameOrBefore(last, "day");
-      current.add(1, "day")
-    ) {
+    for (let current = start.clone(); current.isSameOrBefore(last, "day"); current.add(1, "day")) {
       if (recurrenceDays.includes(current.isoWeekday())) {
         slots.push({
           date: current.format(DATE_FMT),
@@ -468,13 +338,7 @@ function RequestApprovalForm({
 
   const generateSlots = () => {
     if (!requestData) return [];
-    return createSlotsFromRecurrence(
-      requestData.startDate,
-      requestData.endDate,
-      requestData.startTime,
-      requestData.endTime,
-      requestData.recurrence
-    );
+    return createSlotsFromRecurrence(requestData.startDate, requestData.endDate, requestData.startTime, requestData.endTime, requestData.recurrence);
   };
 
   const validateConflicts = async (slots: Slot[]) => {
@@ -487,19 +351,14 @@ function RequestApprovalForm({
         startDate: moment().format("YYYY-MM-DD"),
         endDate: academicSessionEndDate,
       };
-      const response = await callApi<RoomInfo>(
-        process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND,
-        requestbody
-      );
+      const response = await callApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, requestbody);
       if (response.success) {
         const existingSlots: Slot[] =
           response.data?.occupants?.map((o) => ({
             date: moment(o.scheduledDate).format("YYYY-MM-DD"),
             start: o.startTime,
             end: o.endTime,
-            id: `${moment(o.scheduledDate).format(
-              "YYYYMMDD"
-            )}_${o.startTime.replace(/:/g, "")}_${o.endTime.replace(/:/g, "")}`,
+            id: `${moment(o.scheduledDate).format("YYYYMMDD")}_${o.startTime.replace(/:/g, "")}_${o.endTime.replace(/:/g, "")}`,
           })) || [];
         setExistingBookedSlots(existingSlots);
         return existingSlots;
@@ -554,26 +413,19 @@ function RequestApprovalForm({
       // Insert allocations
       let allSucceeded = true;
       for (const allocation of allocations) {
-        const resp = await callApi(
-          process.env.NEXT_PUBLIC_INSERT_SPACE_ALLOCATION_ENTRY ||
-            URL_NOT_FOUND,
-          allocation
-        );
+        const resp = await callApi(process.env.NEXT_PUBLIC_INSERT_SPACE_ALLOCATION_ENTRY || URL_NOT_FOUND, allocation);
         if (!resp?.data) allSucceeded = false;
       }
 
       if (allSucceeded) {
-        const resp = await callApi(
-          process.env.NEXT_PUBLIC_UPDATE_REQUEST || URL_NOT_FOUND,
-          {
-            requestID: requestData.requestID,
-            description,
-            status: 2, // Approved
-            allocatedRoomID: selectedRoomId,
-            approvedBy: user?.employeeId,
-            approvalDate: moment().format("YYYY-MM-DD"),
-          }
-        );
+        const resp = await callApi(process.env.NEXT_PUBLIC_UPDATE_REQUEST || URL_NOT_FOUND, {
+          requestID: requestData.requestID,
+          description,
+          status: 2, // Approved
+          allocatedRoomID: selectedRoomId,
+          approvedBy: user?.employeeId,
+          approvalDate: moment().format("YYYY-MM-DD"),
+        });
         if (resp.data) {
           alert("Request approved successfully!");
           onRequestApproval();
@@ -586,17 +438,14 @@ function RequestApprovalForm({
         alert("Please provide rejection reason.");
         return;
       }
-      const resp = await callApi(
-        process.env.NEXT_PUBLIC_UPDATE_REQUEST || URL_NOT_FOUND,
-        {
-          requestID: requestData.requestID,
-          description,
-          status: 3, // Rejected
-          approvedBy: user?.employeeId,
-          approvalDate: moment().format("YYYY-MM-DD"),
-          allocatedRoomID: "",
-        }
-      );
+      const resp = await callApi(process.env.NEXT_PUBLIC_UPDATE_REQUEST || URL_NOT_FOUND, {
+        requestID: requestData.requestID,
+        description,
+        status: 3, // Rejected
+        approvedBy: user?.employeeId,
+        approvalDate: moment().format("YYYY-MM-DD"),
+        allocatedRoomID: "",
+      });
       if (resp.data) {
         alert("Request rejected successfully!");
         onRequestApproval();
@@ -606,19 +455,14 @@ function RequestApprovalForm({
   };
 
   const handleProceedAnyway = () => {
-    const list = allocationSlotsList.filter(
-      (slot) => !conflicts.some((c) => areSlotsEqual(slot, c))
-    );
+    const list = allocationSlotsList.filter((slot) => !conflicts.some((c) => areSlotsEqual(slot, c)));
     onSuccessfulSlotsCreation(createSpaceAllocations(list));
     setShowConflictsView(false);
   };
 
   const onSuccessfulSlotsCreation = async (allocations: SpaceAllocation[]) => {
     for (const allocation of allocations) {
-      await callApi(
-        process.env.NEXT_PUBLIC_INSERT_SPACE_ALLOCATION_ENTRY || URL_NOT_FOUND,
-        allocation
-      );
+      await callApi(process.env.NEXT_PUBLIC_INSERT_SPACE_ALLOCATION_ENTRY || URL_NOT_FOUND, allocation);
     }
     if (allocations.length > 0) {
       await callApi(process.env.NEXT_PUBLIC_UPDATE_REQUEST || URL_NOT_FOUND, {
@@ -641,9 +485,7 @@ function RequestApprovalForm({
         {!showConflicts && (
           <div className="max-h-[80vh] bg-white overflow-y-scroll mr-4 pr-2">
             <div className="flex justify-between items-center">
-              <span className="text-gray-900 font-[550] text-sm">
-                {isApproved ? "Approve" : "Reject"}
-              </span>
+              <span className="text-gray-900 font-[550] text-sm">{isApproved ? "Approve" : "Reject"}</span>
             </div>
 
             {/* Form Fields remain same as your original design */}
@@ -653,9 +495,7 @@ function RequestApprovalForm({
                   {/* Building / Floor / Room Selects */}
                   <div className="flex flex-col md:flex-row md:space-x-4">
                     <div className="w-full">
-                      <label className="block text-sm text-gray-700 mb-1">
-                        Building
-                      </label>
+                      <label className="block text-sm text-gray-700 mb-1">Building</label>
                       <select
                         className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
                         value={selectedBuildingId}
@@ -670,9 +510,7 @@ function RequestApprovalForm({
                       </select>
                     </div>
                     <div className="md:w-1/2 w-full mt-4 md:mt-0">
-                      <label className="block text-sm text-gray-700 mb-1">
-                        Floor
-                      </label>
+                      <label className="block text-sm text-gray-700 mb-1">Floor</label>
                       <select
                         className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
                         value={selectedFloorId}
@@ -692,9 +530,7 @@ function RequestApprovalForm({
                       </select>
                     </div>
                     <div className="md:w-1/2 w-full mt-4 md:mt-0">
-                      <label className="block text-sm text-gray-700 mb-1">
-                        Room
-                      </label>
+                      <label className="block text-sm text-gray-700 mb-1">Room</label>
                       <select
                         className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
                         value={selectedRoomId}
@@ -723,9 +559,7 @@ function RequestApprovalForm({
                   </div>
 
                   <div className="mb-6">
-                    <label className="block text-sm text-gray-700">
-                      Remarks
-                    </label>
+                    <label className="block text-sm text-gray-700">Remarks</label>
                     <textarea
                       className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
                       rows={3}
@@ -741,9 +575,7 @@ function RequestApprovalForm({
             {!isApproved && (
               <div className="mt-2 pt-4 border-t-2 border-gray-200">
                 <div className="space-y-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Rejection Reason
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Rejection Reason</label>
                   <textarea
                     rows={3}
                     className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
@@ -779,15 +611,13 @@ function RequestApprovalForm({
             <ConflictSlotsList
               handleProceedAnyway={handleProceedAnyway}
               existingSlots={existingBookedSlots}
-              conflicts={conflicts}
+              createdSlots={conflicts}
               onClose={() => {
                 setShowConflictsView(false);
                 if (conflicts.length < 1) onClosePressed();
               }}
               onUpdateSlot={(date, oldSlot, updatedSlot) => {
-                const newList = allocationSlotsList.map((slot) =>
-                  areSlotsEqual(oldSlot, slot) ? updatedSlot : slot
-                );
+                const newList = allocationSlotsList.map((slot) => (areSlotsEqual(oldSlot, slot) ? updatedSlot : slot));
                 setAllocationSlotsList(newList);
               }}
             />

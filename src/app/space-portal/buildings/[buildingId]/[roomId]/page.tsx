@@ -16,18 +16,10 @@ function RoomPage() {
   const router = useRouter();
   const userRole = useSelector((state: any) => state.dataState.userRole);
   const [isManagedByThisUser, setIsManagedByThisUser] = useState(false);
-  const acadmeicYear = useSelector(
-    (state: any) => state.dataState.selectedAcademicYear
-  );
-  const acadmeicSession = useSelector(
-    (state: any) => state.dataState.selectedAcademicSession
-  );
-  const academicSessionStartDate = useSelector(
-    (state: any) => state.dataState.selectedAcademicSessionStartDate
-  );
-  const academicSessionEndDate = useSelector(
-    (state: any) => state.dataState.selectedAcademicSessionEndDate
-  );
+  const acadmeicYear = useSelector((state: any) => state.dataState.selectedAcademicYear);
+  const acadmeicSession = useSelector((state: any) => state.dataState.selectedAcademicSession);
+  const academicSessionStartDate = useSelector((state: any) => state.dataState.selectedAcademicSessionStartDate);
+  const academicSessionEndDate = useSelector((state: any) => state.dataState.selectedAcademicSessionEndDate);
 
   const string = decrypt(params.roomId?.toString() || "");
   const buildingId = decrypt(params.buildingId?.toString() || "");
@@ -43,9 +35,7 @@ function RoomPage() {
     end: string;
   } | null>(null);
   const [allBuildingsData, setAllBuildingsData] = useState<Building[]>([]);
-  const [selectedWeekStart, setSelectedWeekStart] = useState(() =>
-    moment().startOf("isoWeek").toDate()
-  );
+  const [selectedWeekStart, setSelectedWeekStart] = useState(() => moment().startOf("isoWeek").toDate());
 
   const MAX_WEEKLY_MINUTES = 63 * 60; // adjustable max weekly minutes
 
@@ -58,10 +48,7 @@ function RoomPage() {
           acadSession: `${acadmeicSession}`,
           acadYear: `${acadmeicYear}`,
         };
-        const response = await callApi<Building[]>(
-          process.env.NEXT_PUBLIC_GET_BUILDING_LIST || URL_NOT_FOUND,
-          reqBody
-        );
+        const response = await callApi<Building[]>(process.env.NEXT_PUBLIC_GET_BUILDING_LIST || URL_NOT_FOUND, reqBody);
         if (response.success) setAllBuildingsData(response.data || []);
       } catch (error) {
         console.error("Error fetching buildings:", error);
@@ -72,14 +59,7 @@ function RoomPage() {
 
   /** Fetch room info */
   const fetchRoomInfo = async () => {
-    if (
-      !roomId ||
-      !acadmeicYear ||
-      !acadmeicSession ||
-      !academicSessionStartDate ||
-      !academicSessionEndDate
-    )
-      return;
+    if (!roomId || !acadmeicYear || !acadmeicSession || !academicSessionStartDate || !academicSessionEndDate) return;
     const requestbody = {
       roomID: roomId,
       subroomID: subRoomId ?? 0,
@@ -89,14 +69,10 @@ function RoomPage() {
       endDate: academicSessionEndDate,
     };
     try {
-      const res = await callApi<RoomInfo>(
-        process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND,
-        requestbody
-      );
+      const res = await callApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, requestbody);
       const isAllocationAllowed = res.data?.managedBy?.split("|").some((d) => {
         return d.toUpperCase() === userRole?.toUpperCase();
       });
-      console.log(isAllocationAllowed);
       setIsManagedByThisUser(isAllocationAllowed || false);
       if (res.success) setRoomInfo(res.data);
     } catch (error) {
@@ -105,37 +81,20 @@ function RoomPage() {
   };
 
   useEffect(() => {
-    if (
-      acadmeicYear &&
-      acadmeicSession &&
-      academicSessionStartDate &&
-      academicSessionEndDate
-    ) {
+    if (acadmeicYear && acadmeicSession && academicSessionStartDate && academicSessionEndDate) {
       fetchRoomInfo();
     }
-  }, [
-    acadmeicYear,
-    acadmeicSession,
-    academicSessionStartDate,
-    academicSessionEndDate,
-  ]);
+  }, [acadmeicYear, acadmeicSession, academicSessionStartDate, academicSessionEndDate]);
 
   /** Handle timetable slot click */
-  const handleTimeTableClick = (
-    date: string,
-    slot: { start: string; end: string }
-  ) => {
+  const handleTimeTableClick = (date: string, slot: { start: string; end: string }) => {
     if (isManagedByThisUser) {
       const slotDate = moment(date);
       const startSlotTime = moment(slot.start, "HH:mm");
-      const exactSlotStartTime = slotDate
-        .hour(startSlotTime.hour())
-        .minute(startSlotTime.minute());
+      const exactSlotStartTime = slotDate.hour(startSlotTime.hour()).minute(startSlotTime.minute());
       setSelectedSlot({
         date,
-        start: moment().isSameOrBefore(exactSlotStartTime)
-          ? slot.start
-          : moment().format("HH:mm"),
+        start: moment().isSameOrBefore(exactSlotStartTime) ? slot.start : moment().format("HH:mm"),
         end: slot.end,
       });
       setIsAllocationFormVisible(true);
@@ -149,11 +108,7 @@ function RoomPage() {
     let allSucceeded = true;
     for (const allocation of allocations) {
       try {
-        const response = await callApi<any>(
-          process.env.NEXT_PUBLIC_INSERT_SPACE_ALLOCATION_ENTRY ||
-            URL_NOT_FOUND,
-          allocation
-        );
+        const response = await callApi<any>(process.env.NEXT_PUBLIC_INSERT_SPACE_ALLOCATION_ENTRY || URL_NOT_FOUND, allocation);
         if (!response?.data) {
           console.warn("Insert failed for allocation:", allocation, response);
           allSucceeded = false;
@@ -174,12 +129,7 @@ function RoomPage() {
     roomInfo?.occupants?.filter((o: Occupant) => {
       if (!o.scheduledDate) return false;
       const scheduled = moment(o.scheduledDate);
-      return scheduled.isBetween(
-        startOfSelectedWeek,
-        endOfSelectedWeek,
-        "day",
-        "[]"
-      );
+      return scheduled.isBetween(startOfSelectedWeek, endOfSelectedWeek, "day", "[]");
     }) || [];
 
   const totalMinutes = weeklyOccupants.reduce((sum, occupant) => {
@@ -191,14 +141,9 @@ function RoomPage() {
 
   const weeklyOccupancy = ((totalMinutes || 0) / MAX_WEEKLY_MINUTES) * 100;
   const circumference = 2 * Math.PI * 28;
-  const strokeDashoffset = circumference - weeklyOccupancy * circumference;
-  const borderColor =
-    roomInfo?.occupied === 0
-      ? "text-green-400"
-      : totalMinutes >= MAX_WEEKLY_MINUTES * 0.8
-      ? "text-red-500"
-      : "text-yellow-400";
+  const strokeDashoffset = circumference - (weeklyOccupancy / 100) * circumference;
 
+  const borderColor = roomInfo?.occupied === 0 ? "text-green-400" : totalMinutes >= MAX_WEEKLY_MINUTES * 0.8 ? "text-red-500" : "text-yellow-400";
   return roomInfo ? (
     <>
       <section className="bg-white w-full">
@@ -211,12 +156,7 @@ function RoomPage() {
                 .name.toUpperCase()}
               - Room Details
             </h4>
-            <span className="text-xs font-semibold text-gray-500 md:ml-2">
-              {
-                allBuildingsData.filter((b) => b.id === roomInfo.building)?.[0]
-                  ?.name
-              }
-            </span>
+            <span className="text-xs font-semibold text-gray-500 md:ml-2">{allBuildingsData.filter((b) => b.id === roomInfo.building)?.[0]?.name}</span>
           </div>
           <button
             className="mt-4 flex h-fit items-center rounded-md bg-[#F26722] px-4 py-2 text-xs text-white shadow-md transition-all hover:bg-[#a5705a] md:mt-0"
@@ -235,21 +175,13 @@ function RoomPage() {
                   <div className="flex items-center">
                     <div
                       className={`w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold ${
-                        weeklyOccupancy === 0
-                          ? "bg-green-500"
-                          : weeklyOccupancy >= 63 * 0.8
-                          ? "bg-orange-500"
-                          : "bg-yellow-500"
+                        weeklyOccupancy === 0 ? "bg-green-500" : weeklyOccupancy >= 63 * 0.8 ? "bg-orange-500" : "bg-yellow-500"
                       }`}
                     >
-                      {roomInfo.roomName
-                        ? roomInfo?.roomName?.substring(0, 3)
-                        : roomInfo?.id?.split(" ")[0].substring(0, 3)}
+                      {roomInfo.roomName ? roomInfo?.roomName?.substring(0, 3) : roomInfo?.id?.split(" ")[0].substring(0, 3)}
                     </div>
                     <div className="ml-4">
-                      <h2 className="text font-[500] text-gray-600">
-                        {roomInfo.roomName ? roomInfo?.roomName : roomInfo?.id}
-                      </h2>
+                      <h2 className="text font-[500] text-gray-600">{roomInfo.roomName ? roomInfo?.roomName : roomInfo?.id}</h2>
                       <div className="flex items-center mt-1">
                         <span
                           className={`px-2 py-0.5 text-xs rounded-full ${
@@ -260,16 +192,10 @@ function RoomPage() {
                               : "bg-yellow-100 text-yellow-800"
                           }`}
                         >
-                          {weeklyOccupancy === 0
-                            ? "Available"
-                            : weeklyOccupancy >= 63 * 0.8
-                            ? "High Occupancy"
-                            : "Moderate Occupancy"}
+                          {weeklyOccupancy === 0 ? "Available" : weeklyOccupancy >= 63 * 0.8 ? "High Occupancy" : "Moderate Occupancy"}
                         </span>
                         <span className="mx-2 text-gray-400">•</span>
-                        <span className="text-xs text-gray-600">
-                          Room ID: {roomInfo.id}
-                        </span>
+                        <span className="text-xs text-gray-600">Room ID: {roomInfo.id}</span>
                       </div>
                     </div>
                   </div>
@@ -278,18 +204,8 @@ function RoomPage() {
                     <div className="inline-flex items-center justify-center w-16 h-16 rounded-full border-4 border-gray-100 relative">
                       <div>
                         <div className="relative w-16 h-16">
-                          <svg
-                            className="w-full h-full transform -rotate-90"
-                            viewBox="0 0 64 64"
-                          >
-                            <circle
-                              cx="32"
-                              cy="32"
-                              r="28"
-                              strokeWidth="4"
-                              className="stroke-current text-gray-200"
-                              fill="transparent"
-                            />
+                          <svg className="w-full h-full transform -rotate-90" viewBox="0 0 64 64">
+                            <circle cx="32" cy="32" r="28" strokeWidth="4" className="stroke-current text-gray-200" fill="transparent" />
                             <circle
                               cx="32"
                               cy="32"
@@ -316,22 +232,12 @@ function RoomPage() {
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
                     <div>
                       <p className="text-sm text-gray-500">Capacity</p>
-                      <p className="text-lg font-semibold">
-                        {roomInfo.capacity}
-                      </p>
+                      <p className="text-lg font-semibold">{roomInfo.capacity}</p>
                     </div>
                     <div>
                       <p className="text-sm text-gray-500">Today's Bookings</p>
                       <p className="text-lg font-semibold">
-                        {
-                          roomInfo.occupants?.filter(
-                            (o) =>
-                              moment().format("YYYY-MM-DD") ===
-                              moment(new Date(o.scheduledDate)).format(
-                                "YYYY-MM-DD"
-                              )
-                          ).length
-                        }
+                        {roomInfo.occupants?.filter((o) => moment().format("YYYY-MM-DD") === moment(new Date(o.scheduledDate)).format("YYYY-MM-DD")).length}
                       </p>
                     </div>
                     <div>
@@ -340,18 +246,14 @@ function RoomPage() {
                     </div>
                     <div>
                       <p className="text-sm text-gray-500">Room Type</p>
-                      <p className="text-lg font-semibold">
-                        {roomInfo.roomType}
-                      </p>
+                      <p className="text-lg font-semibold">{roomInfo.roomType}</p>
                     </div>
                   </div>
                 </div>
 
                 <div className="mt-8">
                   <div className="flex flex-row justify-between">
-                    <h3 className="text-lg font-semibold mb-4 text-gray-500">
-                      Current Assignment
-                    </h3>
+                    <h3 className="text-lg font-semibold mb-4 text-gray-500">Current Assignment</h3>
                     {roomInfo.managedBy?.split("|").includes(userRole) && (
                       <button
                         className="mt-4 flex h-fit items-center rounded-md bg-[#F26722] px-4 py-2 text-xs text-white shadow-md transition-all hover:bg-[#a5705a] md:mt-0"
@@ -368,9 +270,7 @@ function RoomPage() {
                     refreshData={() => fetchRoomInfo()}
                     setStartDate={(date) => {
                       setStartDate(date);
-                      setSelectedWeekStart(
-                        moment(date).startOf("isoWeek").toDate()
-                      );
+                      setSelectedWeekStart(moment(date).startOf("isoWeek").toDate());
                     }}
                     occupants={roomInfo.occupants || []}
                     academicSessionStartDate={academicSessionStartDate || ""}
