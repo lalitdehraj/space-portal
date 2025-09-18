@@ -50,6 +50,12 @@ const maintenanceLinks: NavLink[] = [
     iconSrc: "/images/dollar-square.svg",
     alt: "Maintenance icon",
   },
+  {
+    title: "Room Maintenance",
+    href: "/space-portal/maintenance",
+    iconSrc: "/images/dollar-square.svg",
+    alt: "Maintenance icon",
+  },
 ];
 
 const reportsLinks: NavLink[] = [
