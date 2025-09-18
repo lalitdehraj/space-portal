@@ -214,7 +214,7 @@ export default function AddAssignmentForm({
         allocatedfrom: "Direct Allocation",
         allocatedBy: user?.employeeId || "",
         purpose: purpose,
-        type: allocationType,
+        types: allocationType,
       } as SpaceAllocation;
     });
   }
@@ -532,10 +532,10 @@ export default function AddAssignmentForm({
                 <option value="" disabled>
                   Select Type
                 </option>
-                <option value="Lecture">Lecture</option>
-                <option value="Seminar">Seminar</option>
-                <option value="Meeting">Meeting</option>
-                <option value="Activity">Activity</option>
+                <option value="0">Lecture</option>
+                <option value="1">Seminar</option>
+                <option value="2">Meeting</option>
+                <option value="3">Activity</option>
               </select>
             </div>
             <div className="flex flex-col md:flex-row md:space-x-4 space-y-4 md:space-y-0">

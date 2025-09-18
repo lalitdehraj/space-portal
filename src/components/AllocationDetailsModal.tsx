@@ -27,6 +27,20 @@ export default function AllocationDetailsModal({
     return now.isAfter(slotEnd);
   };
 
+  // Check if this is a current ongoing slot (same date as today and currently in progress)
+  const isCurrentOngoingSlot = () => {
+    const now = moment();
+    const slotDate = moment(occupant.scheduledDate).format("YYYY-MM-DD");
+    const today = now.format("YYYY-MM-DD");
+    
+    if (slotDate !== today) return false;
+    
+    const slotStart = moment(`${slotDate} ${occupant.startTime}`);
+    const slotEnd = moment(`${slotDate} ${occupant.endTime}`);
+    
+    return now.isAfter(slotStart) && now.isBefore(slotEnd);
+  };
+
   return (
     <section className="fixed inset-0 z-50 h-screen w-screen bg-[#00000070] flex items-center justify-center text-gray-600">
       <div className="relative w-full max-w-lg bg-white rounded-xl shadow-2xl px-8 py-6">
@@ -78,31 +92,45 @@ export default function AllocationDetailsModal({
         {/* Actions */}
         {/* {console.log("isEditable value:", occupant.isEditable, typeof occupant.isEditable)} */}
         {occupant.isEditable === "true" && isManagedByThisUser && (
-          <div className="mt-8 flex justify-end gap-3">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 bg-gray-200 rounded-lg text-gray-700 hover:bg-gray-300 transition"
-            >
-              {isSlotFullyElapsed() ? "Close" : "Cancel"}
-            </button>
-            {!isSlotFullyElapsed() && (
-              <>
-                <button
-                  onClick={onUpdate}
-                  className="px-4 py-2 bg-orange-500 text-white rounded-lg flex items-center gap-2 hover:bg-orange-600 transition"
-                >
-                  <Edit3 className="w-4 h-4" />
-                  Update
-                </button>
-                <button
-                  onClick={() => onDelete(occupant.Id)}
-                  className="px-4 py-2 bg-orange-500 text-white rounded-lg flex items-center gap-2 hover:bg-orange-600 transition"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  Un-allocate
-                </button>
-              </>
+          <div className="mt-8">
+            {/* Show message for current ongoing slots */}
+            {isCurrentOngoingSlot() && (
+              <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <p className="text-sm text-yellow-700">
+                  This slot is currently ongoing. You can only unallocate the remaining time.
+                </p>
+              </div>
             )}
+            
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={onClose}
+                className="px-4 py-2 bg-gray-200 rounded-lg text-gray-700 hover:bg-gray-300 transition"
+              >
+                {isSlotFullyElapsed() ? "Close" : "Cancel"}
+              </button>
+              {!isSlotFullyElapsed() && (
+                <>
+                  {/* Hide Update button for current ongoing slots */}
+                  {!isCurrentOngoingSlot() && (
+                    <button
+                      onClick={onUpdate}
+                      className="px-4 py-2 bg-orange-500 text-white rounded-lg flex items-center gap-2 hover:bg-orange-600 transition"
+                    >
+                      <Edit3 className="w-4 h-4" />
+                      Update
+                    </button>
+                  )}
+                  <button
+                    onClick={() => onDelete(occupant.Id)}
+                    className="px-4 py-2 bg-orange-500 text-white rounded-lg flex items-center gap-2 hover:bg-orange-600 transition"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    Un-allocate
+                  </button>
+                </>
+              )}
+            </div>
           </div>
         )}
       </div>
