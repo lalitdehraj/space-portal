@@ -45,6 +45,8 @@ export default function UpdateSlotModal({
     hasConflict: false,
     conflictingOccupants: [],
   });
+  const [remarks, setRemarks] = useState<string>("");
+  const [showRemarks, setShowRemarks] = useState<boolean>(false);
 
   // Check if the slot is partially elapsed (current ongoing slot)
   const isSlotPartiallyElapsed = () => {
@@ -256,6 +258,11 @@ export default function UpdateSlotModal({
       return;
     }
 
+    if (!remarks.trim()) {
+      alert("Please provide remarks explaining why this slot is being updated");
+      return;
+    }
+
     setIsUpdating(true);
 
     try {
@@ -265,6 +272,7 @@ export default function UpdateSlotModal({
         startTime: startTime,
         endTime: endTime,
         isAllocationActive: true,
+        remarks:remarks,
       };
 
       const response = await callApi(
@@ -301,7 +309,8 @@ export default function UpdateSlotModal({
       validateSlotNotInPast() &&
       validateTimeNotInPast() &&
       !conflictInfo.hasConflict &&
-      !isSlotFullyElapsed()
+      !isSlotFullyElapsed() &&
+      remarks.trim().length > 0
     );
   };
 
@@ -498,6 +507,47 @@ export default function UpdateSlotModal({
             </div>
           </div>
 
+          {/* Remarks Section */}
+          {!isSlotFullyElapsed() && !isCurrentOngoingSlot() && (
+            <div>
+              {!showRemarks ? (
+                <button
+                  onClick={() => setShowRemarks(true)}
+                  className="w-full px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg text-blue-700 hover:bg-blue-100 transition flex items-center justify-center gap-2"
+                >
+                  <span>Add Remarks (Why is this slot being updated?)</span>
+                </button>
+              ) : (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Remarks (Why is this slot being updated?)
+                  </label>
+                  <textarea
+                    value={remarks}
+                    onChange={(e) => setRemarks(e.target.value)}
+                    placeholder="Please provide a reason for updating this slot..."
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 resize-none"
+                  />
+                  <div className="flex justify-between items-center mt-2">
+                    <p className="text-xs text-gray-500">
+                      Remarks are required to update the slot
+                    </p>
+                    <button
+                      onClick={() => {
+                        setShowRemarks(false);
+                        setRemarks("");
+                      }}
+                      className="text-xs text-gray-500 hover:text-gray-700 underline"
+                    >
+                      Remove remarks
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Conflict Check */}
           {conflictInfo.hasConflict && (
             <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
@@ -553,6 +603,11 @@ export default function UpdateSlotModal({
               </div>
               <p className="text-sm text-orange-600 mt-1">
                 The selected time slot is available for allocation.
+                {remarks.trim() && (
+                  <span className="block mt-1 text-green-600">
+                    ✓ Remarks provided - ready to update
+                  </span>
+                )}
               </p>
             </div>
           )}

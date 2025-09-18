@@ -129,22 +129,13 @@ export default function Dashboard() {
     },
     {
       title: "Total Floors",
-      value: allBuildingsData?.reduce((sum, b) => {
-        return sum + b.floors?.length;
-      }, 0),
+      value: data?.totalFloors,
       iconSrc: "/images/floor-plan.svg",
       alt: "Floor plan icon",
     },
     {
       title: "Total Rooms",
-      value: allBuildingsData.reduce((sum, b) => {
-        return (
-          sum +
-          b.floors.reduce((fsum, f) => {
-            return fsum + f.totalRoomsOnFloor;
-          }, 0)
-        );
-      }, 0),
+      value: data?.totalRooms,
       iconSrc: "/images/house-door.svg",
       alt: "Room icon",
     },
