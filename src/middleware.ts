@@ -6,7 +6,6 @@ import { UserProfile } from "./types";
 import { URL_NOT_FOUND } from "./constants";
 // import { authOptions } from './app/api/auth/[...nextauth]/authOptions';
 
-
 const PUBLIC_PATHS = ["/api/auth", "/login"];
 const PUBLIC_FILE = /\.(.*)$/;
 
