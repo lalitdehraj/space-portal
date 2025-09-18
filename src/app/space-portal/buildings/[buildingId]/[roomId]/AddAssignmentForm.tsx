@@ -234,7 +234,10 @@ export default function AddAssignmentForm({
     const exactSlotStartTime = slotDate.hour(startSlotTime.hour()).minute(startSlotTime.minute());
     if (exactSlotStartTime.isBefore(moment())) errors.push("Start time is in past.");
     if (startTime >= endTime) errors.push("End time must be after start time.");
-
+    if (!keys) errors.push("Keys must be entered.");
+    if (!purpose) errors.push("Purpose must be entered.");
+    if (!remarks) errors.push("Remarks must be entered.");
+    console.log(keys);
     if (errors.length > 0) {
       setValidationErrors(errors);
       return;
