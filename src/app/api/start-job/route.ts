@@ -7,7 +7,6 @@ import { Building, Program, Occupant, Room, RoomInfo, Allocation, Department, Fa
 import { URL_NOT_FOUND } from "@/constants";
 import { getRoomOccupancyByWeekday, getVacantSlotsByWeekday } from "./helperFunction";
 import moment from "moment";
-import React from "react";
 
 export async function POST(req: NextRequest) {
   const jsonObject = await req.json();
@@ -44,15 +43,16 @@ export async function POST(req: NextRequest) {
 }
 
 async function createBigXLS(filePath: string, jsonObject: any) {
-  fs.mkdirSync(path.dirname(filePath), {
-    recursive: true,
-  });
+  try {
+    fs.mkdirSync(path.dirname(filePath), {
+      recursive: true,
+    });
 
-  const workbook = new ExcelJS.Workbook();
-  const worksheet = workbook.addWorksheet("report");
-  const worksheetFaculty = workbook.addWorksheet("faculty_seating");
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet("report");
+    const worksheetFaculty = workbook.addWorksheet("faculty_seating");
 
-  worksheet.columns = [
+    worksheet.columns = [
     {
       header: "Room No",
       key: "roomNo",
@@ -432,12 +432,12 @@ async function createBigXLS(filePath: string, jsonObject: any) {
     }
   };
 
-  if (jsonObject.reportType === "room") {
+    if (jsonObject.reportType === "room") {
     await dataManupulation(jsonObject);
     await workbook.xlsx.writeFile(filePath);
   }
 
-  if (jsonObject.reportType === "building") {
+    if (jsonObject.reportType === "building") {
     let { data: buildings } = await callApi<Building[]>(process.env.NEXT_PUBLIC_GET_BUILDING_LIST || URL_NOT_FOUND, {
       acadSession: jsonObject.acadSess,
       acadYear: jsonObject.academicYr,
@@ -447,16 +447,16 @@ async function createBigXLS(filePath: string, jsonObject: any) {
       buildings = buildings?.filter((b) => b.id === jsonObject.buildingId);
     }
 
-    buildings?.forEach(async (b) => {
+    for (const b of buildings || []) {
       const { data: roomsList } = await callApi<Room[]>(process.env.NEXT_PUBLIC_GET_ROOMS_LIST || URL_NOT_FOUND, {
         buildingNo: b.id,
         floorID: ``,
         curreentTime: moment().format("HH:mm"),
       });
-      roomsList?.forEach(async (room) => {
+      for (const room of roomsList || []) {
         await dataManupulation({ ...jsonObject, roomID: room.roomId });
-      });
-    });
+      }
+    }
 
     // this is used to insert data into second Sheet
     const allRooms: Room[] = (
@@ -528,14 +528,14 @@ async function createBigXLS(filePath: string, jsonObject: any) {
 
     // console.log(roomInfoResponses);
 
-    employees?.forEach(async (emp) => {
+    for (const emp of employees || []) {
       await handleFacultySeating(emp, roomInfoResponses);
-    });
+    }
 
     await workbook.xlsx.writeFile(filePath);
   }
 
-  if (jsonObject.reportType === "department") {
+    if (jsonObject.reportType === "department") {
     let { data: buildings } = await callApi<Building[]>(process.env.NEXT_PUBLIC_GET_BUILDING_LIST || URL_NOT_FOUND, {
       acadSession: jsonObject.acadSess,
       acadYear: jsonObject.academicYr,
@@ -545,16 +545,16 @@ async function createBigXLS(filePath: string, jsonObject: any) {
       buildings = buildings?.filter((b) => b.id === jsonObject.buildingId);
     }
 
-    buildings?.forEach(async (b) => {
+    for (const b of buildings || []) {
       const { data: roomsList } = await callApi<Room[]>(process.env.NEXT_PUBLIC_GET_ROOMS_LIST || URL_NOT_FOUND, {
         buildingNo: b.id,
         floorID: ``,
         curreentTime: moment().format("HH:mm"),
       });
-      roomsList?.forEach(async (room) => {
+      for (const room of roomsList || []) {
         await dataManupulation({ ...jsonObject, roomID: room.roomId });
-      });
-    });
+      }
+    }
 
     // this is used to insert data into second Sheet
     const allRooms: Room[] = (
@@ -622,18 +622,18 @@ async function createBigXLS(filePath: string, jsonObject: any) {
     // Run everything in parallel and flatten
     const roomInfoResponses = (await Promise.all(roomInfoPromises)).flat().filter((r) => (r.occupants?.length || 0) > 0);
 
-    employees
-      ?.filter((e) => {
-        e.departmentCode === jsonObject.departmentId;
-      })
-      ?.forEach(async (emp) => {
-        await handleFacultySeating(emp, roomInfoResponses);
-      });
+    const filteredEmployees = employees?.filter((e) => {
+      return e.departmentCode === jsonObject.departmentId;
+    }) || [];
+
+    for (const emp of filteredEmployees) {
+      await handleFacultySeating(emp, roomInfoResponses);
+    }
 
     await workbook.xlsx.writeFile(filePath);
   }
 
-  if (jsonObject.reportType === "faculty") {
+    if (jsonObject.reportType === "faculty") {
     let { data: buildings } = await callApi<Building[]>(process.env.NEXT_PUBLIC_GET_BUILDING_LIST || URL_NOT_FOUND, {
       acadSession: jsonObject.acadSess,
       acadYear: jsonObject.academicYr,
@@ -643,16 +643,16 @@ async function createBigXLS(filePath: string, jsonObject: any) {
       buildings = buildings?.filter((b) => b.id === jsonObject.buildingId);
     }
 
-    buildings?.forEach(async (b) => {
+    for (const b of buildings || []) {
       const { data: roomsList } = await callApi<Room[]>(process.env.NEXT_PUBLIC_GET_ROOMS_LIST || URL_NOT_FOUND, {
         buildingNo: b.id,
         floorID: ``,
         curreentTime: moment().format("HH:mm"),
       });
-      roomsList?.forEach(async (room) => {
+      for (const room of roomsList || []) {
         await dataManupulation({ ...jsonObject, roomID: room.roomId });
-      });
-    });
+      }
+    }
 
     // this is used to insert data into second Sheet
     const allRooms: Room[] = (
@@ -720,16 +720,23 @@ async function createBigXLS(filePath: string, jsonObject: any) {
     // Run everything in parallel and flatten
     const roomInfoResponses = (await Promise.all(roomInfoPromises)).flat().filter((r) => (r.occupants?.length || 0) > 0);
 
-    employees
-      ?.filter((e) => {
-        e.facultyCode === jsonObject.facultyId;
-      })
-      .forEach(async (emp) => {
-        // await handleFacultySeating(employees?.[1473]!, roomInfoResponses);
-        await handleFacultySeating(emp, roomInfoResponses);
-      });
+    const filteredEmployees = employees?.filter((e) => {
+      return e.facultyCode === jsonObject.facultyId;
+    }) || [];
+
+    for (const emp of filteredEmployees) {
+      // await handleFacultySeating(employees?.[1473]!, roomInfoResponses);
+      await handleFacultySeating(emp, roomInfoResponses);
+    }
 
     await workbook.xlsx.writeFile(filePath);
+  }
+} catch (error) {
+    console.error("Error creating Excel file:", error);
+    // You could add additional error handling here, such as:
+    // - Writing error to a log file
+    // - Sending notification to admin
+    // - Creating a fallback error report
   }
 }
 

@@ -10,28 +10,28 @@ const PUBLIC_PATHS = ["/api/auth", "/login"];
 const PUBLIC_FILE = /\.(.*)$/;
 
 export async function middleware(req: NextRequest) {
-  const { pathname } = req.nextUrl;
-  const userRoles = new Set<string>();
-  // const session = await getServerSession(authOptions);
+  // const { pathname } = req.nextUrl;
+  // const userRoles = new Set<string>();
+  // // const session = await getServerSession(authOptions);
 
-  const fetchUser = async (email: string | null) => {
-    if (!email) return;
-    try {
-      const response = await callApi<UserProfile[]>(process.env.NEXT_PUBLIC_GET_USER || URL_NOT_FOUND);
-      if (response.success) {
-        response.data?.forEach((user) => {
-          if (!userRoles.has(user.userRole)) userRoles.add(user.userRole.replace(" ", "%20"));
-        });
-      }
-      console.log("response::", response);
-    } catch (error) {
-      console.error("Error fetching user profile:", error);
-    }
-  };
+  // const fetchUser = async (email: string | null) => {
+  //   if (!email) return;
+  //   try {
+  //     const response = await callApi<UserProfile[]>(process.env.NEXT_PUBLIC_GET_USER || URL_NOT_FOUND);
+  //     if (response.success) {
+  //       response.data?.forEach((user) => {
+  //         if (!userRoles.has(user.userRole)) userRoles.add(user.userRole.replace(" ", "%20"));
+  //       });
+  //     }
+  //     console.log("response::", response);
+  //   } catch (error) {
+  //     console.error("Error fetching user profile:", error);
+  //   }
+  // };
 
-  if (PUBLIC_PATHS.some((path) => pathname.startsWith(path)) || PUBLIC_FILE.test(pathname)) {
-    return NextResponse.next();
-  }
+  // if (PUBLIC_PATHS.some((path) => pathname.startsWith(path)) || PUBLIC_FILE.test(pathname)) {
+  //   return NextResponse.next();
+  // }
 
   // // If there's no session, redirect to the login page
   // if (!session) {
@@ -40,10 +40,10 @@ export async function middleware(req: NextRequest) {
   //   return NextResponse.redirect(url);
   // }
 
-  fetchUser(null);
+  // fetchUser(null);
 
-  const hasAccess = Array.from(userRoles).some((role) => pathname.includes(role));
-  console.log("hasAccess::", hasAccess);
+  // const hasAccess = Array.from(userRoles).some((role) => pathname.includes(role));
+  // console.log("hasAccess::", hasAccess);
 
   // if (hasAccess) return NextResponse.next();
 }

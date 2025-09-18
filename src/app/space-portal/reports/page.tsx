@@ -250,6 +250,31 @@ export default function UtilizationReport() {
             Overall Reports
           </h2>
           <div className="flex items-center space-x-4">
+            {polling && (
+              <div className="flex items-center text-sm text-orange-600">
+                <svg
+                  className="animate-spin -ml-1 mr-2 h-4 w-4 text-orange-600"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  ></circle>
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  ></path>
+                </svg>
+                Generating report...
+              </div>
+            )}
             <input
               type="text"
               placeholder="Search"
@@ -431,6 +456,9 @@ export default function UtilizationReport() {
           onClosePressed={() => setGenerateReportVisible(false)}
           startJob={startJob} // Pass startJob to the form
           buildings={[]}
+          setJobId={setJobId}
+          setReady={setReady}
+          setPolling={setPolling}
           // we won't pass buildings here because GenerateReportForm fetches them internally
         />
       )}
@@ -442,11 +470,14 @@ type FormProps = {
   onClosePressed: () => void;
   startJob: (fileName: string) => void;
   buildings?: Building[]; // not used, kept for compatibility
+  setJobId: (jobId: string) => void;
+  setReady: (ready: boolean) => void;
+  setPolling: (polling: boolean) => void;
 };
 
-function GenerateReportForm({ onClosePressed, startJob }: FormProps) {
+function GenerateReportForm({ onClosePressed, startJob, setJobId, setReady, setPolling }: FormProps) {
   const [selectedBuildingId, setSelectedBuildingId] = useState<string>("");
-  const [timePeriod, setTimePeriod] = useState<string>("last7");
+  const [timePeriod, setTimePeriod] = useState<string>("thisWeek");
   const [selectedRoomId, setSelectedRoomId] = useState<string>("");
   const [selectedFaculty, setSelectedFaculty] = useState<string>("");
   const [selectedDepartment, setSelectedDepartment] = useState<string>("");
@@ -462,6 +493,8 @@ function GenerateReportForm({ onClosePressed, startJob }: FormProps) {
   const [customStartDate, setCustomStartDate] = useState("");
   const [customEndDate, setCustomEndDate] = useState("");
   const [isGenerateDisabled, setIsGenerateDisabled] = useState(true);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [error, setError] = useState<string>("");
   const acadmeicYear = useSelector(
     (state: any) => state.dataState.selectedAcademicYear
   );
@@ -552,11 +585,11 @@ function GenerateReportForm({ onClosePressed, startJob }: FormProps) {
   }, [reportType]);
 
   useEffect(() => {
-    if (timePeriod === "last7") {
-      const endDate = moment();
-      const startDate = moment().subtract(7, "days");
-      setCustomStartDate(startDate.format("YYYY-MM-DD"));
-      setCustomEndDate(endDate.format("YYYY-MM-DD"));
+    if (timePeriod === "thisWeek") {
+      const startOfWeek = moment().startOf('isoWeek'); // Monday
+      const endOfWeek = moment().endOf('isoWeek'); // Sunday
+      setCustomStartDate(startOfWeek.format("YYYY-MM-DD"));
+      setCustomEndDate(endOfWeek.format("YYYY-MM-DD"));
     } else if (timePeriod === "last30") {
       const endDate = moment();
       const startDate = moment().subtract(30, "days");
@@ -668,49 +701,76 @@ function GenerateReportForm({ onClosePressed, startJob }: FormProps) {
   useEffect(() => {}, [timePeriod]);
 
   const handleSubmit = async () => {
-    // determine start & end date
-    // let startDate = customStartDate;
-    // let endDate = customEndDate;
+    setIsGenerating(true);
+    setError("");
 
-    // if (timePeriod === "last7") {
-    //   startDate = moment().subtract(6, "day").format("YYYY-MM-DD");
-    //   endDate = moment().format("YYYY-MM-DD");
-    // } else if (timePeriod === "last30") {
-    //   startDate = moment().subtract(29, "day").format("YYYY-MM-DD");
-    //   endDate = moment().format("YYYY-MM-DD");
-    // } else if (
-    //   timePeriod === "active" ||
-    //   timePeriod === "year" ||
-    //   timePeriod === "session"
-    // ) {
-    //   startDate = "";
-    //   endDate = "";
-    // }
+    try {
+      // Determine start & end date based on time period
+      let startDate = customStartDate;
+      let endDate = customEndDate;
 
-    let fileName = "";
-    if (reportType === "room") {
-      fileName = `room_${selectedRoomId}_${acadmeicYear}_${acadmeicSession}`;
-    } else if (reportType === "building") {
-      fileName = `building_${selectedBuildingId}_${acadmeicYear}_${acadmeicSession}`;
-    } else if (reportType === "department") {
-      fileName = `department_${selectedDepartment}_${acadmeicYear}_${acadmeicSession}`;
-    } else if (reportType === "faculty") {
-      fileName = `faculty_${selectedFaculty}_${acadmeicYear}_${acadmeicSession}`;
+      if (timePeriod === "thisWeek") {
+        startDate = moment().startOf('isoWeek').format("YYYY-MM-DD"); // Monday
+        endDate = moment().endOf('isoWeek').format("YYYY-MM-DD"); // Sunday
+      } else if (timePeriod === "last30") {
+        startDate = moment().subtract(29, "day").format("YYYY-MM-DD");
+        endDate = moment().format("YYYY-MM-DD");
+      } else if (
+        timePeriod === "active" ||
+        timePeriod === "year" ||
+        timePeriod === "session"
+      ) {
+        startDate = "";
+        endDate = "";
+      }
+
+      let fileName = "";
+      if (reportType === "room") {
+        fileName = `room_${selectedRoomId}_${acadmeicYear}_${acadmeicSession}`;
+      } else if (reportType === "building") {
+        fileName = `building_${selectedBuildingId}_${acadmeicYear}_${acadmeicSession}`;
+      } else if (reportType === "department") {
+        fileName = `department_${selectedDepartment}_${acadmeicYear}_${acadmeicSession}`;
+      } else if (reportType === "faculty") {
+        fileName = `faculty_${selectedFaculty}_${acadmeicYear}_${acadmeicSession}`;
+      }
+
+      const response = await fetch("/api/start-job", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          fileKey: fileName,
+          roomID: selectedRoomId,
+          reportType,
+          buildingId: selectedBuildingId,
+          departmentId: selectedDepartment,
+          facultyId: selectedFaculty,
+          subroomID: 0,
+          academicYr: acadmeicYear,
+          acadSess: acadmeicSession,
+          startDate: startDate,
+          endDate: endDate,
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setJobId(data.jobId);
+        setReady(false);
+        setPolling(true);
+        onClosePressed(); // Close the modal
+      } else {
+        const errorData = await response.json();
+        setError(errorData.error || "Failed to start report generation");
+      }
+    } catch (error) {
+      console.error("Error starting report generation:", error);
+      setError("Network error occurred. Please try again.");
+    } finally {
+      setIsGenerating(false);
     }
-
-    await callApi("/api/start-job", {
-      fileKey: fileName,
-      roomID: selectedRoomId,
-      reportType,
-      buildingId: selectedBuildingId,
-      departmentId: selectedDepartment,
-      facultyId: selectedFaculty,
-      subroomID: 0,
-      academicYr: acadmeicYear,
-      acadSess: acadmeicSession,
-      startDate: "2025-09-15", //startDate,
-      endDate: "2025-09-21", //endDate,
-    });
   };
 
   return (
@@ -723,6 +783,11 @@ function GenerateReportForm({ onClosePressed, startJob }: FormProps) {
             </span>
           </div>
 
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">
+              {error}
+            </div>
+          )}
           <div className="border-t-2 border-gray-200 mt-2 pt-2 space-y-2">
             <div className="flex flex-col md:flex-row md:space-x-4">
               <div className="w-full">
@@ -865,7 +930,7 @@ function GenerateReportForm({ onClosePressed, startJob }: FormProps) {
                     onChange={(e) => setTimePeriod(e.target.value)}
                   >
                     <option value="">Select Duration</option>
-                    <option value={"last7"}>Last 7 Days</option>
+                    <option value={"thisWeek"}>This Week</option>
                     <option value={"last30"}>Last 30 Days</option>
                     <option value={"active"}>Active Session</option>
                     <option value={"year"}>Academic Year</option>
@@ -963,14 +1028,40 @@ function GenerateReportForm({ onClosePressed, startJob }: FormProps) {
             <button
               type="button"
               className={`px-3 py-2 rounded-lg shadow-md transition duration-300 ${
-                isGenerateDisabled
+                isGenerateDisabled || isGenerating
                   ? "bg-gray-300 text-gray-500 cursor-not-allowed"
                   : "bg-orange-500 text-white hover:bg-orange-600"
               }`}
               onClick={handleSubmit}
-              disabled={isGenerateDisabled}
+              disabled={isGenerateDisabled || isGenerating}
             >
-              Generate
+              {isGenerating ? (
+                <div className="flex items-center">
+                  <svg
+                    className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    ></circle>
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    ></path>
+                  </svg>
+                  Generating...
+                </div>
+              ) : (
+                "Generate"
+              )}
             </button>
           </div>
         </div>
