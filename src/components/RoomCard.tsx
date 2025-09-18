@@ -79,52 +79,13 @@ export default function RoomCard({
         const endDate = isActiveSession
           ? moment().endOf("week").format("YYYY-MM-DD")
           : moment(academicSessionEndDate).format("YYYY-MM-DD");
-        const requestBody = {
-          roomID: room.parentId ? room.parentId : room.roomId,
-          subroomID: room.parentId ? room.roomId : 0,
-          academicYr: acadmeicYear,
-          acadSess: acadmeicSession,
-          startDate,
-          endDate,
-        };
 
-        const response = await callApi<RoomInfo>(
-          process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND,
-          requestBody
-        );
-
-        if (response.success && response.data) {
-          const room = response.data;
-
-          setTotalOccupants(response.data.occupants?.length || 0);
-          // Determine date range
-          const startDate = isActiveSession
-            ? moment().startOf("week")
-            : moment(academicSessionStartDate);
-          const endDate = isActiveSession
-            ? moment().endOf("week")
-            : moment(academicSessionEndDate);
-
-          const weeklyOccupants: Occupant[] =
-            room.occupants?.filter((o) => {
-              if (!o.scheduledDate) return false;
-              const scheduled = moment(o.scheduledDate);
-              return scheduled.isBetween(startDate, endDate, "day", "[]");
-            }) || [];
-
-          const totalMinutes = weeklyOccupants.reduce((sum, occupant) => {
-            if (!occupant.startTime || !occupant.endTime) return sum;
-            const start = moment(occupant.startTime, "HH:mm");
-            const end = moment(occupant.endTime, "HH:mm");
-            return sum + Math.max(end.diff(start, "minutes"), 0);
-          }, 0);
-
-          const totalDays = endDate.diff(startDate, "days") + 1;
-          const maxMinutes = totalDays * WORK_HOURS_PER_DAY * 60;
-
-          const percent =
-            maxMinutes > 0 ? (totalMinutes / maxMinutes) * 100 : 0;
-          setOccupancyPercent(percent);
+        if (room.hasSubroom) {
+          // Handle parent room with subrooms
+          await fetchParentRoomOccupancy(startDate, endDate);
+        } else {
+          // Handle regular room or subroom
+          await fetchRegularRoomOccupancy(startDate, endDate);
         }
       } catch (error) {
         console.error("Error fetching room occupancy:", error);
@@ -134,8 +95,152 @@ export default function RoomCard({
       }
     };
 
+    const fetchParentRoomOccupancy = async (startDate: string, endDate: string) => {
+      try {
+        // First, fetch all subrooms for this parent room
+        const subroomsResponse = await callApi<Room[]>(
+          process.env.NEXT_PUBLIC_GET_SUBROOMS_LIST || URL_NOT_FOUND,
+          {
+            roomID: room.roomId,
+            buildingNo: room.buildingId,
+            acadSess: acadmeicSession,
+            acadYr: acadmeicYear,
+          }
+        );
+
+        if (!subroomsResponse.success || !subroomsResponse.data || subroomsResponse.data.length === 0) {
+          setTotalOccupants(0);
+          setOccupancyPercent(0);
+          return;
+        }
+
+        const subrooms = subroomsResponse.data;
+        let totalSubroomOccupants = 0;
+        let totalSubroomOccupancyPercent = 0;
+
+        // Fetch occupancy for each subroom
+        const subroomPromises = subrooms.map(async (subroom) => {
+          const requestBody = {
+            roomID: room.roomId, // parent room ID
+            subroomID: subroom.roomId, // subroom ID
+            academicYr: acadmeicYear,
+            acadSess: acadmeicSession,
+            startDate,
+            endDate,
+          };
+
+          const response = await callApi<RoomInfo>(
+            process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND,
+            requestBody
+          );
+
+          if (response.success && response.data) {
+            const roomData = response.data;
+            const occupants = roomData.occupants?.length || 0;
+            
+            // Calculate occupancy percentage for this subroom
+            const startDateMoment = isActiveSession
+              ? moment().startOf("week")
+              : moment(academicSessionStartDate);
+            const endDateMoment = isActiveSession
+              ? moment().endOf("week")
+              : moment(academicSessionEndDate);
+
+            const weeklyOccupants: Occupant[] =
+              roomData.occupants?.filter((o) => {
+                if (!o.scheduledDate) return false;
+                const scheduled = moment(o.scheduledDate);
+                return scheduled.isBetween(startDateMoment, endDateMoment, "day", "[]");
+              }) || [];
+
+            const totalMinutes = weeklyOccupants.reduce((sum, occupant) => {
+              if (!occupant.startTime || !occupant.endTime) return sum;
+              const start = moment(occupant.startTime, "HH:mm");
+              const end = moment(occupant.endTime, "HH:mm");
+              return sum + Math.max(end.diff(start, "minutes"), 0);
+            }, 0);
+
+            const totalDays = endDateMoment.diff(startDateMoment, "days") + 1;
+            const maxMinutes = totalDays * WORK_HOURS_PER_DAY * 60;
+            const percent = maxMinutes > 0 ? (totalMinutes / maxMinutes) * 100 : 0;
+
+            return { occupants, occupancyPercent: percent };
+          }
+          return { occupants: 0, occupancyPercent: 0 };
+        });
+
+        const subroomResults = await Promise.all(subroomPromises);
+        
+        // Calculate totals
+        totalSubroomOccupants = subroomResults.reduce((sum, result) => sum + result.occupants, 0);
+        totalSubroomOccupancyPercent = subroomResults.reduce((sum, result) => sum + result.occupancyPercent, 0);
+        
+        // Average occupancy percentage across all subrooms
+        const averageOccupancyPercent = subrooms.length > 0 
+          ? totalSubroomOccupancyPercent / subrooms.length 
+          : 0;
+
+        setTotalOccupants(totalSubroomOccupants);
+        setOccupancyPercent(averageOccupancyPercent);
+      } catch (error) {
+        console.error("Error fetching parent room occupancy:", error);
+        setTotalOccupants(0);
+        setOccupancyPercent(0);
+      }
+    };
+
+    const fetchRegularRoomOccupancy = async (startDate: string, endDate: string) => {
+      const requestBody = {
+        roomID: room.parentId ? room.parentId : room.roomId,
+        subroomID: room.parentId ? room.roomId : 0,
+        academicYr: acadmeicYear,
+        acadSess: acadmeicSession,
+        startDate,
+        endDate,
+      };
+
+      const response = await callApi<RoomInfo>(
+        process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND,
+        requestBody
+      );
+
+      if (response.success && response.data) {
+        const roomData = response.data;
+
+        setTotalOccupants(response.data.occupants?.length || 0);
+        // Determine date range
+        const startDateMoment = isActiveSession
+          ? moment().startOf("week")
+          : moment(academicSessionStartDate);
+        const endDateMoment = isActiveSession
+          ? moment().endOf("week")
+          : moment(academicSessionEndDate);
+
+        const weeklyOccupants: Occupant[] =
+          roomData.occupants?.filter((o) => {
+            if (!o.scheduledDate) return false;
+            const scheduled = moment(o.scheduledDate);
+            return scheduled.isBetween(startDateMoment, endDateMoment, "day", "[]");
+          }) || [];
+
+        const totalMinutes = weeklyOccupants.reduce((sum, occupant) => {
+          if (!occupant.startTime || !occupant.endTime) return sum;
+          const start = moment(occupant.startTime, "HH:mm");
+          const end = moment(occupant.endTime, "HH:mm");
+          return sum + Math.max(end.diff(start, "minutes"), 0);
+        }, 0);
+
+        const totalDays = endDateMoment.diff(startDateMoment, "days") + 1;
+        const maxMinutes = totalDays * WORK_HOURS_PER_DAY * 60;
+
+        const percent =
+          maxMinutes > 0 ? (totalMinutes / maxMinutes) * 100 : 0;
+        setOccupancyPercent(percent);
+      }
+    };
+
     fetchRoomInfo();
-  }, [academicSessionStartDate, academicSessionEndDate, isActiveSession]);
+  }, [academicSessionStartDate, academicSessionEndDate, isActiveSession, room.roomId, room.hasSubroom, room.buildingId]);
 
   const classes = statusClasses[occupancyStatus];
   return (
