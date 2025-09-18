@@ -434,6 +434,74 @@ async function createBigXLS(filePath: string, jsonObject: any) {
 
     if (jsonObject.reportType === "room") {
     await dataManupulation(jsonObject);
+    
+    // Add faculty seating logic for room reports if it's a faculty room
+    const reqBody = {
+      roomID: jsonObject.roomID,
+      subroomID: 0,
+      academicYr: jsonObject.academicYr,
+      acadSess: jsonObject.acadSess,
+      startDate: jsonObject.startDate,
+      endDate: jsonObject.endDate,
+    };
+
+    const roomInfoResponse = await callApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, reqBody);
+    
+    if (roomInfoResponse.success && roomInfoResponse.data?.roomType.toLowerCase().includes("faculty")) {
+      // Handle subrooms for faculty seating
+      if (roomInfoResponse.data?.hasSubtype) {
+        // 🔹 CASE 1: Room has subrooms
+        const subroomsResponse = await callApi<Room[]>(process.env.NEXT_PUBLIC_GET_SUBROOMS_LIST || URL_NOT_FOUND, {
+          roomID: jsonObject.roomID,
+          buildingNo: roomInfoResponse.data.building,
+          acadSess: jsonObject.acadSess,
+          acadYr: jsonObject.academicYr,
+        });
+
+        const subrooms = subroomsResponse?.data || [];
+        const subroomInfoResponses = [];
+        
+        for (const sub of subrooms) {
+          const subRoomReqBody = {
+            ...reqBody,
+            subroomID: sub.roomId,
+          };
+
+          const subRoomInfoResponse = await callApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, subRoomReqBody);
+
+          if (subRoomInfoResponse.success) {
+            subroomInfoResponses.push(subRoomInfoResponse.data);
+          }
+        }
+
+        // Process faculty seating for all subrooms
+        for (const subroomData of subroomInfoResponses) {
+          const roomOccupants = subroomData?.occupants || [];
+          const employeeIds = roomOccupants.map(o => o.occupantId).filter(id => id);
+          
+          const filteredEmployees = employees?.filter((e) => {
+            return employeeIds.includes(e.employeeCode);
+          }) || [];
+
+          for (const emp of filteredEmployees) {
+            await handleFacultySeating(emp, [subroomData]);
+          }
+        }
+      } else {
+        // 🔹 CASE 2: Normal faculty room
+        const roomOccupants = roomInfoResponse.data?.occupants || [];
+        const employeeIds = roomOccupants.map(o => o.occupantId).filter(id => id);
+        
+        const filteredEmployees = employees?.filter((e) => {
+          return employeeIds.includes(e.employeeCode);
+        }) || [];
+
+        for (const emp of filteredEmployees) {
+          await handleFacultySeating(emp, [roomInfoResponse.data]);
+        }
+      }
+    }
+    
     await workbook.xlsx.writeFile(filePath);
   }
 
