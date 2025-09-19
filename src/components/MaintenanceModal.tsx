@@ -809,11 +809,24 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({
   const hasMaintenanceValidationErrors = !!timeValidationErrors['maintenance'];
   const hasConflictValidationErrors = Object.keys(timeValidationErrors).some(key => key.startsWith('conflict-'));
   
+  // Check if all selected conflicts have valid room assignments with no conflicts
+  const allSelectedConflictsResolved = conflicts
+    .filter(c => selectedConflicts.includes(c.occupant.Id) && c.isEditable)
+    .every(c => {
+      const conflictId = c.occupant.Id;
+      return conflictRoomSelections[conflictId] && 
+             conflictDates[conflictId] && 
+             conflictStartTimes[conflictId] && 
+             conflictEndTimes[conflictId] &&
+             !conflictRoomConflictStatus[conflictId] &&
+             !timeValidationErrors[`conflict-${conflictId}`];
+    });
+  
   const canScheduleMaintenance = selectedRoomInfo && 
     !hasMaintenanceValidationErrors && 
     !hasConflictValidationErrors &&
-    (conflicts.length === 0 || 
-    (conflicts.every(c => selectedConflicts.includes(c.occupant.Id)) && !hasNonEditableConflicts));
+    !hasNonEditableConflicts &&
+    (conflicts.length === 0 || allSelectedConflictsResolved);
 
   return (
     <div className="fixed inset-0 bg-[#00000070] flex items-center justify-center z-50 text-gray-500">
@@ -1339,13 +1352,6 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({
                               </div>
                             )}
 
-                            <button
-                              onClick={() => handleMoveOccupant(conflict.occupant.Id)}
-                              className="mt-2 px-3 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600"
-                              disabled={!conflictRoomSelections[conflict.occupant.Id] || !conflictDates[conflict.occupant.Id] || !conflictStartTimes[conflict.occupant.Id] || !conflictEndTimes[conflict.occupant.Id]}
-                            >
-                              Move Occupant
-                            </button>
                           </div>
 
                           {/* Cancel slot */}
@@ -1410,6 +1416,8 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({
                 ? 'Cannot Schedule - Fix Conflict Time Validation'
                 : hasNonEditableConflicts 
                 ? 'Cannot Schedule - Non-editable Conflicts' 
+                : conflicts.length > 0 && !allSelectedConflictsResolved
+                ? 'Cannot Schedule - Resolve All Conflicts'
                 : 'Schedule Maintenance'
             }
           </button>
