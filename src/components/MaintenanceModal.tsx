@@ -44,19 +44,19 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({
   const [conflicts, setConflicts] = useState<ConflictInfo[]>([]);
   const [isCheckingConflicts, setIsCheckingConflicts] = useState(false);
   const [selectedConflicts, setSelectedConflicts] = useState<string[]>([]);
-  const [newRoomId, setNewRoomId] = useState("");
-  const [newDate, setNewDate] = useState("");
-  const [newStartTime, setNewStartTime] = useState("");
-  const [newEndTime, setNewEndTime] = useState("");
+  const [conflictRoomSelections, setConflictRoomSelections] = useState<{[key: string]: string}>({});
+  const [conflictDates, setConflictDates] = useState<{[key: string]: string}>({});
+  const [conflictStartTimes, setConflictStartTimes] = useState<{[key: string]: string}>({});
+  const [conflictEndTimes, setConflictEndTimes] = useState<{[key: string]: string}>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingRoomInfo, setIsLoadingRoomInfo] = useState(false);
   const [allRooms, setAllRooms] = useState<Room[]>([]);
   const [isLoadingRooms, setIsLoadingRooms] = useState(false);
-  const [newRoomInfo, setNewRoomInfo] = useState<RoomInfo | null>(null);
-  const [isLoadingNewRoomInfo, setIsLoadingNewRoomInfo] = useState(false);
-  const [showNewRoomSchedule, setShowNewRoomSchedule] = useState(false);
-  const [availableSlots, setAvailableSlots] = useState<string[]>([]);
-  const [newRoomConflictStatus, setNewRoomConflictStatus] = useState<boolean>(false);
+  const [conflictRoomInfos, setConflictRoomInfos] = useState<{[key: string]: RoomInfo}>({});
+  const [isLoadingConflictRoomInfo, setIsLoadingConflictRoomInfo] = useState<{[key: string]: boolean}>({});
+  const [showConflictRoomSchedule, setShowConflictRoomSchedule] = useState<{[key: string]: boolean}>({});
+  const [conflictAvailableSlots, setConflictAvailableSlots] = useState<{[key: string]: string[]}>({});
+  const [conflictRoomConflictStatus, setConflictRoomConflictStatus] = useState<{[key: string]: boolean}>({});
 
   // Fetch all rooms from all buildings and floors
   const fetchAllRooms = async () => {
@@ -137,11 +137,47 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({
     }
   };
 
-  // Fetch new room info for conflict checking
-  const fetchNewRoomInfo = async (roomId: string) => {
+
+  // Handle room selection
+  const handleRoomSelection = (roomId: string) => {
+    setSelectedRoomId(roomId);
+    setConflicts([]);
+    setSelectedConflicts([]);
+    setMaintenanceDate("");
+    setStartTime("09:00");
+    setEndTime("10:00");
+    // Clear conflict-specific states
+    setConflictRoomSelections({});
+    setConflictDates({});
+    setConflictStartTimes({});
+    setConflictEndTimes({});
+    setConflictRoomInfos({});
+    setIsLoadingConflictRoomInfo({});
+    setShowConflictRoomSchedule({});
+    setConflictAvailableSlots({});
+    setConflictRoomConflictStatus({});
+    if (roomId) {
+      fetchRoomInfo(roomId);
+    } else {
+      setSelectedRoomInfo(null);
+    }
+  };
+
+  // Check for conflicts when maintenance details change
+  useEffect(() => {
+    if (maintenanceDate && startTime && endTime && selectedRoomInfo) {
+      checkConflicts();
+    } else {
+      // Clear conflicts if not all required fields are present
+      setConflicts([]);
+    }
+  }, [maintenanceDate, startTime, endTime, selectedRoomInfo]);
+
+  // Fetch conflict room info when room is selected for a specific conflict
+  const fetchConflictRoomInfo = async (conflictId: string, roomId: string) => {
     if (!roomId || !academicYear || !academicSession || !startDate || !endDate) return;
     
-    setIsLoadingNewRoomInfo(true);
+    setIsLoadingConflictRoomInfo(prev => ({ ...prev, [conflictId]: true }));
     try {
       const requestbody = {
         roomID: roomId,
@@ -154,25 +190,26 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({
       
       const res = await callApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, requestbody);
       if (res.success && res.data) {
-        setNewRoomInfo(res.data);
-        // Calculate available slots for the new date if it's set
-        if (newDate) {
-          calculateAvailableSlots(res.data, newDate);
+        setConflictRoomInfos(prev => ({ ...prev, [conflictId]: res.data! }));
+        // Calculate available slots for the conflict date if it's set
+        const conflictDate = conflictDates[conflictId];
+        if (conflictDate) {
+          calculateConflictAvailableSlots(conflictId, res.data, conflictDate);
         }
       }
     } catch (error) {
-      console.error("Error fetching new room info:", error);
+      console.error("Error fetching conflict room info:", error);
     } finally {
-      setIsLoadingNewRoomInfo(false);
+      setIsLoadingConflictRoomInfo(prev => ({ ...prev, [conflictId]: false }));
     }
   };
 
-  // Calculate available slots for a given room and date
-  const calculateAvailableSlots = (roomInfo: RoomInfo, date: string) => {
+  // Calculate available slots for a given conflict room and date
+  const calculateConflictAvailableSlots = (conflictId: string, roomInfo: RoomInfo, date: string) => {
     const today = new Date().toISOString().split("T")[0];
     const currentTime = new Date();
     if (new Date(date) < new Date(today)) {
-      setAvailableSlots([]);
+      setConflictAvailableSlots(prev => ({ ...prev, [conflictId]: [] }));
       return;
     }
 
@@ -218,76 +255,15 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({
       return `${startHour}:${startMin} → ${endHour}:${endMin}`;
     });
 
-    setAvailableSlots(slots);
+    setConflictAvailableSlots(prev => ({ ...prev, [conflictId]: slots }));
   };
 
-  // Handle available slot selection
-  const handleAvailableSlotClick = (timeString: string) => {
+  // Handle available slot selection for conflicts
+  const handleConflictAvailableSlotClick = (conflictId: string, timeString: string) => {
     const [start, end] = timeString.split(" → ");
-    setNewStartTime(start);
-    setNewEndTime(end);
+    setConflictStartTimes(prev => ({ ...prev, [conflictId]: start }));
+    setConflictEndTimes(prev => ({ ...prev, [conflictId]: end }));
   };
-
-  // Handle room selection
-  const handleRoomSelection = (roomId: string) => {
-    setSelectedRoomId(roomId);
-    setConflicts([]);
-    setSelectedConflicts([]);
-    setMaintenanceDate("");
-    setStartTime("09:00");
-    setEndTime("10:00");
-    if (roomId) {
-      fetchRoomInfo(roomId);
-    } else {
-      setSelectedRoomInfo(null);
-    }
-  };
-
-  // Check for conflicts when maintenance details change
-  useEffect(() => {
-    if (maintenanceDate && startTime && endTime && selectedRoomInfo) {
-      checkConflicts();
-    } else {
-      // Clear conflicts if not all required fields are present
-      setConflicts([]);
-    }
-  }, [maintenanceDate, startTime, endTime, selectedRoomInfo]);
-
-  // Fetch new room info when new room is selected
-  useEffect(() => {
-    if (newRoomId) {
-      fetchNewRoomInfo(newRoomId);
-    } else {
-      setNewRoomInfo(null);
-      setAvailableSlots([]);
-      setNewRoomConflictStatus(false);
-    }
-  }, [newRoomId]);
-
-  // Calculate available slots when new date changes
-  useEffect(() => {
-    if (newRoomInfo && newDate) {
-      calculateAvailableSlots(newRoomInfo, newDate);
-    } else {
-      setAvailableSlots([]);
-    }
-    // Reset conflict status when date changes
-    setNewRoomConflictStatus(false);
-  }, [newDate, newRoomInfo]);
-
-  // Check for conflicts when new room details change
-  useEffect(() => {
-    const checkConflicts = async () => {
-      if (newRoomInfo && newDate && newStartTime && newEndTime) {
-        const hasConflicts = await checkNewRoomConflicts(newRoomId, newDate, newStartTime, newEndTime);
-        setNewRoomConflictStatus(hasConflicts);
-      } else {
-        setNewRoomConflictStatus(false);
-      }
-    };
-    
-    checkConflicts();
-  }, [newRoomInfo, newDate, newStartTime, newEndTime, newRoomId]);
 
   const checkConflicts = async () => {
     if (!selectedRoomInfo || !maintenanceDate || !startTime || !endTime) return;
@@ -380,26 +356,68 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({
           const occupant = selectedConflict.occupant;
           const occupantDate = moment(occupant.scheduledDate).format('YYYY-MM-DD');
           
-          // Auto-fill the new room allocation details with the occupant's details
-          setNewDate(occupantDate);
-          setNewStartTime(occupant.startTime);
-          setNewEndTime(occupant.endTime);
-          
+          // Auto-fill the conflict-specific details
+          setConflictDates(prev => ({ ...prev, [occupantId]: occupantDate }));
+          setConflictStartTimes(prev => ({ ...prev, [occupantId]: occupant.startTime }));
+          setConflictEndTimes(prev => ({ ...prev, [occupantId]: occupant.endTime }));
         }
+      } else {
+        // If unchecking, clear the conflict-specific details
+        setConflictRoomSelections(prev => {
+          const newSelections = { ...prev };
+          delete newSelections[occupantId];
+          return newSelections;
+        });
+        setConflictDates(prev => {
+          const newDates = { ...prev };
+          delete newDates[occupantId];
+          return newDates;
+        });
+        setConflictStartTimes(prev => {
+          const newTimes = { ...prev };
+          delete newTimes[occupantId];
+          return newTimes;
+        });
+        setConflictEndTimes(prev => {
+          const newTimes = { ...prev };
+          delete newTimes[occupantId];
+          return newTimes;
+        });
+        setConflictRoomInfos(prev => {
+          const newInfos = { ...prev };
+          delete newInfos[occupantId];
+          return newInfos;
+        });
+        setConflictAvailableSlots(prev => {
+          const newSlots = { ...prev };
+          delete newSlots[occupantId];
+          return newSlots;
+        });
+        setConflictRoomConflictStatus(prev => {
+          const newStatus = { ...prev };
+          delete newStatus[occupantId];
+          return newStatus;
+        });
+        setShowConflictRoomSchedule(prev => {
+          const newSchedule = { ...prev };
+          delete newSchedule[occupantId];
+          return newSchedule;
+        });
       }
       
       return newSelection;
     });
   };
 
-  const checkNewRoomConflicts = async (roomId: string, date: string, startTime: string, endTime: string) => {
-    if (!newRoomInfo || !date || !startTime || !endTime) return false;
+  const checkConflictRoomConflicts = async (conflictId: string, roomId: string, date: string, startTime: string, endTime: string) => {
+    const roomInfo = conflictRoomInfos[conflictId];
+    if (!roomInfo || !date || !startTime || !endTime) return false;
     
     try {
       const newSlotStart = moment(`${date} ${startTime}`);
       const newSlotEnd = moment(`${date} ${endTime}`);
       
-      const conflictingOccupants = (newRoomInfo.occupants || []).filter((occupant: Occupant) => {
+      const conflictingOccupants = (roomInfo.occupants || []).filter((occupant: Occupant) => {
         const occupantDate = moment(occupant.scheduledDate);
         const occupantStart = moment(`${occupantDate.format('YYYY-MM-DD')} ${occupant.startTime}`);
         const occupantEnd = moment(`${occupantDate.format('YYYY-MM-DD')} ${occupant.endTime}`);
@@ -413,19 +431,24 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({
       
       return conflictingOccupants.length > 0;
     } catch (error) {
-      console.error("Error checking new room conflicts:", error);
+      console.error("Error checking conflict room conflicts:", error);
       return false;
     }
   };
 
   const handleMoveOccupant = async (occupantId: string) => {
+    const newRoomId = conflictRoomSelections[occupantId];
+    const newDate = conflictDates[occupantId];
+    const newStartTime = conflictStartTimes[occupantId];
+    const newEndTime = conflictEndTimes[occupantId];
+
     if (!newRoomId || !newDate || !newStartTime || !newEndTime) {
-      alert("Please fill in all new slot details");
+      alert("Please fill in all new slot details for this conflict");
       return;
     }
 
     // Check for conflicts in the new room
-    const hasConflicts = await checkNewRoomConflicts(newRoomId, newDate, newStartTime, newEndTime);
+    const hasConflicts = await checkConflictRoomConflicts(occupantId, newRoomId, newDate, newStartTime, newEndTime);
     if (hasConflicts) {
       alert("The selected time slot conflicts with existing occupants in the new room. Please choose a different time or room.");
       return;
@@ -474,9 +497,51 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({
         newAllocation
       );
 
-      // Remove from conflicts list
+      // Remove from conflicts list and clear conflict-specific data
       setConflicts(prev => prev.filter(c => c.occupant.Id !== occupantId));
       setSelectedConflicts(prev => prev.filter(id => id !== occupantId));
+      
+      // Clear conflict-specific data
+      setConflictRoomSelections(prev => {
+        const newSelections = { ...prev };
+        delete newSelections[occupantId];
+        return newSelections;
+      });
+      setConflictDates(prev => {
+        const newDates = { ...prev };
+        delete newDates[occupantId];
+        return newDates;
+      });
+      setConflictStartTimes(prev => {
+        const newTimes = { ...prev };
+        delete newTimes[occupantId];
+        return newTimes;
+      });
+      setConflictEndTimes(prev => {
+        const newTimes = { ...prev };
+        delete newTimes[occupantId];
+        return newTimes;
+      });
+      setConflictRoomInfos(prev => {
+        const newInfos = { ...prev };
+        delete newInfos[occupantId];
+        return newInfos;
+      });
+      setConflictAvailableSlots(prev => {
+        const newSlots = { ...prev };
+        delete newSlots[occupantId];
+        return newSlots;
+      });
+      setConflictRoomConflictStatus(prev => {
+        const newStatus = { ...prev };
+        delete newStatus[occupantId];
+        return newStatus;
+      });
+      setShowConflictRoomSchedule(prev => {
+        const newSchedule = { ...prev };
+        delete newSchedule[occupantId];
+        return newSchedule;
+      });
       
       alert("Occupant moved successfully");
     } catch (error) {
@@ -502,9 +567,51 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({
         }
       );
 
-      // Remove from conflicts list
+      // Remove from conflicts list and clear conflict-specific data
       setConflicts(prev => prev.filter(c => c.occupant.Id !== occupantId));
       setSelectedConflicts(prev => prev.filter(id => id !== occupantId));
+      
+      // Clear conflict-specific data
+      setConflictRoomSelections(prev => {
+        const newSelections = { ...prev };
+        delete newSelections[occupantId];
+        return newSelections;
+      });
+      setConflictDates(prev => {
+        const newDates = { ...prev };
+        delete newDates[occupantId];
+        return newDates;
+      });
+      setConflictStartTimes(prev => {
+        const newTimes = { ...prev };
+        delete newTimes[occupantId];
+        return newTimes;
+      });
+      setConflictEndTimes(prev => {
+        const newTimes = { ...prev };
+        delete newTimes[occupantId];
+        return newTimes;
+      });
+      setConflictRoomInfos(prev => {
+        const newInfos = { ...prev };
+        delete newInfos[occupantId];
+        return newInfos;
+      });
+      setConflictAvailableSlots(prev => {
+        const newSlots = { ...prev };
+        delete newSlots[occupantId];
+        return newSlots;
+      });
+      setConflictRoomConflictStatus(prev => {
+        const newStatus = { ...prev };
+        delete newStatus[occupantId];
+        return newStatus;
+      });
+      setShowConflictRoomSchedule(prev => {
+        const newSchedule = { ...prev };
+        delete newSchedule[occupantId];
+        return newSchedule;
+      });
       
       alert("Occupant slot cancelled successfully");
     } catch (error) {
@@ -792,9 +899,35 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({
                             </label>
                             <div className="grid grid-cols-2 gap-2">
                               <select
-                                value={newRoomId}
-                                onChange={(e) => setNewRoomId(e.target.value)}
-                                className="px-3 py-2 border border-gray-300 rounded-md text-sm"
+                                value={conflictRoomSelections[conflict.occupant.Id] || ""}
+                                onChange={(e) => {
+                                  const roomId = e.target.value;
+                                  setConflictRoomSelections(prev => ({ ...prev, [conflict.occupant.Id]: roomId }));
+                                  if (roomId) {
+                                    fetchConflictRoomInfo(conflict.occupant.Id, roomId);
+                                  } else {
+                                    setConflictRoomInfos(prev => {
+                                      const newInfos = { ...prev };
+                                      delete newInfos[conflict.occupant.Id];
+                                      return newInfos;
+                                    });
+                                    setConflictAvailableSlots(prev => {
+                                      const newSlots = { ...prev };
+                                      delete newSlots[conflict.occupant.Id];
+                                      return newSlots;
+                                    });
+                                    setConflictRoomConflictStatus(prev => {
+                                      const newStatus = { ...prev };
+                                      delete newStatus[conflict.occupant.Id];
+                                      return newStatus;
+                                    });
+                                  }
+                                }}
+                                className={`px-3 py-2 border rounded-md text-sm ${
+                                  conflictRoomSelections[conflict.occupant.Id] 
+                                    ? 'border-green-300 bg-green-50' 
+                                    : 'border-gray-300'
+                                }`}
                                 disabled={isLoadingRooms}
                               >
                                 <option value="">
@@ -812,9 +945,21 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({
                               </select>
                               <input
                                 type="date"
-                                value={newDate}
-                                onChange={(e) => setNewDate(e.target.value)}
-                                className="px-3 py-2 border border-gray-300 rounded-md text-sm"
+                                value={conflictDates[conflict.occupant.Id] || ""}
+                                onChange={(e) => {
+                                  const date = e.target.value;
+                                  setConflictDates(prev => ({ ...prev, [conflict.occupant.Id]: date }));
+                                  const roomInfo = conflictRoomInfos[conflict.occupant.Id];
+                                  if (roomInfo && date) {
+                                    calculateConflictAvailableSlots(conflict.occupant.Id, roomInfo, date);
+                                  }
+                                  setConflictRoomConflictStatus(prev => ({ ...prev, [conflict.occupant.Id]: false }));
+                                }}
+                                className={`px-3 py-2 border rounded-md text-sm ${
+                                  conflictDates[conflict.occupant.Id] 
+                                    ? 'border-green-300 bg-green-50' 
+                                    : 'border-gray-300'
+                                }`}
                                 placeholder="New Date"
                                 min={moment().format('YYYY-MM-DD')}
                               />
@@ -823,53 +968,79 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({
                               <div className="relative">
                                 <input
                                   type="time"
-                                  value={newStartTime}
-                                  onChange={(e) => setNewStartTime(e.target.value)}
+                                  value={conflictStartTimes[conflict.occupant.Id] || ""}
+                                  onChange={(e) => {
+                                    const startTime = e.target.value;
+                                    setConflictStartTimes(prev => ({ ...prev, [conflict.occupant.Id]: startTime }));
+                                    // Check for conflicts when time changes
+                                    const roomId = conflictRoomSelections[conflict.occupant.Id];
+                                    const date = conflictDates[conflict.occupant.Id];
+                                    const endTime = conflictEndTimes[conflict.occupant.Id];
+                                    if (roomId && date && startTime && endTime) {
+                                      checkConflictRoomConflicts(conflict.occupant.Id, roomId, date, startTime, endTime)
+                                        .then(hasConflicts => {
+                                          setConflictRoomConflictStatus(prev => ({ ...prev, [conflict.occupant.Id]: hasConflicts }));
+                                        });
+                                    }
+                                  }}
                                   className={`px-3 py-2 border rounded-md text-sm w-full ${
-                                    newRoomId && newDate && newStartTime && newEndTime && !newRoomConflictStatus
+                                    conflictRoomSelections[conflict.occupant.Id] && conflictDates[conflict.occupant.Id] && conflictStartTimes[conflict.occupant.Id] && conflictEndTimes[conflict.occupant.Id] && !conflictRoomConflictStatus[conflict.occupant.Id]
                                       ? 'border-green-300 bg-green-50'
-                                      : newRoomConflictStatus
+                                      : conflictRoomConflictStatus[conflict.occupant.Id]
                                       ? 'border-red-300 bg-red-50'
                                       : 'border-gray-300'
                                   }`}
                                   placeholder="Start Time"
                                 />
-                                {newRoomId && newDate && newStartTime && newEndTime && (
+                                {conflictRoomSelections[conflict.occupant.Id] && conflictDates[conflict.occupant.Id] && conflictStartTimes[conflict.occupant.Id] && conflictEndTimes[conflict.occupant.Id] && (
                                   <div className={`absolute -top-1 -right-1 w-3 h-3 rounded-full ${
-                                    newRoomConflictStatus ? 'bg-red-500' : 'bg-green-500'
+                                    conflictRoomConflictStatus[conflict.occupant.Id] ? 'bg-red-500' : 'bg-green-500'
                                   }`}></div>
                                 )}
                               </div>
                               <div className="relative">
                                 <input
                                   type="time"
-                                  value={newEndTime}
-                                  onChange={(e) => setNewEndTime(e.target.value)}
+                                  value={conflictEndTimes[conflict.occupant.Id] || ""}
+                                  onChange={(e) => {
+                                    const endTime = e.target.value;
+                                    setConflictEndTimes(prev => ({ ...prev, [conflict.occupant.Id]: endTime }));
+                                    // Check for conflicts when time changes
+                                    const roomId = conflictRoomSelections[conflict.occupant.Id];
+                                    const date = conflictDates[conflict.occupant.Id];
+                                    const startTime = conflictStartTimes[conflict.occupant.Id];
+                                    if (roomId && date && startTime && endTime) {
+                                      checkConflictRoomConflicts(conflict.occupant.Id, roomId, date, startTime, endTime)
+                                        .then(hasConflicts => {
+                                          setConflictRoomConflictStatus(prev => ({ ...prev, [conflict.occupant.Id]: hasConflicts }));
+                                        });
+                                    }
+                                  }}
                                   className={`px-3 py-2 border rounded-md text-sm w-full ${
-                                    newRoomId && newDate && newStartTime && newEndTime && !newRoomConflictStatus
+                                    conflictRoomSelections[conflict.occupant.Id] && conflictDates[conflict.occupant.Id] && conflictStartTimes[conflict.occupant.Id] && conflictEndTimes[conflict.occupant.Id] && !conflictRoomConflictStatus[conflict.occupant.Id]
                                       ? 'border-green-300 bg-green-50'
-                                      : newRoomConflictStatus
+                                      : conflictRoomConflictStatus[conflict.occupant.Id]
                                       ? 'border-red-300 bg-red-50'
                                       : 'border-gray-300'
                                   }`}
                                   placeholder="End Time"
                                 />
-                                {newRoomId && newDate && newStartTime && newEndTime && (
+                                {conflictRoomSelections[conflict.occupant.Id] && conflictDates[conflict.occupant.Id] && conflictStartTimes[conflict.occupant.Id] && conflictEndTimes[conflict.occupant.Id] && (
                                   <div className={`absolute -top-1 -right-1 w-3 h-3 rounded-full ${
-                                    newRoomConflictStatus ? 'bg-red-500' : 'bg-green-500'
+                                    conflictRoomConflictStatus[conflict.occupant.Id] ? 'bg-red-500' : 'bg-green-500'
                                   }`}></div>
                                 )}
                               </div>
                             </div>
                             
                             {/* Conflict Status Message */}
-                            {newRoomId && newDate && newStartTime && newEndTime && (
+                            {conflictRoomSelections[conflict.occupant.Id] && conflictDates[conflict.occupant.Id] && conflictStartTimes[conflict.occupant.Id] && conflictEndTimes[conflict.occupant.Id] && (
                               <div className={`text-xs mt-1 px-2 py-1 rounded ${
-                                newRoomConflictStatus 
+                                conflictRoomConflictStatus[conflict.occupant.Id] 
                                   ? 'bg-red-100 text-red-700 border border-red-300' 
                                   : 'bg-green-100 text-green-700 border border-green-300'
                               }`}>
-                                {newRoomConflictStatus 
+                                {conflictRoomConflictStatus[conflict.occupant.Id] 
                                   ? '⚠️ This time slot conflicts with existing occupants' 
                                   : '✅ Time slot is available'
                                 }
@@ -877,32 +1048,32 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({
                             )}
                             
                             {/* View Schedule Button */}
-                            {newRoomId && newDate && (
+                            {conflictRoomSelections[conflict.occupant.Id] && conflictDates[conflict.occupant.Id] && (
                               <button
-                                onClick={() => setShowNewRoomSchedule(!showNewRoomSchedule)}
+                                onClick={() => setShowConflictRoomSchedule(prev => ({ ...prev, [conflict.occupant.Id]: !prev[conflict.occupant.Id] }))}
                                 className="mt-2 flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-700 text-sm rounded hover:bg-blue-200"
-                                disabled={isLoadingNewRoomInfo}
+                                disabled={isLoadingConflictRoomInfo[conflict.occupant.Id]}
                               >
                                 <Eye className="w-4 h-4" />
-                                {isLoadingNewRoomInfo ? 'Loading...' : (showNewRoomSchedule ? 'Hide' : 'View') + ' Schedule'}
+                                {isLoadingConflictRoomInfo[conflict.occupant.Id] ? 'Loading...' : (showConflictRoomSchedule[conflict.occupant.Id] ? 'Hide' : 'View') + ' Schedule'}
                               </button>
                             )}
 
                             {/* Available Slots Display */}
-                            {showNewRoomSchedule && newDate && (
+                            {showConflictRoomSchedule[conflict.occupant.Id] && conflictDates[conflict.occupant.Id] && (
                               <div className="mt-3 p-3 bg-gray-50 rounded-md border">
                                 <h4 className="text-sm font-medium text-gray-700 mb-2">Available Time Slots:</h4>
-                                {isLoadingNewRoomInfo ? (
+                                {isLoadingConflictRoomInfo[conflict.occupant.Id] ? (
                                   <div className="text-center py-2">
                                     <div className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
                                     <p className="text-xs text-gray-600 mt-1">Loading room schedule...</p>
                                   </div>
-                                ) : availableSlots.length > 0 ? (
+                                ) : (conflictAvailableSlots[conflict.occupant.Id] || []).length > 0 ? (
                                   <div className="space-y-1">
-                                    {availableSlots.map((slot, index) => (
+                                    {(conflictAvailableSlots[conflict.occupant.Id] || []).map((slot, index) => (
                                       <button
                                         key={index}
-                                        onClick={() => handleAvailableSlotClick(slot)}
+                                        onClick={() => handleConflictAvailableSlotClick(conflict.occupant.Id, slot)}
                                         className="block w-full text-left px-2 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200 border border-green-300"
                                       >
                                         {slot}
@@ -914,13 +1085,13 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({
                                 )}
                                 
                                 {/* Existing Occupants */}
-                                {newRoomInfo && newRoomInfo.occupants && newRoomInfo.occupants.length > 0 && (
+                                {conflictRoomInfos[conflict.occupant.Id] && conflictRoomInfos[conflict.occupant.Id]?.occupants && (conflictRoomInfos[conflict.occupant.Id]?.occupants?.length || 0) > 0 && (
                                   <div className="mt-3">
                                     <h4 className="text-sm font-medium text-gray-700 mb-2">Existing Occupants:</h4>
                                     <div className="space-y-1">
-                                      {newRoomInfo.occupants
-                                        .filter(occupant => moment(occupant.scheduledDate).format('YYYY-MM-DD') === newDate)
-                                        .map((occupant, index) => (
+                                      {conflictRoomInfos[conflict.occupant.Id]?.occupants
+                                        ?.filter(occupant => moment(occupant.scheduledDate).format('YYYY-MM-DD') === conflictDates[conflict.occupant.Id])
+                                        ?.map((occupant, index) => (
                                           <div key={index} className="text-xs text-red-600 bg-red-50 px-2 py-1 rounded border border-red-300">
                                             {occupant.occupantName} - {occupant.startTime} → {occupant.endTime}
                                           </div>
@@ -934,7 +1105,7 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({
                             <button
                               onClick={() => handleMoveOccupant(conflict.occupant.Id)}
                               className="mt-2 px-3 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600"
-                              disabled={!newRoomId || !newDate || !newStartTime || !newEndTime}
+                              disabled={!conflictRoomSelections[conflict.occupant.Id] || !conflictDates[conflict.occupant.Id] || !conflictStartTimes[conflict.occupant.Id] || !conflictEndTimes[conflict.occupant.Id]}
                             >
                               Move Occupant
                             </button>
