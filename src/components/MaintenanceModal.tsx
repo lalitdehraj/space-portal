@@ -409,14 +409,38 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({
     });
   };
 
-  const checkConflictRoomConflicts = async (conflictId: string, roomId: string, date: string, startTime: string, endTime: string) => {
+  const checkConflictRoomConflicts = async (conflictId: string, roomId: string, date: string, newStartTime: string, newEndTime: string) => {
     const roomInfo = conflictRoomInfos[conflictId];
-    if (!roomInfo || !date || !startTime || !endTime) return false;
+    if (!roomInfo || !date || !newStartTime || !newEndTime) return false;
     
     try {
-      const newSlotStart = moment(`${date} ${startTime}`);
-      const newSlotEnd = moment(`${date} ${endTime}`);
+      const newSlotStart = moment(`${date} ${newStartTime}`);
+      const newSlotEnd = moment(`${date} ${newEndTime}`);
       
+      // Check if the new room is the same as the maintenance room and time overlaps
+      if (roomId === selectedRoomId && date === maintenanceDate) {
+        const maintenanceStart = moment(`${maintenanceDate} ${startTime}`);
+        const maintenanceEnd = moment(`${maintenanceDate} ${endTime}`);
+        
+        console.log('Checking maintenance conflict:', {
+          roomId,
+          selectedRoomId,
+          date,
+          maintenanceDate,
+          newSlotStart: newSlotStart.format('YYYY-MM-DD HH:mm'),
+          newSlotEnd: newSlotEnd.format('YYYY-MM-DD HH:mm'),
+          maintenanceStart: maintenanceStart.format('YYYY-MM-DD HH:mm'),
+          maintenanceEnd: maintenanceEnd.format('YYYY-MM-DD HH:mm')
+        });
+        
+        // Check if the new slot overlaps with the maintenance time
+        if (newSlotStart.isBefore(maintenanceEnd) && newSlotEnd.isAfter(maintenanceStart)) {
+          console.log('MAINTENANCE CONFLICT DETECTED!');
+          return true; // Conflict with maintenance time
+        }
+      }
+      
+      // Check for conflicts with existing occupants in the new room
       const conflictingOccupants = (roomInfo.occupants || []).filter((occupant: Occupant) => {
         const occupantDate = moment(occupant.scheduledDate);
         const occupantStart = moment(`${occupantDate.format('YYYY-MM-DD')} ${occupant.startTime}`);
@@ -450,7 +474,11 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({
     // Check for conflicts in the new room
     const hasConflicts = await checkConflictRoomConflicts(occupantId, newRoomId, newDate, newStartTime, newEndTime);
     if (hasConflicts) {
-      alert("The selected time slot conflicts with existing occupants in the new room. Please choose a different time or room.");
+      if (newRoomId === selectedRoomId && newDate === maintenanceDate) {
+        alert("The selected time slot conflicts with the scheduled maintenance time. Please choose a different time or room.");
+      } else {
+        alert("The selected time slot conflicts with existing occupants in the new room. Please choose a different time or room.");
+      }
       return;
     }
 
@@ -676,10 +704,15 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({
     }
   };
 
-  const canScheduleMaintenance = selectedRoomInfo && (conflicts.length === 0 || conflicts.every(c => selectedConflicts.includes(c.occupant.Id)));
+  // Check if there are any non-editable conflicts that haven't been resolved
+  const hasNonEditableConflicts = conflicts.some(c => !c.isEditable && !selectedConflicts.includes(c.occupant.Id));
+  
+  const canScheduleMaintenance = selectedRoomInfo && 
+    conflicts.length === 0 || 
+    (conflicts.every(c => selectedConflicts.includes(c.occupant.Id)) && !hasNonEditableConflicts);
 
   return (
-    <div className="fixed inset-0 bg-[#00000070] flex items-center justify-center z-50">
+    <div className="fixed inset-0 bg-[#00000070] flex items-center justify-center z-50 text-gray-500">
       <div className="bg-white rounded-lg p-6 w-full max-w-4xl h-[90vh]">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-xl font-semibold text-gray-800">
@@ -856,6 +889,21 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({
                   </p>
                 </div>
 
+                {/* Show warning for non-editable conflicts */}
+                {hasNonEditableConflicts && (
+                  <div className="bg-red-50 border border-red-200 rounded-md p-4">
+                    <div className="flex items-center">
+                      <div className="text-red-500 mr-2">🚫</div>
+                      <p className="text-red-800 font-medium">
+                        Non-editable conflicts detected
+                      </p>
+                    </div>
+                    <p className="text-red-700 text-sm mt-1">
+                      Some conflicts cannot be resolved from this portal. Please contact the faculty to change their class schedule before proceeding with maintenance.
+                    </p>
+                  </div>
+                )}
+
                 {conflicts.map((conflict) => (
                   <div key={conflict.occupant.Id} className="border border-gray-200 rounded-md p-4">
                     <div className="flex items-start justify-between">
@@ -905,6 +953,16 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({
                                   setConflictRoomSelections(prev => ({ ...prev, [conflict.occupant.Id]: roomId }));
                                   if (roomId) {
                                     fetchConflictRoomInfo(conflict.occupant.Id, roomId);
+                                    // Immediately check for conflicts if we have all required data
+                                    const date = conflictDates[conflict.occupant.Id];
+                                    const startTime = conflictStartTimes[conflict.occupant.Id];
+                                    const endTime = conflictEndTimes[conflict.occupant.Id];
+                                    if (date && startTime && endTime) {
+                                      checkConflictRoomConflicts(conflict.occupant.Id, roomId, date, startTime, endTime)
+                                        .then(hasConflicts => {
+                                          setConflictRoomConflictStatus(prev => ({ ...prev, [conflict.occupant.Id]: hasConflicts }));
+                                        });
+                                    }
                                   } else {
                                     setConflictRoomInfos(prev => {
                                       const newInfos = { ...prev };
@@ -953,7 +1011,18 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({
                                   if (roomInfo && date) {
                                     calculateConflictAvailableSlots(conflict.occupant.Id, roomInfo, date);
                                   }
-                                  setConflictRoomConflictStatus(prev => ({ ...prev, [conflict.occupant.Id]: false }));
+                                  // Immediately check for conflicts if we have all required data
+                                  const roomId = conflictRoomSelections[conflict.occupant.Id];
+                                  const startTime = conflictStartTimes[conflict.occupant.Id];
+                                  const endTime = conflictEndTimes[conflict.occupant.Id];
+                                  if (roomId && startTime && endTime) {
+                                    checkConflictRoomConflicts(conflict.occupant.Id, roomId, date, startTime, endTime)
+                                      .then(hasConflicts => {
+                                        setConflictRoomConflictStatus(prev => ({ ...prev, [conflict.occupant.Id]: hasConflicts }));
+                                      });
+                                  } else {
+                                    setConflictRoomConflictStatus(prev => ({ ...prev, [conflict.occupant.Id]: false }));
+                                  }
                                 }}
                                 className={`px-3 py-2 border rounded-md text-sm ${
                                   conflictDates[conflict.occupant.Id] 
@@ -1041,7 +1110,9 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({
                                   : 'bg-green-100 text-green-700 border border-green-300'
                               }`}>
                                 {conflictRoomConflictStatus[conflict.occupant.Id] 
-                                  ? '⚠️ This time slot conflicts with existing occupants' 
+                                  ? (conflictRoomSelections[conflict.occupant.Id] === selectedRoomId && conflictDates[conflict.occupant.Id] === maintenanceDate
+                                      ? '⚠️ This time slot conflicts with scheduled maintenance'
+                                      : '⚠️ This time slot conflicts with existing occupants')
                                   : '✅ Time slot is available'
                                 }
                               </div>
@@ -1126,9 +1197,17 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({
 
                     {selectedConflicts.includes(conflict.occupant.Id) && !conflict.isEditable && (
                       <div className="mt-3 pt-3 border-t border-gray-200">
-                        <div className="bg-gray-50 p-3 rounded">
-                          <p className="text-sm text-gray-600">
-                            This slot cannot be modified. It will be listed as a conflict.
+                        <div className="bg-red-50 border border-red-200 p-3 rounded">
+                          <div className="flex items-center mb-2">
+                            <div className="text-red-500 mr-2">🚫</div>
+                            <p className="text-red-800 font-medium text-sm">
+                              Non-editable Conflict
+                            </p>
+                          </div>
+                          <p className="text-red-700 text-sm">
+                            This is a class from the timetable that cannot be modified from this portal. 
+                            Please contact the faculty ({conflict.occupant.occupantName}) to change their class schedule 
+                            before proceeding with maintenance.
                           </p>
                         </div>
                       </div>
@@ -1157,7 +1236,12 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({
                 : 'bg-gray-300 text-gray-500 cursor-not-allowed'
             }`}
           >
-            {isSubmitting ? 'Scheduling...' : 'Schedule Maintenance'}
+            {isSubmitting 
+              ? 'Scheduling...' 
+              : hasNonEditableConflicts 
+                ? 'Cannot Schedule - Non-editable Conflicts' 
+                : 'Schedule Maintenance'
+            }
           </button>
         </div>
       </div>
