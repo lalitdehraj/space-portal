@@ -270,7 +270,7 @@ function RoomPage() {
                     refreshData={() => fetchRoomInfo()}
                     setStartDate={(date) => {
                       setStartDate(date);
-                      setSelectedWeekStart(moment(date).startOf("isoWeek").toDate());
+                      setSelectedWeekStart(moment(date as Date).startOf("isoWeek").toDate());
                     }}
                     occupants={roomInfo.occupants || []}
                     academicSessionStartDate={academicSessionStartDate || ""}
@@ -294,6 +294,7 @@ function RoomPage() {
           initialEndTime={selectedSlot?.end}
         />
       )}
+
     </>
   ) : (
     <div>Room Info Not Found</div>
