@@ -57,6 +57,42 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({
   const [showConflictRoomSchedule, setShowConflictRoomSchedule] = useState<{[key: string]: boolean}>({});
   const [conflictAvailableSlots, setConflictAvailableSlots] = useState<{[key: string]: string[]}>({});
   const [conflictRoomConflictStatus, setConflictRoomConflictStatus] = useState<{[key: string]: boolean}>({});
+  const [timeValidationErrors, setTimeValidationErrors] = useState<{[key: string]: string}>({});
+
+  // Validation functions for past time slots
+  const validateTimeSlot = (date: string, startTime: string, endTime: string, fieldKey: string) => {
+    const now = moment();
+    const selectedDate = moment(date);
+    const selectedStartTime = moment(`${date} ${startTime}`);
+    const selectedEndTime = moment(`${date} ${endTime}`);
+    
+    // Check if date is in the past
+    if (selectedDate.isBefore(now, 'day')) {
+      setTimeValidationErrors(prev => ({ ...prev, [fieldKey]: 'Cannot schedule in the past' }));
+      return false;
+    }
+    
+    // Check if time is in the past for today
+    if (selectedDate.isSame(now, 'day') && selectedStartTime.isBefore(now)) {
+      setTimeValidationErrors(prev => ({ ...prev, [fieldKey]: 'Start time cannot be in the past' }));
+      return false;
+    }
+    
+    // Check if end time is before start time
+    if (selectedEndTime.isBefore(selectedStartTime)) {
+      setTimeValidationErrors(prev => ({ ...prev, [fieldKey]: 'End time must be after start time' }));
+      return false;
+    }
+    
+    // Clear any existing error
+    setTimeValidationErrors(prev => {
+      const newErrors = { ...prev };
+      delete newErrors[fieldKey];
+      return newErrors;
+    });
+    
+    return true;
+  };
 
   // Fetch all rooms from all buildings and floors
   const fetchAllRooms = async () => {
@@ -173,6 +209,26 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({
     }
   }, [maintenanceDate, startTime, endTime, selectedRoomInfo]);
 
+  // Trigger conflict checks when conflict room info is loaded
+  useEffect(() => {
+    Object.keys(conflictRoomInfos).forEach(conflictId => {
+      const roomInfo = conflictRoomInfos[conflictId];
+      const roomId = conflictRoomSelections[conflictId];
+      const date = conflictDates[conflictId];
+      const startTime = conflictStartTimes[conflictId];
+      const endTime = conflictEndTimes[conflictId];
+      
+      if (roomInfo && roomId && date && startTime && endTime) {
+        console.log('useEffect triggering conflict check:', { conflictId, roomId, date, startTime, endTime });
+        checkConflictRoomConflicts(conflictId, roomId, date, startTime, endTime)
+          .then(hasConflicts => {
+            console.log('useEffect conflict check result:', hasConflicts);
+            setConflictRoomConflictStatus(prev => ({ ...prev, [conflictId]: hasConflicts }));
+          });
+      }
+    });
+  }, [conflictRoomInfos]);
+
   // Fetch conflict room info when room is selected for a specific conflict
   const fetchConflictRoomInfo = async (conflictId: string, roomId: string) => {
     if (!roomId || !academicYear || !academicSession || !startDate || !endDate) return;
@@ -195,6 +251,19 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({
         const conflictDate = conflictDates[conflictId];
         if (conflictDate) {
           calculateConflictAvailableSlots(conflictId, res.data, conflictDate);
+        }
+        
+        // Trigger conflict check after room info is loaded
+        const date = conflictDates[conflictId];
+        const startTime = conflictStartTimes[conflictId];
+        const endTime = conflictEndTimes[conflictId];
+        if (date && startTime && endTime) {
+          console.log('Triggering conflict check after room info loaded:', { conflictId, roomId, date, startTime, endTime });
+          checkConflictRoomConflicts(conflictId, roomId, date, startTime, endTime)
+            .then(hasConflicts => {
+              console.log('Conflict check result:', hasConflicts);
+              setConflictRoomConflictStatus(prev => ({ ...prev, [conflictId]: hasConflicts }));
+            });
         }
       }
     } catch (error) {
@@ -411,11 +480,26 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({
 
   const checkConflictRoomConflicts = async (conflictId: string, roomId: string, date: string, newStartTime: string, newEndTime: string) => {
     const roomInfo = conflictRoomInfos[conflictId];
-    if (!roomInfo || !date || !newStartTime || !newEndTime) return false;
+    if (!roomInfo || !date || !newStartTime || !newEndTime) {
+      console.log('Missing data for conflict check:', { conflictId, roomId, date, newStartTime, newEndTime, hasRoomInfo: !!roomInfo });
+      return false;
+    }
     
     try {
       const newSlotStart = moment(`${date} ${newStartTime}`);
       const newSlotEnd = moment(`${date} ${newEndTime}`);
+      
+      console.log('Starting conflict check:', {
+        conflictId,
+        roomId,
+        date,
+        newStartTime,
+        newEndTime,
+        selectedRoomId,
+        maintenanceDate,
+        startTime,
+        endTime
+      });
       
       // Check if the new room is the same as the maintenance room and time overlaps
       if (roomId === selectedRoomId && date === maintenanceDate) {
@@ -453,6 +537,7 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({
         return newSlotStart.isBefore(occupantEnd) && newSlotEnd.isAfter(occupantStart);
       });
       
+      console.log('Occupant conflicts found:', conflictingOccupants.length);
       return conflictingOccupants.length > 0;
     } catch (error) {
       console.error("Error checking conflict room conflicts:", error);
@@ -654,6 +739,19 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({
       return;
     }
 
+    // Check for time validation errors
+    if (timeValidationErrors['maintenance']) {
+      alert("Please fix the time validation errors before scheduling maintenance");
+      return;
+    }
+
+    // Check for conflict validation errors
+    const hasConflictValidationErrors = Object.keys(timeValidationErrors).some(key => key.startsWith('conflict-'));
+    if (hasConflictValidationErrors) {
+      alert("Please fix the time validation errors in conflict resolution before scheduling maintenance");
+      return;
+    }
+
     // Check if there are unresolved conflicts
     const unresolvedConflicts = conflicts.filter(c => !selectedConflicts.includes(c.occupant.Id));
     if (unresolvedConflicts.length > 0) {
@@ -707,9 +805,15 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({
   // Check if there are any non-editable conflicts that haven't been resolved
   const hasNonEditableConflicts = conflicts.some(c => !c.isEditable && !selectedConflicts.includes(c.occupant.Id));
   
+  // Check for validation errors
+  const hasMaintenanceValidationErrors = !!timeValidationErrors['maintenance'];
+  const hasConflictValidationErrors = Object.keys(timeValidationErrors).some(key => key.startsWith('conflict-'));
+  
   const canScheduleMaintenance = selectedRoomInfo && 
-    conflicts.length === 0 || 
-    (conflicts.every(c => selectedConflicts.includes(c.occupant.Id)) && !hasNonEditableConflicts);
+    !hasMaintenanceValidationErrors && 
+    !hasConflictValidationErrors &&
+    (conflicts.length === 0 || 
+    (conflicts.every(c => selectedConflicts.includes(c.occupant.Id)) && !hasNonEditableConflicts));
 
   return (
     <div className="fixed inset-0 bg-[#00000070] flex items-center justify-center z-50 text-gray-500">
@@ -773,12 +877,23 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({
               <input
                 type="date"
                 value={maintenanceDate}
-                onChange={(e) => setMaintenanceDate(e.target.value)}
+                onChange={(e) => {
+                  setMaintenanceDate(e.target.value);
+                  // Validate time slot when date changes
+                  if (e.target.value && startTime && endTime) {
+                    validateTimeSlot(e.target.value, startTime, endTime, 'maintenance');
+                  }
+                }}
                 min={moment().format('YYYY-MM-DD')}
                 max={endDate}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-orange-500 focus:border-orange-500 ${
+                  timeValidationErrors['maintenance'] ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                }`}
                 required
               />
+              {timeValidationErrors['maintenance'] && (
+                <p className="text-red-600 text-sm mt-1">{timeValidationErrors['maintenance']}</p>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -789,8 +904,17 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({
                 <input
                   type="time"
                   value={startTime}
-                  onChange={(e) => setStartTime(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  onChange={(e) => {
+                    setStartTime(e.target.value);
+                    // Validate time slot when start time changes
+                    if (maintenanceDate && e.target.value && endTime) {
+                      validateTimeSlot(maintenanceDate, e.target.value, endTime, 'maintenance');
+                    }
+                  }}
+                  min={maintenanceDate === moment().format('YYYY-MM-DD') ? moment().format('HH:mm') : undefined}
+                  className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-orange-500 focus:border-orange-500 ${
+                    timeValidationErrors['maintenance'] ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                  }`}
                   required
                 />
               </div>
@@ -801,8 +925,17 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({
                 <input
                   type="time"
                   value={endTime}
-                  onChange={(e) => setEndTime(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  onChange={(e) => {
+                    setEndTime(e.target.value);
+                    // Validate time slot when end time changes
+                    if (maintenanceDate && startTime && e.target.value) {
+                      validateTimeSlot(maintenanceDate, startTime, e.target.value, 'maintenance');
+                    }
+                  }}
+                  min={maintenanceDate === moment().format('YYYY-MM-DD') && startTime ? startTime : undefined}
+                  className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-orange-500 focus:border-orange-500 ${
+                    timeValidationErrors['maintenance'] ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                  }`}
                   required
                 />
               </div>
@@ -953,6 +1086,8 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({
                                   setConflictRoomSelections(prev => ({ ...prev, [conflict.occupant.Id]: roomId }));
                                   if (roomId) {
                                     fetchConflictRoomInfo(conflict.occupant.Id, roomId);
+                                    // Clear conflict status when room changes
+                                    setConflictRoomConflictStatus(prev => ({ ...prev, [conflict.occupant.Id]: false }));
                                     // Immediately check for conflicts if we have all required data
                                     const date = conflictDates[conflict.occupant.Id];
                                     const startTime = conflictStartTimes[conflict.occupant.Id];
@@ -1011,21 +1146,27 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({
                                   if (roomInfo && date) {
                                     calculateConflictAvailableSlots(conflict.occupant.Id, roomInfo, date);
                                   }
-                                  // Immediately check for conflicts if we have all required data
-                                  const roomId = conflictRoomSelections[conflict.occupant.Id];
+                                  // Clear conflict status when date changes
+                                  setConflictRoomConflictStatus(prev => ({ ...prev, [conflict.occupant.Id]: false }));
+                                  // Validate time slot when date changes
                                   const startTime = conflictStartTimes[conflict.occupant.Id];
                                   const endTime = conflictEndTimes[conflict.occupant.Id];
+                                  if (date && startTime && endTime) {
+                                    validateTimeSlot(date, startTime, endTime, `conflict-${conflict.occupant.Id}`);
+                                  }
+                                  // Immediately check for conflicts if we have all required data
+                                  const roomId = conflictRoomSelections[conflict.occupant.Id];
                                   if (roomId && startTime && endTime) {
                                     checkConflictRoomConflicts(conflict.occupant.Id, roomId, date, startTime, endTime)
                                       .then(hasConflicts => {
                                         setConflictRoomConflictStatus(prev => ({ ...prev, [conflict.occupant.Id]: hasConflicts }));
                                       });
-                                  } else {
-                                    setConflictRoomConflictStatus(prev => ({ ...prev, [conflict.occupant.Id]: false }));
                                   }
                                 }}
                                 className={`px-3 py-2 border rounded-md text-sm ${
-                                  conflictDates[conflict.occupant.Id] 
+                                  timeValidationErrors[`conflict-${conflict.occupant.Id}`]
+                                    ? 'border-red-300 bg-red-50'
+                                    : conflictDates[conflict.occupant.Id] 
                                     ? 'border-green-300 bg-green-50' 
                                     : 'border-gray-300'
                                 }`}
@@ -1041,10 +1182,16 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({
                                   onChange={(e) => {
                                     const startTime = e.target.value;
                                     setConflictStartTimes(prev => ({ ...prev, [conflict.occupant.Id]: startTime }));
-                                    // Check for conflicts when time changes
-                                    const roomId = conflictRoomSelections[conflict.occupant.Id];
+                                    // Clear conflict status when time changes
+                                    setConflictRoomConflictStatus(prev => ({ ...prev, [conflict.occupant.Id]: false }));
+                                    // Validate time slot when start time changes
                                     const date = conflictDates[conflict.occupant.Id];
                                     const endTime = conflictEndTimes[conflict.occupant.Id];
+                                    if (date && startTime && endTime) {
+                                      validateTimeSlot(date, startTime, endTime, `conflict-${conflict.occupant.Id}`);
+                                    }
+                                    // Check for conflicts when time changes
+                                    const roomId = conflictRoomSelections[conflict.occupant.Id];
                                     if (roomId && date && startTime && endTime) {
                                       checkConflictRoomConflicts(conflict.occupant.Id, roomId, date, startTime, endTime)
                                         .then(hasConflicts => {
@@ -1052,8 +1199,11 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({
                                         });
                                     }
                                   }}
+                                  min={conflictDates[conflict.occupant.Id] === moment().format('YYYY-MM-DD') ? moment().format('HH:mm') : undefined}
                                   className={`px-3 py-2 border rounded-md text-sm w-full ${
-                                    conflictRoomSelections[conflict.occupant.Id] && conflictDates[conflict.occupant.Id] && conflictStartTimes[conflict.occupant.Id] && conflictEndTimes[conflict.occupant.Id] && !conflictRoomConflictStatus[conflict.occupant.Id]
+                                    timeValidationErrors[`conflict-${conflict.occupant.Id}`]
+                                      ? 'border-red-300 bg-red-50'
+                                      : conflictRoomSelections[conflict.occupant.Id] && conflictDates[conflict.occupant.Id] && conflictStartTimes[conflict.occupant.Id] && conflictEndTimes[conflict.occupant.Id] && !conflictRoomConflictStatus[conflict.occupant.Id]
                                       ? 'border-green-300 bg-green-50'
                                       : conflictRoomConflictStatus[conflict.occupant.Id]
                                       ? 'border-red-300 bg-red-50'
@@ -1074,10 +1224,16 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({
                                   onChange={(e) => {
                                     const endTime = e.target.value;
                                     setConflictEndTimes(prev => ({ ...prev, [conflict.occupant.Id]: endTime }));
-                                    // Check for conflicts when time changes
-                                    const roomId = conflictRoomSelections[conflict.occupant.Id];
+                                    // Clear conflict status when time changes
+                                    setConflictRoomConflictStatus(prev => ({ ...prev, [conflict.occupant.Id]: false }));
+                                    // Validate time slot when end time changes
                                     const date = conflictDates[conflict.occupant.Id];
                                     const startTime = conflictStartTimes[conflict.occupant.Id];
+                                    if (date && startTime && endTime) {
+                                      validateTimeSlot(date, startTime, endTime, `conflict-${conflict.occupant.Id}`);
+                                    }
+                                    // Check for conflicts when time changes
+                                    const roomId = conflictRoomSelections[conflict.occupant.Id];
                                     if (roomId && date && startTime && endTime) {
                                       checkConflictRoomConflicts(conflict.occupant.Id, roomId, date, startTime, endTime)
                                         .then(hasConflicts => {
@@ -1085,8 +1241,11 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({
                                         });
                                     }
                                   }}
+                                  min={conflictDates[conflict.occupant.Id] === moment().format('YYYY-MM-DD') && conflictStartTimes[conflict.occupant.Id] ? conflictStartTimes[conflict.occupant.Id] : undefined}
                                   className={`px-3 py-2 border rounded-md text-sm w-full ${
-                                    conflictRoomSelections[conflict.occupant.Id] && conflictDates[conflict.occupant.Id] && conflictStartTimes[conflict.occupant.Id] && conflictEndTimes[conflict.occupant.Id] && !conflictRoomConflictStatus[conflict.occupant.Id]
+                                    timeValidationErrors[`conflict-${conflict.occupant.Id}`]
+                                      ? 'border-red-300 bg-red-50'
+                                      : conflictRoomSelections[conflict.occupant.Id] && conflictDates[conflict.occupant.Id] && conflictStartTimes[conflict.occupant.Id] && conflictEndTimes[conflict.occupant.Id] && !conflictRoomConflictStatus[conflict.occupant.Id]
                                       ? 'border-green-300 bg-green-50'
                                       : conflictRoomConflictStatus[conflict.occupant.Id]
                                       ? 'border-red-300 bg-red-50'
@@ -1102,8 +1261,15 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({
                               </div>
                             </div>
                             
+                            {/* Time Validation Error Message */}
+                            {timeValidationErrors[`conflict-${conflict.occupant.Id}`] && (
+                              <div className="text-red-600 text-xs mt-1 px-2 py-1 bg-red-50 border border-red-300 rounded">
+                                {timeValidationErrors[`conflict-${conflict.occupant.Id}`]}
+                              </div>
+                            )}
+                            
                             {/* Conflict Status Message */}
-                            {conflictRoomSelections[conflict.occupant.Id] && conflictDates[conflict.occupant.Id] && conflictStartTimes[conflict.occupant.Id] && conflictEndTimes[conflict.occupant.Id] && (
+                            {conflictRoomSelections[conflict.occupant.Id] && conflictDates[conflict.occupant.Id] && conflictStartTimes[conflict.occupant.Id] && conflictEndTimes[conflict.occupant.Id] && !timeValidationErrors[`conflict-${conflict.occupant.Id}`] && (
                               <div className={`text-xs mt-1 px-2 py-1 rounded ${
                                 conflictRoomConflictStatus[conflict.occupant.Id] 
                                   ? 'bg-red-100 text-red-700 border border-red-300' 
@@ -1238,7 +1404,11 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({
           >
             {isSubmitting 
               ? 'Scheduling...' 
-              : hasNonEditableConflicts 
+              : hasMaintenanceValidationErrors
+                ? 'Cannot Schedule - Fix Time Validation'
+                : hasConflictValidationErrors
+                ? 'Cannot Schedule - Fix Conflict Time Validation'
+                : hasNonEditableConflicts 
                 ? 'Cannot Schedule - Non-editable Conflicts' 
                 : 'Schedule Maintenance'
             }
