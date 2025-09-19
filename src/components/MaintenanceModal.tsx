@@ -7,7 +7,7 @@ import { URL_NOT_FOUND } from "@/constants";
 import moment from "moment";
 import { checkSlotConflicts, Slot } from "@/utils/slotsHelper";
 import { useSelector } from "react-redux";
-import { X } from "lucide-react";
+import { X, Eye } from "lucide-react";
 
 interface MaintenanceModalProps {
   allBuildingsData: Building[];
@@ -52,6 +52,11 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({
   const [isLoadingRoomInfo, setIsLoadingRoomInfo] = useState(false);
   const [allRooms, setAllRooms] = useState<Room[]>([]);
   const [isLoadingRooms, setIsLoadingRooms] = useState(false);
+  const [newRoomInfo, setNewRoomInfo] = useState<RoomInfo | null>(null);
+  const [isLoadingNewRoomInfo, setIsLoadingNewRoomInfo] = useState(false);
+  const [showNewRoomSchedule, setShowNewRoomSchedule] = useState(false);
+  const [availableSlots, setAvailableSlots] = useState<string[]>([]);
+  const [newRoomConflictStatus, setNewRoomConflictStatus] = useState<boolean>(false);
 
   // Fetch all rooms from all buildings and floors
   const fetchAllRooms = async () => {
@@ -132,6 +137,97 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({
     }
   };
 
+  // Fetch new room info for conflict checking
+  const fetchNewRoomInfo = async (roomId: string) => {
+    if (!roomId || !academicYear || !academicSession || !startDate || !endDate) return;
+    
+    setIsLoadingNewRoomInfo(true);
+    try {
+      const requestbody = {
+        roomID: roomId,
+        subroomID: 0,
+        academicYr: academicYear,
+        acadSess: academicSession,
+        startDate: startDate,
+        endDate: endDate,
+      };
+      
+      const res = await callApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, requestbody);
+      if (res.success && res.data) {
+        setNewRoomInfo(res.data);
+        // Calculate available slots for the new date if it's set
+        if (newDate) {
+          calculateAvailableSlots(res.data, newDate);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching new room info:", error);
+    } finally {
+      setIsLoadingNewRoomInfo(false);
+    }
+  };
+
+  // Calculate available slots for a given room and date
+  const calculateAvailableSlots = (roomInfo: RoomInfo, date: string) => {
+    const today = new Date().toISOString().split("T")[0];
+    const currentTime = new Date();
+    if (new Date(date) < new Date(today)) {
+      setAvailableSlots([]);
+      return;
+    }
+
+    const workingStart = 9 * 60; // 9:00 AM in minutes
+    const workingEnd = 18 * 60; // 6:00 PM in minutes
+
+    const occupiedIntervals = (roomInfo.occupants || [])
+      .filter((occupant) => {
+        const occupantDate = moment(occupant.scheduledDate).format('YYYY-MM-DD');
+        return occupantDate === date;
+      })
+      .map((occupant) => ({
+        start: parseInt(occupant.startTime.split(":")[0]) * 60 + parseInt(occupant.startTime.split(":")[1]),
+        end: parseInt(occupant.endTime.split(":")[0]) * 60 + parseInt(occupant.endTime.split(":")[1]),
+      }))
+      .sort((a, b) => a.start - b.start);
+
+    let freeIntervals: { start: number; end: number }[] = [];
+    let currentPosition = workingStart;
+
+    // If it's today, start from current time
+    if (date === today) {
+      const currentMinutes = currentTime.getHours() * 60 + currentTime.getMinutes();
+      currentPosition = Math.max(currentPosition, currentMinutes);
+    }
+
+    occupiedIntervals.forEach((interval) => {
+      if (currentPosition < interval.start) {
+        freeIntervals.push({ start: currentPosition, end: interval.start });
+      }
+      currentPosition = Math.max(currentPosition, interval.end);
+    });
+
+    if (currentPosition < workingEnd) {
+      freeIntervals.push({ start: currentPosition, end: workingEnd });
+    }
+
+    const slots = freeIntervals.map((interval) => {
+      const startHour = String(Math.floor(interval.start / 60)).padStart(2, "0");
+      const startMin = String(interval.start % 60).padStart(2, "0");
+      const endHour = String(Math.floor(interval.end / 60)).padStart(2, "0");
+      const endMin = String(interval.end % 60).padStart(2, "0");
+      return `${startHour}:${startMin} → ${endHour}:${endMin}`;
+    });
+
+    setAvailableSlots(slots);
+  };
+
+  // Handle available slot selection
+  const handleAvailableSlotClick = (timeString: string) => {
+    const [start, end] = timeString.split(" → ");
+    setNewStartTime(start);
+    setNewEndTime(end);
+  };
+
   // Handle room selection
   const handleRoomSelection = (roomId: string) => {
     setSelectedRoomId(roomId);
@@ -156,6 +252,42 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({
       setConflicts([]);
     }
   }, [maintenanceDate, startTime, endTime, selectedRoomInfo]);
+
+  // Fetch new room info when new room is selected
+  useEffect(() => {
+    if (newRoomId) {
+      fetchNewRoomInfo(newRoomId);
+    } else {
+      setNewRoomInfo(null);
+      setAvailableSlots([]);
+      setNewRoomConflictStatus(false);
+    }
+  }, [newRoomId]);
+
+  // Calculate available slots when new date changes
+  useEffect(() => {
+    if (newRoomInfo && newDate) {
+      calculateAvailableSlots(newRoomInfo, newDate);
+    } else {
+      setAvailableSlots([]);
+    }
+    // Reset conflict status when date changes
+    setNewRoomConflictStatus(false);
+  }, [newDate, newRoomInfo]);
+
+  // Check for conflicts when new room details change
+  useEffect(() => {
+    const checkConflicts = async () => {
+      if (newRoomInfo && newDate && newStartTime && newEndTime) {
+        const hasConflicts = await checkNewRoomConflicts(newRoomId, newDate, newStartTime, newEndTime);
+        setNewRoomConflictStatus(hasConflicts);
+      } else {
+        setNewRoomConflictStatus(false);
+      }
+    };
+    
+    checkConflicts();
+  }, [newRoomInfo, newDate, newStartTime, newEndTime, newRoomId]);
 
   const checkConflicts = async () => {
     if (!selectedRoomInfo || !maintenanceDate || !startTime || !endTime) return;
@@ -261,42 +393,25 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({
   };
 
   const checkNewRoomConflicts = async (roomId: string, date: string, startTime: string, endTime: string) => {
-    if (!academicYear || !academicSession || !startDate || !endDate) return false;
+    if (!newRoomInfo || !date || !startTime || !endTime) return false;
     
     try {
-      // Fetch room info for the new room to check for conflicts
-      const requestbody = {
-        roomID: roomId,
-        subroomID: 0,
-        academicYr: academicYear,
-        acadSess: academicSession,
-        startDate: startDate,
-        endDate: endDate,
-      };
+      const newSlotStart = moment(`${date} ${startTime}`);
+      const newSlotEnd = moment(`${date} ${endTime}`);
       
-      const res = await callApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, requestbody);
-      
-      if (res.success && res.data && res.data.occupants) {
-        const newRoomOccupants = res.data.occupants;
-        const newSlotStart = moment(`${date} ${startTime}`);
-        const newSlotEnd = moment(`${date} ${endTime}`);
+      const conflictingOccupants = (newRoomInfo.occupants || []).filter((occupant: Occupant) => {
+        const occupantDate = moment(occupant.scheduledDate);
+        const occupantStart = moment(`${occupantDate.format('YYYY-MM-DD')} ${occupant.startTime}`);
+        const occupantEnd = moment(`${occupantDate.format('YYYY-MM-DD')} ${occupant.endTime}`);
         
-        const conflictingOccupants = newRoomOccupants.filter((occupant: Occupant) => {
-          const occupantDate = moment(occupant.scheduledDate);
-          const occupantStart = moment(`${occupantDate.format('YYYY-MM-DD')} ${occupant.startTime}`);
-          const occupantEnd = moment(`${occupantDate.format('YYYY-MM-DD')} ${occupant.endTime}`);
-          
-          // Check if dates match
-          if (!occupantDate.isSame(date, 'day')) return false;
-          
-          // Check for time overlap
-          return newSlotStart.isBefore(occupantEnd) && newSlotEnd.isAfter(occupantStart);
-        });
+        // Check if dates match
+        if (!occupantDate.isSame(date, 'day')) return false;
         
-        return conflictingOccupants.length > 0;
-      }
+        // Check for time overlap
+        return newSlotStart.isBefore(occupantEnd) && newSlotEnd.isAfter(occupantStart);
+      });
       
-      return false;
+      return conflictingOccupants.length > 0;
     } catch (error) {
       console.error("Error checking new room conflicts:", error);
       return false;
@@ -680,8 +795,11 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({
                                 value={newRoomId}
                                 onChange={(e) => setNewRoomId(e.target.value)}
                                 className="px-3 py-2 border border-gray-300 rounded-md text-sm"
+                                disabled={isLoadingRooms}
                               >
-                                <option value="">Select Room</option>
+                                <option value="">
+                                  {isLoadingRooms ? "Loading rooms..." : "Select Room"}
+                                </option>
                                 {allRooms.map(room => {
                                   const building = allBuildingsData.find(b => b.id === room.buildingId);
                                   const floor = building?.floors.find(f => f.id === room.floorId);
@@ -698,27 +816,125 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({
                                 onChange={(e) => setNewDate(e.target.value)}
                                 className="px-3 py-2 border border-gray-300 rounded-md text-sm"
                                 placeholder="New Date"
+                                min={moment().format('YYYY-MM-DD')}
                               />
                             </div>
                             <div className="grid grid-cols-2 gap-2 mt-2">
-                              <input
-                                type="time"
-                                value={newStartTime}
-                                onChange={(e) => setNewStartTime(e.target.value)}
-                                className="px-3 py-2 border border-gray-300 rounded-md text-sm"
-                                placeholder="Start Time"
-                              />
-                              <input
-                                type="time"
-                                value={newEndTime}
-                                onChange={(e) => setNewEndTime(e.target.value)}
-                                className="px-3 py-2 border border-gray-300 rounded-md text-sm"
-                                placeholder="End Time"
-                              />
+                              <div className="relative">
+                                <input
+                                  type="time"
+                                  value={newStartTime}
+                                  onChange={(e) => setNewStartTime(e.target.value)}
+                                  className={`px-3 py-2 border rounded-md text-sm w-full ${
+                                    newRoomId && newDate && newStartTime && newEndTime && !newRoomConflictStatus
+                                      ? 'border-green-300 bg-green-50'
+                                      : newRoomConflictStatus
+                                      ? 'border-red-300 bg-red-50'
+                                      : 'border-gray-300'
+                                  }`}
+                                  placeholder="Start Time"
+                                />
+                                {newRoomId && newDate && newStartTime && newEndTime && (
+                                  <div className={`absolute -top-1 -right-1 w-3 h-3 rounded-full ${
+                                    newRoomConflictStatus ? 'bg-red-500' : 'bg-green-500'
+                                  }`}></div>
+                                )}
+                              </div>
+                              <div className="relative">
+                                <input
+                                  type="time"
+                                  value={newEndTime}
+                                  onChange={(e) => setNewEndTime(e.target.value)}
+                                  className={`px-3 py-2 border rounded-md text-sm w-full ${
+                                    newRoomId && newDate && newStartTime && newEndTime && !newRoomConflictStatus
+                                      ? 'border-green-300 bg-green-50'
+                                      : newRoomConflictStatus
+                                      ? 'border-red-300 bg-red-50'
+                                      : 'border-gray-300'
+                                  }`}
+                                  placeholder="End Time"
+                                />
+                                {newRoomId && newDate && newStartTime && newEndTime && (
+                                  <div className={`absolute -top-1 -right-1 w-3 h-3 rounded-full ${
+                                    newRoomConflictStatus ? 'bg-red-500' : 'bg-green-500'
+                                  }`}></div>
+                                )}
+                              </div>
                             </div>
+                            
+                            {/* Conflict Status Message */}
+                            {newRoomId && newDate && newStartTime && newEndTime && (
+                              <div className={`text-xs mt-1 px-2 py-1 rounded ${
+                                newRoomConflictStatus 
+                                  ? 'bg-red-100 text-red-700 border border-red-300' 
+                                  : 'bg-green-100 text-green-700 border border-green-300'
+                              }`}>
+                                {newRoomConflictStatus 
+                                  ? '⚠️ This time slot conflicts with existing occupants' 
+                                  : '✅ Time slot is available'
+                                }
+                              </div>
+                            )}
+                            
+                            {/* View Schedule Button */}
+                            {newRoomId && newDate && (
+                              <button
+                                onClick={() => setShowNewRoomSchedule(!showNewRoomSchedule)}
+                                className="mt-2 flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-700 text-sm rounded hover:bg-blue-200"
+                                disabled={isLoadingNewRoomInfo}
+                              >
+                                <Eye className="w-4 h-4" />
+                                {isLoadingNewRoomInfo ? 'Loading...' : (showNewRoomSchedule ? 'Hide' : 'View') + ' Schedule'}
+                              </button>
+                            )}
+
+                            {/* Available Slots Display */}
+                            {showNewRoomSchedule && newDate && (
+                              <div className="mt-3 p-3 bg-gray-50 rounded-md border">
+                                <h4 className="text-sm font-medium text-gray-700 mb-2">Available Time Slots:</h4>
+                                {isLoadingNewRoomInfo ? (
+                                  <div className="text-center py-2">
+                                    <div className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
+                                    <p className="text-xs text-gray-600 mt-1">Loading room schedule...</p>
+                                  </div>
+                                ) : availableSlots.length > 0 ? (
+                                  <div className="space-y-1">
+                                    {availableSlots.map((slot, index) => (
+                                      <button
+                                        key={index}
+                                        onClick={() => handleAvailableSlotClick(slot)}
+                                        className="block w-full text-left px-2 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200 border border-green-300"
+                                      >
+                                        {slot}
+                                      </button>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <p className="text-xs text-gray-500 italic">No available slots for this date.</p>
+                                )}
+                                
+                                {/* Existing Occupants */}
+                                {newRoomInfo && newRoomInfo.occupants && newRoomInfo.occupants.length > 0 && (
+                                  <div className="mt-3">
+                                    <h4 className="text-sm font-medium text-gray-700 mb-2">Existing Occupants:</h4>
+                                    <div className="space-y-1">
+                                      {newRoomInfo.occupants
+                                        .filter(occupant => moment(occupant.scheduledDate).format('YYYY-MM-DD') === newDate)
+                                        .map((occupant, index) => (
+                                          <div key={index} className="text-xs text-red-600 bg-red-50 px-2 py-1 rounded border border-red-300">
+                                            {occupant.occupantName} - {occupant.startTime} → {occupant.endTime}
+                                          </div>
+                                        ))}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
                             <button
                               onClick={() => handleMoveOccupant(conflict.occupant.Id)}
                               className="mt-2 px-3 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600"
+                              disabled={!newRoomId || !newDate || !newStartTime || !newEndTime}
                             >
                               Move Occupant
                             </button>
