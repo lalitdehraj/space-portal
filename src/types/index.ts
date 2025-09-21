@@ -214,3 +214,15 @@ export interface SpaceAllocation {
   allocatedBy?: string;
   allocatedOnDate?: string;
 }
+
+export interface Maintenance {
+  id: number;
+  buildingId: string;
+  roomid: string;
+  maintanceDate: string;
+  startTime: string;
+  endTime: string;
+  maintainenceType: string;
+  description: string;
+  isMainteneceActive: boolean;
+}

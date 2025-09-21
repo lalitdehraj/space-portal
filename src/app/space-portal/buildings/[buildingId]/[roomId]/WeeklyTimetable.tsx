@@ -3,7 +3,7 @@
 import React from "react";
 import { addDaysToDate } from "@/utils";
 import moment from "moment";
-import { Occupant } from "@/types";
+import { Occupant, Maintenance } from "@/types";
 import AllocationDetailsModal from "@/components/AllocationDetailsModal";
 import UpdateSlotModal from "@/components/UpdateSlotModal";
 import { callApi } from "@/utils/apiIntercepter";
@@ -14,18 +14,16 @@ type WeeklyTimetableProps = {
   isManagedByThisUser: Boolean;
   setStartDate: React.Dispatch<React.SetStateAction<Date>>;
   occupants: Occupant[];
+  maintenanceData: Maintenance[];
   academicSessionStartDate: string;
   academicSessionEndDate: string;
-  onClickTimeTableSlot: (
-    date: string,
-    slot: { start: string; end: string }
-  ) => void;
+  onClickTimeTableSlot: (date: string, slot: { start: string; end: string }) => void;
   refreshData: () => void;
 };
 
-let unique = 0;
 function WeeklyTimetable({
   occupants,
+  maintenanceData,
   isManagedByThisUser,
   startDate,
   setStartDate,
@@ -49,23 +47,14 @@ function WeeklyTimetable({
     const endMinutes = endMinutesTotal % 60;
 
     timeSlots.push({
-      start: `${String(startHours).padStart(2, "0")}:${String(
-        startMinutes
-      ).padStart(2, "0")}`,
-      end: `${String(endHours).padStart(2, "0")}:${String(endMinutes).padStart(
-        2,
-        "0"
-      )}`,
+      start: `${String(startHours).padStart(2, "0")}:${String(startMinutes).padStart(2, "0")}`,
+      end: `${String(endHours).padStart(2, "0")}:${String(endMinutes).padStart(2, "0")}`,
     });
   }
 
   /** Session boundaries */
-  const sessionStartDate = academicSessionStartDate
-    ? new Date(academicSessionStartDate)
-    : null;
-  const sessionEndDate = academicSessionEndDate
-    ? new Date(academicSessionEndDate)
-    : null;
+  const sessionStartDate = academicSessionStartDate ? new Date(academicSessionStartDate) : null;
+  const sessionEndDate = academicSessionEndDate ? new Date(academicSessionEndDate) : null;
 
   /** Always align week start to Monday */
   let clampedStartDate = moment(startDate).startOf("isoWeek").toDate();
@@ -74,9 +63,7 @@ function WeeklyTimetable({
     clampedStartDate = sessionStartDate;
   }
   if (sessionEndDate) {
-    const lastPossibleStart = moment(sessionEndDate)
-      .startOf("isoWeek")
-      .toDate();
+    const lastPossibleStart = moment(sessionEndDate).startOf("isoWeek").toDate();
     if (clampedStartDate > lastPossibleStart) {
       clampedStartDate = lastPossibleStart;
     }
@@ -91,25 +78,16 @@ function WeeklyTimetable({
   }
 
   /** Slot availability check */
-  const isSlotAvailable = (
-    date: Date,
-    slot: { start: string; end: string }
-  ) => {
+  const isSlotAvailable = (date: Date, slot: { start: string; end: string }) => {
     const [endHour, endMinute] = slot.end.split(":").map(Number);
-    const slotDateTimeEnd = moment(date)
-      .hour(endHour)
-      .minute(endMinute)
-      .second(0)
-      .millisecond(0);
+    const slotDateTimeEnd = moment(date).hour(endHour).minute(endMinute).second(0).millisecond(0);
 
     const now = moment();
     return slotDateTimeEnd.isSameOrAfter(now);
   };
 
-  const [selectedOccupant, setSelectedOccupant] =
-    React.useState<Occupant | null>(null);
-  const [showUpdateModal, setShowUpdateModal] =
-    React.useState<boolean>(false);
+  const [selectedOccupant, setSelectedOccupant] = React.useState<Occupant | null>(null);
+  const [showUpdateModal, setShowUpdateModal] = React.useState<boolean>(false);
 
   /** Navigation */
   const handlePrevWeek = () => {
@@ -124,9 +102,7 @@ function WeeklyTimetable({
   const handleNextWeek = () => {
     const nextStart = moment(clampedStartDate).add(1, "week").toDate();
     if (sessionEndDate) {
-      const lastPossibleStart = moment(sessionEndDate)
-        .startOf("isoWeek")
-        .toDate();
+      const lastPossibleStart = moment(sessionEndDate).startOf("isoWeek").toDate();
       if (nextStart > lastPossibleStart) {
         setStartDate(lastPossibleStart);
       } else {
@@ -138,17 +114,14 @@ function WeeklyTimetable({
   };
 
   const handleDelete = async (id: string) => {
-    const response = await callApi(
-      process.env.NEXT_PUBLIC_UPDATE_SPACE_ALLOCATION_ENTRY || URL_NOT_FOUND,
-      {
-        allocationEntNo: id,
-        isAllocationActive: false,
-        startTime: selectedOccupant?.startTime ? moment(selectedOccupant.startTime, "HH:mm").format("HH:mm:ss") : "",
-        endTime: selectedOccupant?.endTime ? moment(selectedOccupant.endTime, "HH:mm").format("HH:mm:ss") : "",
-        remarks: "",
-        scheduledDate: selectedOccupant?.scheduledDate ? moment(selectedOccupant.scheduledDate).format("YYYY-MM-DD") : "",
-      }
-    );
+    const response = await callApi(process.env.NEXT_PUBLIC_UPDATE_SPACE_ALLOCATION_ENTRY || URL_NOT_FOUND, {
+      allocationEntNo: id,
+      isAllocationActive: false,
+      startTime: selectedOccupant?.startTime ? moment(selectedOccupant.startTime, "HH:mm").format("HH:mm:ss") : "",
+      endTime: selectedOccupant?.endTime ? moment(selectedOccupant.endTime, "HH:mm").format("HH:mm:ss") : "",
+      remarks: "",
+      scheduledDate: selectedOccupant?.scheduledDate ? moment(selectedOccupant.scheduledDate).format("YYYY-MM-DD") : "",
+    });
     if (response.success) {
       setSelectedOccupant(null);
       refreshData();
@@ -173,11 +146,7 @@ function WeeklyTimetable({
           <button
             className="px-3 py-1 rounded bg-gray-200 text-gray-700 hover:bg-gray-300"
             onClick={handlePrevWeek}
-            disabled={
-              (sessionStartDate &&
-                clampedStartDate.getTime() === sessionStartDate.getTime()) ??
-              true
-            }
+            disabled={(sessionStartDate && clampedStartDate.getTime() === sessionStartDate.getTime()) ?? true}
           >
             Previous
           </button>
@@ -189,24 +158,16 @@ function WeeklyTimetable({
               year: "numeric",
             })}{" "}
             -{" "}
-            {upcomingDates[upcomingDates.length - 1]?.toLocaleDateString(
-              "en-US",
-              {
-                month: "short",
-                day: "numeric",
-                year: "numeric",
-              }
-            )}
+            {upcomingDates[upcomingDates.length - 1]?.toLocaleDateString("en-US", {
+              month: "short",
+              day: "numeric",
+              year: "numeric",
+            })}
           </div>
           <button
             className="px-3 py-1 rounded bg-gray-200 text-gray-700 hover:bg-gray-300"
             onClick={handleNextWeek}
-            disabled={
-              (sessionEndDate &&
-                upcomingDates[upcomingDates.length - 1]?.toDateString() ===
-                  sessionEndDate.toDateString()) ??
-              true
-            }
+            disabled={(sessionEndDate && upcomingDates[upcomingDates.length - 1]?.toDateString() === sessionEndDate.toDateString()) ?? true}
           >
             Next
           </button>
@@ -217,17 +178,11 @@ function WeeklyTimetable({
           <table className="w-full text-left min-w-[900px] border-collapse">
             <thead className="bg-white sticky top-0 z-10 shadow-sm">
               <tr>
-                <th
-                  key={"time"}
-                  className="px-4 py-3 text-sm font-medium text-gray-500 w-24"
-                >
+                <th key={"time"} className="px-4 py-3 text-sm font-medium text-gray-500 w-24">
                   Time
                 </th>
                 {upcomingDates.map((date, index) => (
-                  <th
-                    key={index}
-                    className="px-2 py-3 text-xs font-medium text-gray-500 text-center border-l border-gray-200 min-w-[140px]"
-                  >
+                  <th key={index} className="px-2 py-3 text-xs font-medium text-gray-500 text-center border-l border-gray-200 min-w-[140px]">
                     {date.toLocaleDateString("en-US", { weekday: "short" })}
                     <br />
                     <span className="text-sm font-bold text-gray-800">
@@ -243,15 +198,9 @@ function WeeklyTimetable({
             <tbody>
               <tr>
                 {/* Time column */}
-                <td
-                  key={"time-column"}
-                  className="align-top bg-white sticky left-0 px-2 border-r border-gray-200"
-                >
+                <td key={"time-column"} className="align-top bg-white sticky left-0 px-2 border-r border-gray-200">
                   {timeSlots.map((slot) => (
-                    <div
-                      key={slot.start}
-                      className="h-16 flex items-start text-xs text-gray-700"
-                    >
+                    <div key={slot.start} className="h-16 flex items-start text-xs text-gray-700">
                       {slot.start}
                     </div>
                   ))}
@@ -259,10 +208,7 @@ function WeeklyTimetable({
 
                 {/* Day columns */}
                 {upcomingDates.map((date) => (
-                  <td
-                    key={date.toISOString()}
-                    className="relative border-l border-gray-200 align-top"
-                  >
+                  <td key={date.toISOString()} className="relative border-l border-gray-200 align-top">
                     {/* Grid slots */}
                     {timeSlots.map((slot) => {
                       const isAvailable = isSlotAvailable(date, slot);
@@ -270,17 +216,9 @@ function WeeklyTimetable({
                         <div
                           key={slot.start}
                           className={`relative h-16 border-b border-gray-200 cursor-pointer transition-colors ${
-                            isAvailable
-                              ? "bg-green-100 hover:bg-green-200"
-                              : "bg-gray-100"
+                            isAvailable ? "bg-green-100 hover:bg-green-200" : "bg-gray-100"
                           }`}
-                          onClick={() =>
-                            isAvailable &&
-                            onClickTimeTableSlot(
-                              moment(date).format("YYYY-MM-DD"),
-                              slot
-                            )
-                          }
+                          onClick={() => isAvailable && onClickTimeTableSlot(moment(date).format("YYYY-MM-DD"), slot)}
                         />
                       );
                     })}
@@ -289,24 +227,22 @@ function WeeklyTimetable({
                     {occupants
                       .filter((o) => {
                         const scheduledDate = new Date(o.scheduledDate as any);
-                        return (
-                          scheduledDate.toDateString() === date.toDateString()
-                        );
+                        return scheduledDate.toDateString() === date.toDateString();
                       })
                       .map((occupant) => {
-                        const startMins =
-                          parseInt(occupant.startTime.split(":")[0]) * 60 +
-                          parseInt(occupant.startTime.split(":")[1]);
-                        const endMins =
-                          parseInt(occupant.endTime.split(":")[0]) * 60 +
-                          parseInt(occupant.endTime.split(":")[1]);
+                        const startMins = parseInt(occupant.startTime.split(":")[0]) * 60 + parseInt(occupant.startTime.split(":")[1]);
+                        const endMins = parseInt(occupant.endTime.split(":")[0]) * 60 + parseInt(occupant.endTime.split(":")[1]);
                         const dayStartMins = startHour * 60;
 
-                        const top =
-                          ((startMins - dayStartMins) / slotInterval) *
-                          slotHeight;
-                        const height =
-                          ((endMins - startMins) / slotInterval) * slotHeight;
+                        const top = ((startMins - dayStartMins) / slotInterval) * slotHeight;
+                        const height = ((endMins - startMins) / slotInterval) * slotHeight;
+
+                        const isEditable = occupant.isEditable === "true" || occupant.isEditable === true;
+                        const bgColor = isEditable ? "bg-blue-100" : "bg-yellow-100";
+                        const borderColor = isEditable ? "border-blue-300" : "border-yellow-300";
+                        const hoverColor = isEditable ? "hover:bg-blue-200" : "hover:bg-yellow-200";
+                        const textColor = isEditable ? "text-blue-800" : "text-yellow-800";
+                        const subTextColor = isEditable ? "text-blue-600" : "text-yellow-600";
 
                         return (
                           <div
@@ -315,16 +251,46 @@ function WeeklyTimetable({
                               e.stopPropagation();
                               setSelectedOccupant(occupant);
                             }}
-                            className="absolute left-1 right-1 bg-blue-100 border border-blue-300 rounded-md px-2 py-1 text-xs cursor-pointer hover:bg-blue-200 transition-colors shadow-sm"
+                            className={`absolute left-1 right-1 ${bgColor} border ${borderColor} rounded-md px-2 py-1 text-xs cursor-pointer ${hoverColor} transition-colors shadow-sm`}
                             style={{ top, height }}
                           >
-                            <div className="font-medium text-blue-800 truncate">
-                              {occupant.occupantName}
+                            <div className={`font-medium ${textColor} truncate`}>{occupant.occupantName}</div>
+                            <div className={`${subTextColor} text-[11px] truncate`}>
+                              {occupant.type} • {`${occupant.startTime}`} -{`${occupant.endTime}`}
                             </div>
-                            <div className="text-blue-600 text-[11px] truncate">
-                              {occupant.type} • {`${occupant.startTime}`} -
-                              {`${occupant.endTime}`}
+                          </div>
+                        );
+                      })}
+
+                    {/* Maintenance slots floating */}
+                    {maintenanceData
+                      .filter((maintenance) => {
+                        const maintenanceDate = new Date(maintenance.maintanceDate);
+                        return maintenanceDate.toDateString() === date.toDateString() && maintenance.isMainteneceActive;
+                      })
+                      .map((maintenance) => {
+                        // Parse time from the API format (e.g., "0001-01-02T09:00:00Z")
+                        const startTimeStr = maintenance.startTime.split("T")[1]?.split("Z")[0] || "09:00:00";
+                        const endTimeStr = maintenance.endTime.split("T")[1]?.split("Z")[0] || "10:30:00";
+
+                        const startMins = parseInt(startTimeStr.split(":")[0]) * 60 + parseInt(startTimeStr.split(":")[1]);
+                        const endMins = parseInt(endTimeStr.split(":")[0]) * 60 + parseInt(endTimeStr.split(":")[1]);
+                        const dayStartMins = startHour * 60;
+
+                        const top = ((startMins - dayStartMins) / slotInterval) * slotHeight;
+                        const height = ((endMins - startMins) / slotInterval) * slotHeight;
+
+                        return (
+                          <div
+                            key={`maintenance-${maintenance.id}`}
+                            className="absolute left-1 right-1 bg-red-100 border border-red-300 rounded-md px-2 py-1 text-xs shadow-sm"
+                            style={{ top, height }}
+                          >
+                            <div className="font-medium text-red-800 truncate">🔧 Maintenance</div>
+                            <div className="text-red-600 text-[11px] truncate">
+                              {maintenance.maintainenceType || "Scheduled"} • {startTimeStr.substring(0, 5)} - {endTimeStr.substring(0, 5)}
                             </div>
+                            {maintenance.description && <div className="text-red-500 text-[10px] truncate mt-1">{maintenance.description}</div>}
                           </div>
                         );
                       })}

@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Building, Occupant, RoomInfo, SpaceAllocation } from "@/types";
+import { Building, Occupant, RoomInfo, SpaceAllocation, Maintenance } from "@/types";
 import { BuildingSVG } from "@/components/BuildingSvg";
 import { callApi } from "@/utils/apiIntercepter";
 import { URL_NOT_FOUND } from "@/constants";
@@ -36,6 +36,7 @@ function RoomPage() {
   } | null>(null);
   const [allBuildingsData, setAllBuildingsData] = useState<Building[]>([]);
   const [selectedWeekStart, setSelectedWeekStart] = useState(() => moment().startOf("isoWeek").toDate());
+  const [maintenanceData, setMaintenanceData] = useState<Maintenance[]>([]);
 
   const MAX_WEEKLY_MINUTES = 63 * 60; // adjustable max weekly minutes
 
@@ -85,6 +86,23 @@ function RoomPage() {
       fetchRoomInfo();
     }
   }, [acadmeicYear, acadmeicSession, academicSessionStartDate, academicSessionEndDate]);
+
+  /** Fetch maintenance data */
+  const fetchMaintenanceData = async () => {
+    if (!buildingId || !roomId) return;
+    try {
+      const response = await callApi<Maintenance[]>(process.env.NEXT_PUBLIC_GET_MAINTENANCE_DATA || URL_NOT_FOUND);
+      if (response.success) {
+        setMaintenanceData(response.data || []);
+      }
+    } catch (error) {
+      console.error("Error fetching maintenance data:", error);
+    }
+  };
+
+  useEffect(() => {
+    fetchMaintenanceData();
+  }, []);
 
   /** Handle timetable slot click */
   const handleTimeTableClick = (date: string, slot: { start: string; end: string }) => {
@@ -270,9 +288,14 @@ function RoomPage() {
                     refreshData={() => fetchRoomInfo()}
                     setStartDate={(date) => {
                       setStartDate(date);
-                      setSelectedWeekStart(moment(date as Date).startOf("isoWeek").toDate());
+                      setSelectedWeekStart(
+                        moment(date as Date)
+                          .startOf("isoWeek")
+                          .toDate()
+                      );
                     }}
                     occupants={roomInfo.occupants || []}
+                    maintenanceData={maintenanceData}
                     academicSessionStartDate={academicSessionStartDate || ""}
                     academicSessionEndDate={academicSessionEndDate || ""}
                     onClickTimeTableSlot={handleTimeTableClick}
@@ -294,7 +317,6 @@ function RoomPage() {
           initialEndTime={selectedSlot?.end}
         />
       )}
-
     </>
   ) : (
     <div>Room Info Not Found</div>
