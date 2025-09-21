@@ -818,7 +818,7 @@ async function createBigXLS(filePath: string, jsonObject: any) {
   // - Sending notification to admin
   // - Creating a fallback error report
 }
-
+}
 async function insertFileInfo(filePath: string, jsonObject: any) {
   try {
     const fileName = path.basename(filePath);
@@ -891,4 +891,4 @@ type FacultyRow = {
   cabinNo: string;
   occupancy: string;
   keyNo: string;
-};
+}
