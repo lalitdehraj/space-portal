@@ -20,6 +20,33 @@ export function formatDate(dateString: Date | string) {
   return `${day}/${month}/${year} ${formattedHours}:${minutes}${ampm}`;
 }
 
+export function formatDateOnly(dateString: Date | string) {
+  const date = dateString instanceof Date ? dateString : new Date(dateString);
+
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const year = String(date.getFullYear()).slice(-2);
+
+  return `${day}/${month}/${year}`;
+}
+
+export function formatFileSize(bytes: string | number): string {
+  const size = typeof bytes === "string" ? parseInt(bytes, 10) : bytes;
+
+  if (isNaN(size) || size === 0) return "0 B";
+
+  const units = ["B", "KB", "MB", "GB"];
+  let unitIndex = 0;
+  let fileSize = size;
+
+  while (fileSize >= 1024 && unitIndex < units.length - 1) {
+    fileSize /= 1024;
+    unitIndex++;
+  }
+
+  return `${fileSize.toFixed(unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
+}
+
 export function compareDates(dateA: Date, dateB: Date) {
   if (!(dateA instanceof Date) || !(dateB instanceof Date)) {
     console.error("Invalid input: Both arguments must be Date objects.");
@@ -118,9 +145,7 @@ export function createDateFromDDMMYYYY(dateString: string): Date | null {
 
   // Basic validation to ensure the parts are valid numbers
   if (isNaN(day) || isNaN(month) || isNaN(year)) {
-    console.error(
-      "Invalid date components. Make sure day, month, and year are numbers."
-    );
+    console.error("Invalid date components. Make sure day, month, and year are numbers.");
     return null;
   }
 
@@ -131,10 +156,7 @@ export function createDateFromDDMMYYYY(dateString: string): Date | null {
   return date;
 }
 
-export function getTimeDifference(
-  startTime: string,
-  endTime: string
-): { hours: number; minutes: number; seconds: number } | null {
+export function getTimeDifference(startTime: string, endTime: string): { hours: number; minutes: number; seconds: number } | null {
   if (!startTime && !endTime) return null;
   // Regex to validate the time format 'HH:mm:ss'
   const timeRegex = /^(?:2[0-3]|[01]?[0-9]):[0-5]?[0-9]:[0-5]?[0-9]$/;
@@ -145,9 +167,7 @@ export function getTimeDifference(
   }
 
   // Create Date objects from the time strings on an arbitrary day (e.g., Jan 1, 1970)
-  const [startHour, startMinute, startSecond] = startTime
-    .split(":")
-    .map(Number);
+  const [startHour, startMinute, startSecond] = startTime.split(":").map(Number);
   const [endHour, endMinute, endSecond] = endTime.split(":").map(Number);
 
   const startDate = new Date();

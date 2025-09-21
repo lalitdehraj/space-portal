@@ -2,22 +2,11 @@
 import React, { useEffect, useState } from "react";
 import Pagination from "@/components/PageNumberIndicator";
 import { callApi } from "@/utils/apiIntercepter";
-import { URL_NOT_FOUND } from "@/constants";
+import { URL_NOT_FOUND, GET_UTILIZATION_REPORT_API } from "@/constants";
 import { useSelector } from "react-redux";
-import {
-  Building,
-  Report,
-  AcademicSession,
-  AcademicYear,
-  Room,
-  Department,
-  Faculty,
-} from "@/types";
-import { formatDate } from "@/utils";
-import {
-  AcademicYearResponse,
-  AcademicSessionResponse,
-} from "@/components/Header";
+import { Building, Report, AcademicSession, AcademicYear, Room, Department, Faculty } from "@/types";
+import { formatDate, formatDateOnly, formatFileSize } from "@/utils";
+import { AcademicYearResponse, AcademicSessionResponse } from "@/components/Header";
 import moment from "moment";
 
 /**
@@ -39,8 +28,8 @@ type ReportsResponse = {
 const tableHeadersList: { [key: string]: keyof Report } = {
   "Serial No.": "id",
   Name: "fileName",
-  "Created on": "createdAt",
-  Size: "size",
+  "Created on": "fileCreatedOn",
+  Size: "fileSize",
   "Start Date": "startDate",
   "End Date": "endDate",
   Download: "id",
@@ -69,6 +58,7 @@ const parseSizeToBytes = (sizeString?: string): number => {
 };
 
 function sortData(data: Report[], key: keyof Report, sortOrder: sortingTypes) {
+  if (!data || !Array.isArray(data)) return [];
   if (sortOrder === "") return data;
   return [...data].sort((a, b) => {
     let valueA: any = a[key];
@@ -78,7 +68,7 @@ function sortData(data: Report[], key: keyof Report, sortOrder: sortingTypes) {
     if (valueB === null || valueB === undefined) valueB = "";
 
     let comparison = 0;
-    if (key === "size") {
+    if (key === "fileSize") {
       const bytesA = parseSizeToBytes(valueA as string);
       const bytesB = parseSizeToBytes(valueB as string);
       comparison = bytesA - bytesB;
@@ -144,12 +134,8 @@ export default function UtilizationReport() {
   }, [polling, jobId]);
 
   const [curruntPage, setCurruntPage] = useState(1);
-  const acadmeicYear = useSelector(
-    (state: any) => state.dataState.academicYear
-  );
-  const acadmeicSession = useSelector(
-    (state: any) => state.dataState.academicSession
-  );
+  const acadmeicYear = useSelector((state: any) => state.dataState.academicYear);
+  const acadmeicSession = useSelector((state: any) => state.dataState.academicSession);
   const [sortState, setSortState] = useState<sortingTypes>("");
   const [activeHeader, setActiveHeader] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -159,6 +145,7 @@ export default function UtilizationReport() {
   const [pageSize, setPageSize] = useState("10");
 
   function filterData(data: Report[], searchQuery: string) {
+    if (!data || !Array.isArray(data)) return [];
     if (!searchQuery) return data;
     const filteredBySearch = data.filter((item) => {
       const searchableKeys = Object.values(tableHeadersList);
@@ -175,14 +162,19 @@ export default function UtilizationReport() {
   }
 
   useEffect(() => {
-    const filtered = filterData(reportsList, searchQuery);
-    const sorted = sortData(
-      filtered,
-      (activeHeader as keyof Report) || ("id" as keyof Report),
-      sortState
-    );
-    setFilteredList(sorted);
+    console.log("Processing reportsList:", reportsList);
+    console.log("ReportsList length:", reportsList?.length);
+    const filtered = filterData(reportsList || [], searchQuery);
+    console.log("Filtered data:", filtered);
+    const sorted = sortData(filtered, (activeHeader as keyof Report) || ("id" as keyof Report), sortState);
+    console.log("Sorted data:", sorted);
+    setFilteredList(sorted || []);
   }, [reportsList, activeHeader, sortState, searchQuery]);
+
+  // Debug render state
+  useEffect(() => {
+    console.log("Render state - isLoadingReports:", isLoadingReports, "filteredList:", filteredList, "filteredList.length:", filteredList?.length);
+  }, [isLoadingReports, filteredList]);
 
   const [generateReportVisible, setGenerateReportVisible] = useState(false);
   const [totalPages, setTotalPages] = useState(0);
@@ -191,30 +183,24 @@ export default function UtilizationReport() {
     const fetchReports = async () => {
       setIsLoadingReports(true);
       try {
-        const requestBody = {
-          limit: pageSize,
-          offset: curruntPage,
-          acadmeicSession: acadmeicSession,
-          acadmeicYear: acadmeicYear,
-        };
-        let response = await callApi<ReportsResponse>(
-          `${process.env.NEXT_PUBLIC_GET_REPORTS}` || URL_NOT_FOUND,
-          requestBody
-        );
-        let res = response;
-        setTotalPages(res.data?.totalPages || 0);
+        const response = await callApi<Report[]>(GET_UTILIZATION_REPORT_API);
+        console.log("API Response:", response);
 
-        // keep current page in sync with server response if provided
-        setCurruntPage(res.data?.currentPage || curruntPage);
-        setReportsList(res.data?.reports || []);
+        if (response.success && response.data) {
+          setReportsList(response.data);
+          setTotalPages(1); // Since the API doesn't provide pagination info, set to 1
+        } else {
+          console.warn("API response not successful:", response);
+          setReportsList([]);
+        }
       } catch (error) {
         console.error("Error fetching reports:", error);
+        setReportsList([]);
       } finally {
         setIsLoadingReports(false);
       }
     };
     fetchReports();
-    // We intentionally include curruntPage so pagination works
   }, [acadmeicYear, acadmeicSession, pageSize, curruntPage]);
 
   // Improved sorting toggle behavior:
@@ -246,26 +232,12 @@ export default function UtilizationReport() {
     <>
       <div>
         <div className="flex flex-col md:flex-row justify-between">
-          <h2 className="text-base font-semibold text-gray-800 md:ml-2">
-            Overall Reports
-          </h2>
+          <h2 className="text-base font-semibold text-gray-800 md:ml-2">Overall Reports</h2>
           <div className="flex items-center space-x-4">
             {polling && (
               <div className="flex items-center text-sm text-orange-600">
-                <svg
-                  className="animate-spin -ml-1 mr-2 h-4 w-4 text-orange-600"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  ></circle>
+                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-orange-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                   <path
                     className="opacity-75"
                     fill="currentColor"
@@ -304,19 +276,13 @@ export default function UtilizationReport() {
                         header === "Name" ? "w-full" : ""
                       }`}
                     >
-                      <div
-                        className="flex items-center"
-                        onClick={() => handleSort(header, "asc")}
-                      >
+                      <div className="flex items-center" onClick={() => handleSort(header, "asc")}>
                         {header}
                         {header != "Serial No." && header != "Download" && (
                           <span className="ml-2 flex-none rounded text-gray-400 group-hover:visible invisible">
                             <svg
                               className={`h-5 w-5 ${
-                                activeHeader === tableHeadersList[header] &&
-                                sortState === "asc"
-                                  ? "fill-orange-400 visible"
-                                  : "fill-gray-400"
+                                activeHeader === tableHeadersList[header] && sortState === "asc" ? "fill-orange-400 visible" : "fill-gray-400"
                               } `}
                               aria-hidden="true"
                               name="asc"
@@ -330,10 +296,7 @@ export default function UtilizationReport() {
                             </svg>
                             <svg
                               className={`mt-1 h-5 w-5 ${
-                                activeHeader === tableHeadersList[header] &&
-                                sortState === "desc"
-                                  ? "fill-orange-400 visible"
-                                  : "fill-gray-400"
+                                activeHeader === tableHeadersList[header] && sortState === "desc" ? "fill-orange-400 visible" : "fill-gray-400"
                               } `}
                               aria-hidden="true"
                               name="desc"
@@ -357,20 +320,8 @@ export default function UtilizationReport() {
                   <tr>
                     <td colSpan={Object.keys(tableHeadersList).length + 1}>
                       <div className="flex justify-center items-center h-32">
-                        <svg
-                          className="animate-spin h-12 w-12 text-orange-500"
-                          xmlns="http://www.w3.org/2000/svg"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                        >
-                          <circle
-                            className="opacity-25"
-                            cx="12"
-                            cy="12"
-                            r="10"
-                            stroke="currentColor"
-                            strokeWidth="4"
-                          ></circle>
+                        <svg className="animate-spin h-12 w-12 text-orange-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                           <path
                             className="opacity-75"
                             fill="currentColor"
@@ -383,32 +334,18 @@ export default function UtilizationReport() {
                 ) : filteredList.length === 0 ? (
                   <tr>
                     <td colSpan={Object.keys(tableHeadersList).length + 1}>
-                      <div className="flex justify-center items-center h-32 text-gray-500">
-                        No reports found.
-                      </div>
+                      <div className="flex justify-center items-center h-32 text-gray-500">No reports found.</div>
                     </td>
                   </tr>
                 ) : (
-                  filteredList.map((report, index) => (
+                  (filteredList || []).map((report, index) => (
                     <tr key={report.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                        {index + 1}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                        {report.fileName}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                        {formatDate(report.createdAt)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                        {report.size}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                        {report.startDate}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                        {report.endDate}
-                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{index + 1}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{report.fileName}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{formatDateOnly(report.fileCreatedOn)}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{formatFileSize(report.fileSize)}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{formatDateOnly(report.startDate)}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{formatDateOnly(report.endDate)}</td>
                       <td
                         className="px-6 py-4 whitespace-nowrap text-sm text-indigo-400 cursor-pointer hover:text-indigo-700"
                         onClick={() => {
@@ -435,13 +372,7 @@ export default function UtilizationReport() {
             </div>
             <div className="mt-2 text-gray-600 flex items-center mr-6">
               <span className="text-sm text-nowrap mr-2">Rows per page:</span>
-              <select
-                onChange={(e) => setPageSize(e.target.value)}
-                className="border rounded border-gray-300 p-1"
-                name="rowscount"
-                id="rows"
-                value={pageSize}
-              >
+              <select onChange={(e) => setPageSize(e.target.value)} className="border rounded border-gray-300 p-1" name="rowscount" id="rows" value={pageSize}>
                 <option value="10">10</option>
                 <option value="20">20</option>
                 <option value="30">30</option>
@@ -486,8 +417,7 @@ function GenerateReportForm({ onClosePressed, startJob, setJobId, setReady, setP
   const [rooms, setRooms] = useState<Room[]>([]);
   const [reportType, setReportType] = useState("room");
   const [academicYearsList, setAcademicYearsList] = useState<AcademicYear[]>();
-  const [academicSessionsList, setAcademicSessionsList] =
-    useState<AcademicSession[]>();
+  const [academicSessionsList, setAcademicSessionsList] = useState<AcademicSession[]>();
   const [selectedYear, setSelectedYear] = useState("");
   const [selectedSession, setSelectedSession] = useState("");
   const [customStartDate, setCustomStartDate] = useState("");
@@ -495,12 +425,8 @@ function GenerateReportForm({ onClosePressed, startJob, setJobId, setReady, setP
   const [isGenerateDisabled, setIsGenerateDisabled] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string>("");
-  const acadmeicYear = useSelector(
-    (state: any) => state.dataState.selectedAcademicYear
-  );
-  const acadmeicSession = useSelector(
-    (state: any) => state.dataState.selectedAcademicSession
-  );
+  const acadmeicYear = useSelector((state: any) => state.dataState.selectedAcademicYear);
+  const acadmeicSession = useSelector((state: any) => state.dataState.selectedAcademicSession);
 
   const [departments, setDepartments] = useState<Department[]>([]);
   const [faculties, setFaculties] = useState<Faculty[]>([]);
@@ -508,17 +434,13 @@ function GenerateReportForm({ onClosePressed, startJob, setJobId, setReady, setP
   useEffect(() => {
     const getAcadmicCalender = async () => {
       try {
-        const responseYear = await callApi<AcademicYearResponse>(
-          process.env.NEXT_PUBLIC_GET_ACADMIC_YEARS || URL_NOT_FOUND
-        );
+        const responseYear = await callApi<AcademicYearResponse>(process.env.NEXT_PUBLIC_GET_ACADMIC_YEARS || URL_NOT_FOUND);
         if (responseYear.success) {
           const acadYearsList = responseYear.data?.["Academic Year"]?.reverse();
           setAcademicYearsList(acadYearsList);
         }
 
-        let responseSession = await callApi<AcademicSessionResponse>(
-          process.env.NEXT_PUBLIC_GET_ACADMIC_SESSIONS || URL_NOT_FOUND
-        );
+        let responseSession = await callApi<AcademicSessionResponse>(process.env.NEXT_PUBLIC_GET_ACADMIC_SESSIONS || URL_NOT_FOUND);
 
         if (responseSession.success) {
           setAcademicSessionsList(responseSession.data?.["Academic Session"]);
@@ -538,10 +460,7 @@ function GenerateReportForm({ onClosePressed, startJob, setJobId, setReady, setP
           acadYear: `${acadmeicYear}`,
         };
 
-        const response = await callApi<Building[]>(
-          process.env.NEXT_PUBLIC_GET_BUILDING_LIST || URL_NOT_FOUND,
-          reqBody
-        );
+        const response = await callApi<Building[]>(process.env.NEXT_PUBLIC_GET_BUILDING_LIST || URL_NOT_FOUND, reqBody);
         if (response.success) {
           setBuildings(response.data || []);
         }
@@ -557,12 +476,9 @@ function GenerateReportForm({ onClosePressed, startJob, setJobId, setReady, setP
     if (!reportType) return;
     if (reportType === "department") {
       const fetchDepartments = async () => {
-        const response = await callApi<Department[]>(
-          process.env.NEXT_PUBLIC_GET_FACULTY_OR_DEPARTMENT || URL_NOT_FOUND,
-          {
-            filterValue: reportType.toUpperCase().trim(),
-          }
-        );
+        const response = await callApi<Department[]>(process.env.NEXT_PUBLIC_GET_FACULTY_OR_DEPARTMENT || URL_NOT_FOUND, {
+          filterValue: reportType.toUpperCase().trim(),
+        });
         if (response.success && response.data) {
           setDepartments(response.data);
         }
@@ -570,12 +486,9 @@ function GenerateReportForm({ onClosePressed, startJob, setJobId, setReady, setP
       fetchDepartments();
     } else {
       const fetchFaculties = async () => {
-        const response = await callApi<Faculty[]>(
-          process.env.NEXT_PUBLIC_GET_FACULTY_OR_DEPARTMENT || URL_NOT_FOUND,
-          {
-            filterValue: reportType.toUpperCase().trim(),
-          }
-        );
+        const response = await callApi<Faculty[]>(process.env.NEXT_PUBLIC_GET_FACULTY_OR_DEPARTMENT || URL_NOT_FOUND, {
+          filterValue: reportType.toUpperCase().trim(),
+        });
         if (response.success && response.data) {
           setFaculties(response.data);
         }
@@ -586,8 +499,8 @@ function GenerateReportForm({ onClosePressed, startJob, setJobId, setReady, setP
 
   useEffect(() => {
     if (timePeriod === "thisWeek") {
-      const startOfWeek = moment().startOf('isoWeek'); // Monday
-      const endOfWeek = moment().endOf('isoWeek'); // Sunday
+      const startOfWeek = moment().startOf("isoWeek"); // Monday
+      const endOfWeek = moment().endOf("isoWeek"); // Sunday
       setCustomStartDate(startOfWeek.format("YYYY-MM-DD"));
       setCustomEndDate(endOfWeek.format("YYYY-MM-DD"));
     } else if (timePeriod === "last30") {
@@ -620,10 +533,7 @@ function GenerateReportForm({ onClosePressed, startJob, setJobId, setReady, setP
 
     if (reportType === "building" && !selectedBuildingId) {
       isValid = false;
-    } else if (
-      reportType === "room" &&
-      (!selectedBuildingId || !selectedRoomId)
-    ) {
+    } else if (reportType === "room" && (!selectedBuildingId || !selectedRoomId)) {
       isValid = false;
     } else if (reportType === "department" && !selectedDepartment) {
       isValid = false;
@@ -639,15 +549,7 @@ function GenerateReportForm({ onClosePressed, startJob, setJobId, setReady, setP
     }
 
     setIsGenerateDisabled(!isValid);
-  }, [
-    reportType,
-    selectedBuildingId,
-    selectedRoomId,
-    selectedFloorId,
-    timePeriod,
-    customStartDate,
-    customEndDate,
-  ]);
+  }, [reportType, selectedBuildingId, selectedRoomId, selectedFloorId, timePeriod, customStartDate, customEndDate]);
 
   useEffect(() => {
     const fetchRoomsForBuilding = async (buildingId: string) => {
@@ -663,10 +565,7 @@ function GenerateReportForm({ onClosePressed, startJob, setJobId, setReady, setP
           floorID: `${selectedFloorId}`,
           curreentTime: moment().format("HH:mm"),
         };
-        const response = await callApi<Room[]>(
-          process.env.NEXT_PUBLIC_GET_ROOMS_LIST || URL_NOT_FOUND,
-          reqBody
-        );
+        const response = await callApi<Room[]>(process.env.NEXT_PUBLIC_GET_ROOMS_LIST || URL_NOT_FOUND, reqBody);
         if (response && response.success) setRooms(response.data || []);
         else setRooms([]);
       } catch (err) {
@@ -682,13 +581,7 @@ function GenerateReportForm({ onClosePressed, startJob, setJobId, setReady, setP
       setRooms([]);
       setSelectedRoomId("");
     }
-  }, [
-    selectedBuildingId,
-    acadmeicSession,
-    acadmeicYear,
-    buildings,
-    selectedFloorId,
-  ]);
+  }, [selectedBuildingId, acadmeicSession, acadmeicYear, buildings, selectedFloorId]);
 
   useEffect(() => {
     setSelectedBuildingId("");
@@ -710,16 +603,12 @@ function GenerateReportForm({ onClosePressed, startJob, setJobId, setReady, setP
       let endDate = customEndDate;
 
       if (timePeriod === "thisWeek") {
-        startDate = moment().startOf('isoWeek').format("YYYY-MM-DD"); // Monday
-        endDate = moment().endOf('isoWeek').format("YYYY-MM-DD"); // Sunday
+        startDate = moment().startOf("isoWeek").format("YYYY-MM-DD"); // Monday
+        endDate = moment().endOf("isoWeek").format("YYYY-MM-DD"); // Sunday
       } else if (timePeriod === "last30") {
         startDate = moment().subtract(29, "day").format("YYYY-MM-DD");
         endDate = moment().format("YYYY-MM-DD");
-      } else if (
-        timePeriod === "active" ||
-        timePeriod === "year" ||
-        timePeriod === "session"
-      ) {
+      } else if (timePeriod === "active" || timePeriod === "year" || timePeriod === "session") {
         startDate = "";
         endDate = "";
       }
@@ -778,22 +667,14 @@ function GenerateReportForm({ onClosePressed, startJob, setJobId, setReady, setP
       <div className="relative w-full max-w-3xl bg-white rounded-xl shadow-2xl p-6 transform transition-all duration-300 ease-in-out scale-95 md:scale-100">
         <div className="max-h-[80vh] bg-white pr-2">
           <div className="flex justify-between items-center">
-            <span className="text-gray-900 font-[550] text-sm">
-              Generate Report
-            </span>
+            <span className="text-gray-900 font-[550] text-sm">Generate Report</span>
           </div>
 
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">
-              {error}
-            </div>
-          )}
+          {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">{error}</div>}
           <div className="border-t-2 border-gray-200 mt-2 pt-2 space-y-2">
             <div className="flex flex-col md:flex-row md:space-x-4">
               <div className="w-full">
-                <label className="block text-sm text-gray-700 mb-1">
-                  Report type
-                </label>
+                <label className="block text-sm text-gray-700 mb-1">Report type</label>
                 <select
                   className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
                   value={reportType}
@@ -811,9 +692,7 @@ function GenerateReportForm({ onClosePressed, startJob, setJobId, setReady, setP
             {(reportType === "room" || reportType === "building") && (
               <div className="flex flex-col md:flex-row md:space-x-4">
                 <div className="w-full">
-                  <label className="block text-sm text-gray-700 mb-1">
-                    Building
-                  </label>
+                  <label className="block text-sm text-gray-700 mb-1">Building</label>
                   <select
                     className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
                     value={selectedBuildingId}
@@ -832,9 +711,7 @@ function GenerateReportForm({ onClosePressed, startJob, setJobId, setReady, setP
             {reportType === "room" && (
               <div className="flex flex-col md:flex-row md:space-x-4">
                 <div className="md:w-1/2 w-full mt-4 md:mt-0">
-                  <label className="block text-sm text-gray-700 mb-1">
-                    Floor
-                  </label>
+                  <label className="block text-sm text-gray-700 mb-1">Floor</label>
                   <select
                     className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
                     value={selectedFloorId}
@@ -842,8 +719,7 @@ function GenerateReportForm({ onClosePressed, startJob, setJobId, setReady, setP
                     disabled={!selectedBuildingId}
                   >
                     <option value="">Select floor</option>
-                    {buildings.filter((b) => b.id === selectedBuildingId)
-                      .length > 0
+                    {buildings.filter((b) => b.id === selectedBuildingId).length > 0
                       ? buildings
                           .filter((b) => b.id === selectedBuildingId)[0]
                           .floors.map((f) => (
@@ -855,9 +731,7 @@ function GenerateReportForm({ onClosePressed, startJob, setJobId, setReady, setP
                   </select>
                 </div>
                 <div className="md:w-1/2 w-full mt-4 md:mt-0">
-                  <label className="block text-sm text-gray-700 mb-1">
-                    Room
-                  </label>
+                  <label className="block text-sm text-gray-700 mb-1">Room</label>
                   <select
                     className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
                     value={selectedRoomId}
@@ -878,9 +752,7 @@ function GenerateReportForm({ onClosePressed, startJob, setJobId, setReady, setP
               <div className="flex flex-col md:flex-row md:space-x-4">
                 {reportType === "department" && (
                   <div className="w-full mt-4 md:mt-0">
-                    <label className="block text-sm text-gray-700 mb-1">
-                      Department
-                    </label>
+                    <label className="block text-sm text-gray-700 mb-1">Department</label>
                     <select
                       className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
                       value={selectedDepartment}
@@ -899,9 +771,7 @@ function GenerateReportForm({ onClosePressed, startJob, setJobId, setReady, setP
                 )}
                 {reportType === "faculty" && (
                   <div className="w-full mt-4 md:mt-0">
-                    <label className="block text-sm text-gray-700 mb-1">
-                      Faculty
-                    </label>
+                    <label className="block text-sm text-gray-700 mb-1">Faculty</label>
                     <select
                       className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
                       value={selectedFaculty}
@@ -921,9 +791,7 @@ function GenerateReportForm({ onClosePressed, startJob, setJobId, setReady, setP
             {timePeriod !== "custom" ? (
               <div className="flex flex-col md:flex-row md:space-x-4">
                 <div className="md:w-1/2 w-full">
-                  <label className="block text-sm text-gray-700 mb-1">
-                    Period
-                  </label>
+                  <label className="block text-sm text-gray-700 mb-1">Period</label>
                   <select
                     className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
                     value={timePeriod}
@@ -940,9 +808,7 @@ function GenerateReportForm({ onClosePressed, startJob, setJobId, setReady, setP
                 </div>
                 {timePeriod === "year" && (
                   <div className="md:w-1/2 w-full mt-4 md:mt-0">
-                    <label className="block text-sm text-gray-700 mb-1">
-                      Year
-                    </label>
+                    <label className="block text-sm text-gray-700 mb-1">Year</label>
                     <select
                       className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
                       value={selectedYear}
@@ -959,9 +825,7 @@ function GenerateReportForm({ onClosePressed, startJob, setJobId, setReady, setP
                 )}
                 {timePeriod === "session" && (
                   <div className="md:w-1/2 w-full mt-4 md:mt-0">
-                    <label className="block text-sm text-gray-700 mb-1">
-                      Session
-                    </label>
+                    <label className="block text-sm text-gray-700 mb-1">Session</label>
                     <select
                       className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
                       value={selectedSession}
@@ -980,9 +844,7 @@ function GenerateReportForm({ onClosePressed, startJob, setJobId, setReady, setP
             ) : (
               <div className="flex flex-col md:flex-row md:space-x-4">
                 <div className="md:w-1/2 w-full">
-                  <label className="block text-sm text-gray-700 mb-1">
-                    Start Date
-                  </label>
+                  <label className="block text-sm text-gray-700 mb-1">Start Date</label>
                   <input
                     type="date"
                     className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
@@ -991,9 +853,7 @@ function GenerateReportForm({ onClosePressed, startJob, setJobId, setReady, setP
                   />
                 </div>
                 <div className="md:w-1/2 w-full mt-4 md:mt-0">
-                  <label className="block text-sm text-gray-700 mb-1">
-                    End Date
-                  </label>
+                  <label className="block text-sm text-gray-700 mb-1">End Date</label>
                   <input
                     type="date"
                     className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
@@ -1028,29 +888,15 @@ function GenerateReportForm({ onClosePressed, startJob, setJobId, setReady, setP
             <button
               type="button"
               className={`px-3 py-2 rounded-lg shadow-md transition duration-300 ${
-                isGenerateDisabled || isGenerating
-                  ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                  : "bg-orange-500 text-white hover:bg-orange-600"
+                isGenerateDisabled || isGenerating ? "bg-gray-300 text-gray-500 cursor-not-allowed" : "bg-orange-500 text-white hover:bg-orange-600"
               }`}
               onClick={handleSubmit}
               disabled={isGenerateDisabled || isGenerating}
             >
               {isGenerating ? (
                 <div className="flex items-center">
-                  <svg
-                    className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                  >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    ></circle>
+                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path
                       className="opacity-75"
                       fill="currentColor"

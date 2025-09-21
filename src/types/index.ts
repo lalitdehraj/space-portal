@@ -148,13 +148,16 @@ export interface RoomRequest {
 }
 
 export interface Report {
-  id: string;
-  fileUrl: string;
+  id: number;
   fileName: string;
-  createdAt: string;
-  size: string;
+  fileCreatedOn: string;
   startDate: string;
   endDate: string;
+  filePath: string;
+  baseOfReport: string;
+  fileSize: string;
+  isActiveSession: boolean;
+  reportType: string;
 }
 
 export interface Department {
