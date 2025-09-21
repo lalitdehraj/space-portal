@@ -4,7 +4,7 @@ import path from "path";
 import ExcelJS from "exceljs";
 import { callApi } from "@/utils/apiIntercepter";
 import { Building, Program, Occupant, Room, RoomInfo, Allocation, Department, Faculty, Employee } from "@/types";
-import { URL_NOT_FOUND } from "@/constants";
+import { URL_NOT_FOUND, INSERT_ALLOCATION_UTILIZATION_REPORT_API } from "@/constants";
 import { getRoomOccupancyByWeekday, getVacantSlotsByWeekday } from "./helperFunction";
 import moment from "moment";
 
@@ -503,6 +503,9 @@ async function createBigXLS(filePath: string, jsonObject: any) {
     }
     
     await workbook.xlsx.writeFile(filePath);
+    
+    // Insert file information into database after successful creation
+    await insertFileInfo(filePath, jsonObject);
   }
 
     if (jsonObject.reportType === "building") {
@@ -601,6 +604,9 @@ async function createBigXLS(filePath: string, jsonObject: any) {
     }
 
     await workbook.xlsx.writeFile(filePath);
+    
+    // Insert file information into database after successful creation
+    await insertFileInfo(filePath, jsonObject);
   }
 
     if (jsonObject.reportType === "department") {
@@ -699,6 +705,9 @@ async function createBigXLS(filePath: string, jsonObject: any) {
     }
 
     await workbook.xlsx.writeFile(filePath);
+    
+    // Insert file information into database after successful creation
+    await insertFileInfo(filePath, jsonObject);
   }
 
     if (jsonObject.reportType === "faculty") {
@@ -798,13 +807,45 @@ async function createBigXLS(filePath: string, jsonObject: any) {
     }
 
     await workbook.xlsx.writeFile(filePath);
+    
+    // Insert file information into database after successful creation
+    await insertFileInfo(filePath, jsonObject);
   }
 } catch (error) {
-    console.error("Error creating Excel file:", error);
-    // You could add additional error handling here, such as:
-    // - Writing error to a log file
-    // - Sending notification to admin
-    // - Creating a fallback error report
+  console.error("Error creating Excel file:", error);
+  // You could add additional error handling here, such as:
+  // - Writing error to a log file
+  // - Sending notification to admin
+  // - Creating a fallback error report
+}
+
+async function insertFileInfo(filePath: string, jsonObject: any) {
+  try {
+    const fileName = path.basename(filePath);
+    const stats = fs.statSync(filePath);
+    const fileSize = stats.size.toString();
+    
+    const insertData = {
+      fileName: fileName,
+      reportType: jsonObject.reportType || "room",
+      fileSize: fileSize,
+      isActiveSession: true,
+      startDate: jsonObject.startDate || "",
+      endDate: jsonObject.endDate || "",
+      filePath: filePath
+    };
+
+    console.log("Inserting file info:", insertData);
+    
+    const response = await callApi(INSERT_ALLOCATION_UTILIZATION_REPORT_API, insertData);
+    
+    if (response.success) {
+      console.log("File information inserted successfully");
+    } else {
+      console.error("Failed to insert file information:", response);
+    }
+  } catch (error) {
+    console.error("Error inserting file information:", error);
   }
 }
 
