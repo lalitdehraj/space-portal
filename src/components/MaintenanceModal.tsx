@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { RoomInfo, Occupant, Building, Room } from "@/types";
+import { RoomInfo, Occupant, Building, Room, Maintenance } from "@/types";
 import { callApi } from "@/utils/apiIntercepter";
-import { URL_NOT_FOUND, INSERT_MAINTENANCE_API } from "@/constants";
+import { URL_NOT_FOUND, INSERT_MAINTENANCE_API, CANCEL_MAINTENANCE_API, GET_MAINTENANCE_DATA_API, credentials } from "@/constants";
 import moment from "moment";
 import { checkSlotConflicts, Slot } from "@/utils/slotsHelper";
 import { useSelector } from "react-redux";
@@ -23,6 +23,11 @@ interface ConflictInfo {
   conflictType: "time" | "full";
 }
 
+interface MaintenanceConflictInfo {
+  maintenance: Maintenance;
+  conflictType: "time" | "full";
+}
+
 const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, onClose, onSuccess, startDate, endDate }) => {
   // Redux selectors for academic year and session
   const academicYear = useSelector((state: any) => state.dataState.selectedAcademicYear);
@@ -36,8 +41,10 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
   const [maintenanceType, setMaintenanceType] = useState("routine");
   const [description, setDescription] = useState("");
   const [conflicts, setConflicts] = useState<ConflictInfo[]>([]);
+  const [maintenanceConflicts, setMaintenanceConflicts] = useState<MaintenanceConflictInfo[]>([]);
   const [isCheckingConflicts, setIsCheckingConflicts] = useState(false);
   const [selectedConflicts, setSelectedConflicts] = useState<string[]>([]);
+  const [selectedMaintenanceConflicts, setSelectedMaintenanceConflicts] = useState<string[]>([]);
   const [conflictRoomSelections, setConflictRoomSelections] = useState<{ [key: string]: string }>({});
   const [conflictDates, setConflictDates] = useState<{ [key: string]: string }>({});
   const [conflictStartTimes, setConflictStartTimes] = useState<{ [key: string]: string }>({});
@@ -52,6 +59,7 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
   const [conflictAvailableSlots, setConflictAvailableSlots] = useState<{ [key: string]: string[] }>({});
   const [conflictRoomConflictStatus, setConflictRoomConflictStatus] = useState<{ [key: string]: boolean }>({});
   const [timeValidationErrors, setTimeValidationErrors] = useState<{ [key: string]: string }>({});
+  const [existingMaintenanceRecords, setExistingMaintenanceRecords] = useState<Maintenance[]>([]);
 
   // Validation functions for past time slots
   const validateTimeSlot = (date: string, startTime: string, endTime: string, fieldKey: string) => {
@@ -137,6 +145,27 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
     }
   }, [allBuildingsData]);
 
+  // Fetch existing maintenance records
+  const fetchExistingMaintenanceRecords = async () => {
+    try {
+      console.log("Debug - Fetching maintenance records...");
+      const response = await callApi<Maintenance[]>(GET_MAINTENANCE_DATA_API);
+      console.log("Debug - Maintenance records response:", response);
+      if (response.success && response.data) {
+        console.log("Debug - Setting maintenance records:", response.data.length, "records");
+        setExistingMaintenanceRecords(response.data);
+      } else {
+        console.log("Debug - No maintenance records found or API failed");
+      }
+    } catch (error) {
+      console.error("Error fetching maintenance records:", error);
+    }
+  };
+
+  useEffect(() => {
+    fetchExistingMaintenanceRecords();
+  }, []);
+
   // Fetch room info when room is selected
   const fetchRoomInfo = async (roomId: string) => {
     if (!roomId || !academicYear || !academicSession || !startDate || !endDate) return;
@@ -195,6 +224,7 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
     } else {
       // Clear conflicts if not all required fields are present
       setConflicts([]);
+      setMaintenanceConflicts([]);
     }
   }, [maintenanceDate, startTime, endTime, selectedRoomInfo]);
 
@@ -388,11 +418,109 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
       });
 
       setConflicts(conflictInfo);
+
+      // Check for maintenance conflicts
+      console.log("Debug - Checking maintenance conflicts:", {
+        selectedRoomId,
+        maintenanceDate,
+        startTime,
+        endTime,
+        existingMaintenanceRecords: existingMaintenanceRecords.length,
+      });
+
+      const conflictingMaintenanceRecords = existingMaintenanceRecords.filter((maintenance) => {
+        console.log("Debug - Checking maintenance record:", {
+          maintenanceId: maintenance.id,
+          roomId: maintenance.roomid,
+          selectedRoomId,
+          isActive: maintenance.isMainteneceActive,
+          maintenanceDate: maintenance.maintanceDate,
+          selectedDate: maintenanceDate,
+        });
+
+        // Only check maintenance records for the same room
+        if (maintenance.roomid !== selectedRoomId) {
+          console.log("Debug - Room ID mismatch:", maintenance.roomid, "!=", selectedRoomId);
+          return false;
+        }
+
+        // Only check active maintenance records
+        if (!maintenance.isMainteneceActive) {
+          console.log("Debug - Maintenance not active:", maintenance.id);
+          return false;
+        }
+
+        const existingMaintenanceDate = moment(maintenance.maintanceDate).format("YYYY-MM-DD");
+
+        // Only check maintenance on the same date
+        if (existingMaintenanceDate !== maintenanceDate) {
+          console.log("Debug - Date mismatch:", existingMaintenanceDate, "!=", maintenanceDate);
+          return false;
+        }
+
+        // Check for time overlap
+        const newMaintenanceStart = moment(`${maintenanceDate} ${startTime}`, "YYYY-MM-DD HH:mm");
+        const newMaintenanceEnd = moment(`${maintenanceDate} ${endTime}`, "YYYY-MM-DD HH:mm");
+
+        // Parse existing maintenance times - handle both formats
+        const existingStartTime = maintenance.startTime.includes("T")
+          ? maintenance.startTime.split("T")[1]?.split(":").slice(0, 2).join(":")
+          : maintenance.startTime;
+        const existingEndTime = maintenance.endTime.includes("T") ? maintenance.endTime.split("T")[1]?.split(":").slice(0, 2).join(":") : maintenance.endTime;
+
+        const existingMaintenanceStart = moment(`${maintenanceDate} ${existingStartTime}`, "YYYY-MM-DD HH:mm");
+        const existingMaintenanceEnd = moment(`${maintenanceDate} ${existingEndTime}`, "YYYY-MM-DD HH:mm");
+
+        const overlaps = newMaintenanceStart.isBefore(existingMaintenanceEnd) && newMaintenanceEnd.isAfter(existingMaintenanceStart);
+
+        console.log("Debug - Time overlap check:", {
+          newStart: newMaintenanceStart.format(),
+          newEnd: newMaintenanceEnd.format(),
+          existingStart: existingMaintenanceStart.format(),
+          existingEnd: existingMaintenanceEnd.format(),
+          overlaps,
+        });
+
+        return overlaps;
+      });
+
+      console.log("Debug - Found conflicting maintenance records:", conflictingMaintenanceRecords.length);
+
+      const maintenanceConflictInfo: MaintenanceConflictInfo[] = conflictingMaintenanceRecords.map((maintenance) => {
+        const existingMaintenanceDate = moment(maintenance.maintanceDate).format("YYYY-MM-DD");
+        const newMaintenanceStart = moment(`${maintenanceDate} ${startTime}`, "YYYY-MM-DD HH:mm");
+        const newMaintenanceEnd = moment(`${maintenanceDate} ${endTime}`, "YYYY-MM-DD HH:mm");
+
+        // Parse existing maintenance times - handle both formats
+        const existingStartTime = maintenance.startTime.includes("T")
+          ? maintenance.startTime.split("T")[1]?.split(":").slice(0, 2).join(":")
+          : maintenance.startTime;
+        const existingEndTime = maintenance.endTime.includes("T") ? maintenance.endTime.split("T")[1]?.split(":").slice(0, 2).join(":") : maintenance.endTime;
+
+        const existingMaintenanceStart = moment(`${existingMaintenanceDate} ${existingStartTime}`, "YYYY-MM-DD HH:mm");
+        const existingMaintenanceEnd = moment(`${existingMaintenanceDate} ${existingEndTime}`, "YYYY-MM-DD HH:mm");
+
+        // Determine conflict type
+        const isFullConflict = newMaintenanceStart.isSameOrBefore(existingMaintenanceStart) && newMaintenanceEnd.isSameOrAfter(existingMaintenanceEnd);
+
+        return {
+          maintenance,
+          conflictType: isFullConflict ? "full" : "time",
+        };
+      });
+
+      setMaintenanceConflicts(maintenanceConflictInfo);
     } catch (error) {
       console.error("Error checking conflicts:", error);
     } finally {
       setIsCheckingConflicts(false);
     }
+  };
+
+  const handleMaintenanceConflictSelection = (maintenanceId: string) => {
+    setSelectedMaintenanceConflicts((prev) => {
+      return prev.includes(maintenanceId) ? prev.filter((id) => id !== maintenanceId) : [...prev, maintenanceId];
+    });
   };
 
   const handleConflictSelection = (occupantId: string) => {
@@ -732,6 +860,13 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
       return;
     }
 
+    // Check if there are unresolved maintenance conflicts
+    const unresolvedMaintenanceConflicts = maintenanceConflicts.filter((c) => !selectedMaintenanceConflicts.includes(c.maintenance.id.toString()));
+    if (unresolvedMaintenanceConflicts.length > 0) {
+      alert("Please resolve all maintenance conflicts before scheduling maintenance");
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       // Create maintenance data for the new API
@@ -745,6 +880,29 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
         description: description,
         isMainteneceActive: "true",
       };
+
+      // Cancel selected maintenance conflicts first
+      for (const maintenanceId of selectedMaintenanceConflicts) {
+        try {
+          const cancelResponse = await fetch(CANCEL_MAINTENANCE_API, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Basic ${credentials}`,
+            },
+            body: JSON.stringify({
+              id: maintenanceId,
+              isMainteneceActive: "false",
+            }),
+          });
+
+          if (!cancelResponse.ok) {
+            console.error(`Failed to cancel maintenance ${maintenanceId}:`, cancelResponse.statusText);
+          }
+        } catch (error) {
+          console.error(`Error cancelling maintenance ${maintenanceId}:`, error);
+        }
+      }
 
       const response = await callApi(INSERT_MAINTENANCE_API, maintenanceData);
 
@@ -785,12 +943,17 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
       );
     });
 
+  // Check if all maintenance conflicts are resolved (selected for cancellation)
+  const allMaintenanceConflictsResolved =
+    maintenanceConflicts.length === 0 || maintenanceConflicts.every((c) => selectedMaintenanceConflicts.includes(c.maintenance.id.toString()));
+
   const canScheduleMaintenance =
     selectedRoomInfo &&
     !hasMaintenanceValidationErrors &&
     !hasConflictValidationErrors &&
     !hasNonEditableConflicts &&
-    (conflicts.length === 0 || allSelectedConflictsResolved);
+    (conflicts.length === 0 || allSelectedConflictsResolved) &&
+    allMaintenanceConflictsResolved;
 
   return (
     <div className="fixed inset-0 bg-[#00000070] flex items-center justify-center z-50 text-gray-500">
@@ -946,7 +1109,7 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
               </div>
             )}
 
-            {conflicts.length === 0 && !isCheckingConflicts && maintenanceDate && selectedRoomInfo && (
+            {conflicts.length === 0 && maintenanceConflicts.length === 0 && !isCheckingConflicts && maintenanceDate && selectedRoomInfo && (
               <div className="bg-green-50 border border-green-200 rounded-md p-4">
                 <div className="flex items-center">
                   <div className="text-green-500 mr-2">✓</div>
@@ -956,13 +1119,13 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
               </div>
             )}
 
-            {conflicts.length > 0 && (
+            {(conflicts.length > 0 || maintenanceConflicts.length > 0) && (
               <div className="space-y-3">
                 <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4">
                   <div className="flex items-center">
                     <div className="text-yellow-500 mr-2">⚠</div>
                     <p className="text-yellow-800 font-medium">
-                      {conflicts.length} conflict{conflicts.length > 1 ? "s" : ""} found
+                      {conflicts.length + maintenanceConflicts.length} conflict{conflicts.length + maintenanceConflicts.length > 1 ? "s" : ""} found
                     </p>
                   </div>
                   <p className="text-yellow-700 text-sm mt-1">Please resolve conflicts before scheduling maintenance.</p>
@@ -1331,6 +1494,58 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
                     )}
                   </div>
                 ))}
+
+                {/* Maintenance Conflicts */}
+                {maintenanceConflicts.map((conflict) => (
+                  <div key={`maintenance-${conflict.maintenance.id}`} className="border border-red-200 rounded-md p-4 bg-red-50">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center mb-2">
+                          <input
+                            type="checkbox"
+                            checked={selectedMaintenanceConflicts.includes(conflict.maintenance.id.toString())}
+                            onChange={() => handleMaintenanceConflictSelection(conflict.maintenance.id.toString())}
+                            className="mr-2"
+                          />
+                          <h4 className="font-medium text-gray-800">Maintenance Conflict</h4>
+                          <span
+                            className={`ml-2 px-2 py-1 text-xs rounded-full ${
+                              conflict.conflictType === "full" ? "bg-red-100 text-red-800" : "bg-orange-100 text-orange-800"
+                            }`}
+                          >
+                            {conflict.conflictType === "full" ? "Full Conflict" : "Partial Conflict"}
+                          </span>
+                        </div>
+                        <p className="text-sm text-gray-600 mb-2">
+                          {conflict.maintenance.maintainenceType} •{" "}
+                          {conflict.maintenance.startTime.split("T")[1]?.split(":").slice(0, 2).join(":") || conflict.maintenance.startTime} -{" "}
+                          {conflict.maintenance.endTime.split("T")[1]?.split(":").slice(0, 2).join(":") || conflict.maintenance.endTime}
+                        </p>
+                        <p className="text-xs text-gray-500 mb-2">Scheduled: {moment(conflict.maintenance.maintanceDate).format("MMM DD, YYYY")}</p>
+                        {conflict.maintenance.description && <p className="text-xs text-gray-500 mb-2">Description: {conflict.maintenance.description}</p>}
+                        <p className="text-xs text-red-600 font-medium">
+                          ⚠️ This maintenance conflicts with your scheduled maintenance. You can only cancel this maintenance.
+                        </p>
+                      </div>
+                    </div>
+
+                    {selectedMaintenanceConflicts.includes(conflict.maintenance.id.toString()) && (
+                      <div className="mt-3 pt-3 border-t border-red-200">
+                        <h5 className="font-medium text-gray-700 mb-2">Resolution Options:</h5>
+                        <div className="bg-red-100 border border-red-300 rounded-md p-3">
+                          <p className="text-sm text-red-800 font-medium mb-2">🔧 Maintenance Conflict</p>
+                          <p className="text-sm text-red-700 mb-3">
+                            This maintenance conflicts with your scheduled maintenance. The only resolution is to cancel this existing maintenance.
+                          </p>
+                          <div className="flex items-center space-x-2">
+                            <span className="text-sm text-red-600">Action:</span>
+                            <span className="px-2 py-1 bg-red-200 text-red-800 text-xs rounded-full font-medium">Cancel Maintenance</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
             )}
           </div>
@@ -1358,6 +1573,8 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
               ? "Cannot Schedule - Non-editable Conflicts"
               : conflicts.length > 0 && !allSelectedConflictsResolved
               ? "Cannot Schedule - Resolve All Conflicts"
+              : maintenanceConflicts.length > 0 && !allMaintenanceConflictsResolved
+              ? "Cannot Schedule - Resolve Maintenance Conflicts"
               : "Schedule Maintenance"}
           </button>
         </div>
