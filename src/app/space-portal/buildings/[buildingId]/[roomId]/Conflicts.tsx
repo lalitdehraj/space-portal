@@ -143,6 +143,11 @@ export const ConflictSlotsList: React.FC<ConflictSlotsListProps> = ({ existingSl
     handleTimeChange(slotId, "end", end);
   };
 
+  // Helper function to check if a conflict is specifically with maintenance
+  const hasMaintenanceConflict = (slot: Slot) => {
+    return existingSlots.some((s) => s.date === slot.date && s.id?.startsWith("maintenance-") && !(s.end <= slot.start || s.start >= slot.end));
+  };
+
   return (
     <div className="space-y-4 w-100">
       <div className="flex flex-row justify-between">
@@ -155,11 +160,14 @@ export const ConflictSlotsList: React.FC<ConflictSlotsListProps> = ({ existingSl
         {editableConflicts.map((slot) => {
           const isConflicting = conflictStatus[slot.id];
           const isActive = activeConflictId === slot.id;
+          const hasMaintenance = hasMaintenanceConflict(slot);
 
           return (
             <div
               key={slot.id}
-              className={`rounded-lg p-2 shadow-sm mb-2 border ${isConflicting ? "border-red-300 bg-red-50" : "border-green-300 bg-green-50"}`}
+              className={`rounded-lg p-2 shadow-sm mb-2 border ${
+                isConflicting ? (hasMaintenance ? "border-red-400 bg-red-100" : "border-red-300 bg-red-50") : "border-green-300 bg-green-50"
+              }`}
             >
               <div className="flex items-center justify-between">
                 <div className={`flex items-center gap-2 font-medium ${isConflicting ? "text-red-700" : "text-green-700"}`}>
@@ -173,12 +181,13 @@ export const ConflictSlotsList: React.FC<ConflictSlotsListProps> = ({ existingSl
                       <ChevronRight className="w-4 h-4" />
                     </button>
                   </div>
+                  {hasMaintenance && <span className="text-xs bg-red-200 text-red-800 px-2 py-1 rounded-full">Maintenance</span>}
                 </div>
                 <button
                   onClick={() => setActiveConflictId(isActive ? null : slot.id)}
                   className="flex items-center gap-1 text-sm text-blue-600 hover:underline"
                 >
-                  <Eye className="w-4 h-4" />
+                  <Eye className="w-4 h-4 " />
                   View Day Schedule
                 </button>
               </div>
@@ -206,11 +215,15 @@ export const ConflictSlotsList: React.FC<ConflictSlotsListProps> = ({ existingSl
                       {existingSlots.filter((s) => s.date === slot.date).length > 0 ? (
                         existingSlots
                           .filter((s) => s.date === slot.date)
-                          .map((s, i) => (
-                            <li key={i} className="text-xs text-gray-600">
-                              {s.start} → {s.end}
-                            </li>
-                          ))
+                          .map((s, i) => {
+                            const isMaintenance = s.id?.startsWith("maintenance-");
+                            return (
+                              <li key={i} className={`text-xs ${isMaintenance ? "text-red-600 font-medium" : "text-gray-600"}`}>
+                                {s.start} → {s.end}
+                                {isMaintenance && " 🔧"}
+                              </li>
+                            );
+                          })
                       ) : (
                         <li className="text-xs text-gray-500 italic">No existing slots on this day.</li>
                       )}

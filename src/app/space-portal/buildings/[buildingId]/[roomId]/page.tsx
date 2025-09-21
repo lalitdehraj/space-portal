@@ -315,6 +315,7 @@ function RoomPage() {
           initialDate={selectedSlot?.date}
           initialStartTime={selectedSlot?.start}
           initialEndTime={selectedSlot?.end}
+          maintenanceData={maintenanceData}
         />
       )}
     </>

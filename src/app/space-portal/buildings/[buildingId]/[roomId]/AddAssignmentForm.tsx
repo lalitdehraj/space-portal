@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { callApi } from "@/utils/apiIntercepter";
 import { URL_NOT_FOUND } from "@/constants";
-import { Employee, Occupant, RoomInfo, SpaceAllocation, UserProfile } from "@/types";
+import { Employee, Occupant, RoomInfo, SpaceAllocation, UserProfile, Maintenance } from "@/types";
 import { useSelector } from "react-redux";
 import { areSlotsEqual, buildSlotsWithWeekdays, checkSlotConflicts, Recurrence, Slot } from "@/utils/slotsHelper";
 import { Check, X } from "lucide-react";
@@ -15,6 +15,7 @@ type FormProps = {
   initialDate?: string;
   initialStartTime?: string;
   initialEndTime?: string;
+  maintenanceData?: Maintenance[];
 };
 
 const WEEK_DAYS = ["Mon", "Tues", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -63,6 +64,7 @@ export default function AddAssignmentForm({
   initialDate,
   initialStartTime,
   initialEndTime,
+  maintenanceData = [],
 }: FormProps) {
   const user: UserProfile | null = useSelector((state: any) => state.dataState.user);
   const acadmeicYear = useSelector((state: any) => state.dataState.selectedAcademicYear);
@@ -279,13 +281,33 @@ export default function AddAssignmentForm({
       respectSessionEndDate: true,
       endTime: endTime,
     });
-    const existingSlots = roomInfo.occupants?.map((o) => {
+    // Convert occupants to slots
+    const occupantSlots = roomInfo.occupants?.map((o) => {
       return {
+        id: `occupant-${o.Id}`,
         date: moment(o.scheduledDate).format("YYYY-MM-DD"),
         start: o.startTime,
         end: o.endTime,
       };
     }) as Slot[];
+
+    // Convert maintenance to slots
+    const maintenanceSlots = maintenanceData
+      .filter((maintenance) => maintenance.isMainteneceActive)
+      .map((maintenance) => {
+        // Parse time from the API format (e.g., "0001-01-02T09:00:00Z")
+        const startTimeStr = maintenance.startTime.split("T")[1]?.split("Z")[0] || "09:00:00";
+        const endTimeStr = maintenance.endTime.split("T")[1]?.split("Z")[0] || "10:30:00";
+
+        return {
+          id: `maintenance-${maintenance.id}`,
+          date: moment(maintenance.maintanceDate).format("YYYY-MM-DD"),
+          start: startTimeStr.substring(0, 5), // HH:mm format
+          end: endTimeStr.substring(0, 5), // HH:mm format
+        };
+      }) as Slot[];
+
+    const existingSlots = [...(occupantSlots || []), ...maintenanceSlots];
     const overlapErrors = checkSlotConflicts(createdSlots, existingSlots);
     setAllocationSlotsList(createdSlots);
     setExistingBookedSlots(existingSlots);
@@ -303,6 +325,16 @@ export default function AddAssignmentForm({
     setIsValidationVisible(true);
     if (validationErrors.length === 0) {
       if (slotGroups.unresolved.length > 0) {
+        // Check if there are any unresolved maintenance conflicts
+        const hasUnresolvedMaintenanceConflicts = slotGroups.unresolved.some((slot) => {
+          return existingBookedSlots.some((s) => s.date === slot.date && s.id?.startsWith("maintenance-") && !(s.end <= slot.start || s.start >= slot.end));
+        });
+
+        if (hasUnresolvedMaintenanceConflicts) {
+          alert("❌ Cannot proceed! You have unresolved conflicts with maintenance schedules. Please adjust your time slots to avoid maintenance periods.");
+          return;
+        }
+
         const confirmProceed = window.confirm(
           `⚠️ Some slots are still in conflict:\n${slotGroups.unresolved
             .map((s) => `${s.date} ${s.start} → ${s.end}`)
