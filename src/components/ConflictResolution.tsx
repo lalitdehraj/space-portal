@@ -12,13 +12,7 @@ interface ConflictResolutionProps {
   onClose: () => void;
 }
 
-export const ConflictResolution: React.FC<ConflictResolutionProps> = ({ 
-  existingSlots, 
-  conflictingSlots, 
-  onResolve, 
-  onProceedAnyway, 
-  onClose 
-}) => {
+export const ConflictResolution: React.FC<ConflictResolutionProps> = ({ existingSlots, conflictingSlots, onResolve, onProceedAnyway, onClose }) => {
   const [editableConflicts, setEditableConflicts] = useState<Slot[]>([]);
   const [activeConflictId, setActiveConflictId] = useState<string | null>(null);
   const [conflictStatus, setConflictStatus] = useState<Record<string, boolean>>({});
@@ -65,9 +59,7 @@ export const ConflictResolution: React.FC<ConflictResolutionProps> = ({
   };
 
   const handleTimeChange = (slotId: string, field: "start" | "end", value: string) => {
-    setEditableConflicts((prevConflicts) => 
-      prevConflicts.map((slot) => (slot.id === slotId ? { ...slot, [field]: value } : slot))
-    );
+    setEditableConflicts((prevConflicts) => prevConflicts.map((slot) => (slot.id === slotId ? { ...slot, [field]: value } : slot)));
   };
 
   const validateConflicts = (slots: Slot[]) => {
@@ -150,6 +142,11 @@ export const ConflictResolution: React.FC<ConflictResolutionProps> = ({
     handleTimeChange(slotId, "end", end);
   };
 
+  // Helper function to check if a conflict is specifically with maintenance
+  const hasMaintenanceConflict = (slot: Slot) => {
+    return existingSlots.some((s) => s.date === slot.date && s.id?.startsWith("maintenance-") && !(s.end <= slot.start || s.start >= slot.end));
+  };
+
   const handleResolveConflicts = () => {
     if (slotGroups.unresolved.length > 0) {
       const confirmProceed = window.confirm(
@@ -191,34 +188,28 @@ export const ConflictResolution: React.FC<ConflictResolutionProps> = ({
             {editableConflicts.map((slot) => {
               const isConflicting = conflictStatus[slot.id];
               const isActive = activeConflictId === slot.id;
+              const hasMaintenance = hasMaintenanceConflict(slot);
 
               return (
                 <div
                   key={slot.id}
                   className={`rounded-lg p-4 shadow-sm border ${
-                    isConflicting ? "border-red-300 bg-red-50" : "border-green-300 bg-green-50"
+                    isConflicting ? (hasMaintenance ? "border-red-400 bg-red-100" : "border-red-300 bg-red-50") : "border-green-300 bg-green-50"
                   }`}
                 >
                   <div className="flex items-center justify-between">
                     <div className={`flex items-center gap-2 font-medium ${isConflicting ? "text-red-700" : "text-green-700"}`}>
                       <Calendar className="w-4 h-4" />
                       <div className="flex items-center gap-1">
-                        <button 
-                          onClick={() => handleDateChange(slot.id, -1)} 
-                          className="text-gray-500 hover:text-gray-800 p-1 rounded hover:bg-gray-200"
-                        >
+                        <button onClick={() => handleDateChange(slot.id, -1)} className="text-gray-500 hover:text-gray-800 p-1 rounded hover:bg-gray-200">
                           <ChevronLeft className="w-4 h-4" />
                         </button>
-                        <span className="font-bold text-gray-800 px-2">
-                          {moment(slot.date, "YYYY-MM-DD").format("DD-MM-YYYY")}
-                        </span>
-                        <button 
-                          onClick={() => handleDateChange(slot.id, 1)} 
-                          className="text-gray-500 hover:text-gray-800 p-1 rounded hover:bg-gray-200"
-                        >
+                        <span className="font-bold text-gray-800 px-2">{moment(slot.date, "YYYY-MM-DD").format("DD-MM-YYYY")}</span>
+                        <button onClick={() => handleDateChange(slot.id, 1)} className="text-gray-500 hover:text-gray-800 p-1 rounded hover:bg-gray-200">
                           <ChevronRight className="w-4 h-4" />
                         </button>
                       </div>
+                      {hasMaintenance && <span className="text-xs bg-red-200 text-red-800 px-2 py-1 rounded-full">Maintenance</span>}
                     </div>
                     <button
                       onClick={() => setActiveConflictId(isActive ? null : slot.id)}
@@ -254,11 +245,20 @@ export const ConflictResolution: React.FC<ConflictResolutionProps> = ({
                             <ul className="space-y-1">
                               {existingSlots
                                 .filter((s) => s.date === slot.date)
-                                .map((s, i) => (
-                                  <li key={i} className="text-xs text-gray-600 bg-gray-100 px-2 py-1 rounded">
-                                    {s.start} → {s.end}
-                                  </li>
-                                ))}
+                                .map((s, i) => {
+                                  const isMaintenance = s.id?.startsWith("maintenance-");
+                                  return (
+                                    <li
+                                      key={i}
+                                      className={`text-xs px-2 py-1 rounded ${
+                                        isMaintenance ? "text-red-600 font-medium bg-red-100" : "text-gray-600 bg-gray-100"
+                                      }`}
+                                    >
+                                      {s.start} → {s.end}
+                                      {isMaintenance && " 🔧"}
+                                    </li>
+                                  );
+                                })}
                             </ul>
                           ) : (
                             <p className="text-xs text-gray-500 italic">No existing slots on this day.</p>
@@ -271,9 +271,9 @@ export const ConflictResolution: React.FC<ConflictResolutionProps> = ({
                           {calculateAvailableSlots(slot.date).length > 0 ? (
                             <ul className="space-y-1">
                               {calculateAvailableSlots(slot.date).map((s, i) => (
-                                <li 
-                                  key={i} 
-                                  className="text-xs text-green-600 cursor-pointer hover:underline bg-green-50 px-2 py-1 rounded hover:bg-green-100" 
+                                <li
+                                  key={i}
+                                  className="text-xs text-green-600 cursor-pointer hover:underline bg-green-50 px-2 py-1 rounded hover:bg-green-100"
                                   onClick={() => handleAvailableSlotClick(slot.id, s)}
                                 >
                                   {s}
@@ -291,6 +291,7 @@ export const ConflictResolution: React.FC<ConflictResolutionProps> = ({
                   {isConflicting && (
                     <div className="mt-2 text-xs text-red-600">
                       ⚠️ This slot conflicts with existing allocations
+                      {hasMaintenance && " (including maintenance schedules)"}
                     </div>
                   )}
                 </div>

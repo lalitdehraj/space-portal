@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { RoomRequest, Building, Room, SpaceAllocation, UserProfile } from "@/types";
+import { RoomRequest, Building, Room, SpaceAllocation, UserProfile, Maintenance } from "@/types";
 import { callApi } from "@/utils/apiIntercepter";
 import { URL_NOT_FOUND } from "@/constants";
 import { useSelector } from "react-redux";
@@ -39,6 +39,7 @@ export default function RequestApproval({ requestData, onApprovalComplete, onClo
   const [allocationSlotsList, setAllocationSlotsList] = useState<Slot[]>([]);
   const [existingBookedSlots, setExistingBookedSlots] = useState<Slot[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [maintenanceData, setMaintenanceData] = useState<Maintenance[]>([]);
 
   // Fetch buildings
   useEffect(() => {
@@ -71,6 +72,21 @@ export default function RequestApproval({ requestData, onApprovalComplete, onClo
     } else setRooms([]);
   }, [selectedBuildingId, selectedFloorId, buildings, academicSession, academicYear]);
 
+  // Fetch maintenance data
+  useEffect(() => {
+    const fetchMaintenanceData = async () => {
+      try {
+        const response = await callApi<Maintenance[]>(process.env.NEXT_PUBLIC_GET_MAINTENANCE_DATA || URL_NOT_FOUND);
+        if (response.success) {
+          setMaintenanceData(response.data || []);
+        }
+      } catch (error) {
+        console.error("Error fetching maintenance data:", error);
+      }
+    };
+    fetchMaintenanceData();
+  }, []);
+
   // Create slots from recurrence
   function createSlotsFromRecurrence(startDate: string, endDate: string, startTime: string, endTime: string, recurrence: string): Slot[] {
     const DATE_FMT = "YYYY-MM-DD";
@@ -83,10 +99,30 @@ export default function RequestApproval({ requestData, onApprovalComplete, onClo
     const endTimeMoment = moment(endTime, tFormats, true);
     if (!startTimeMoment.isValid() || !endTimeMoment.isValid()) return [];
     if (!endTimeMoment.isAfter(startTimeMoment)) return [];
+
+    // Day name to weekday number mapping (ISO weekday: 1=Monday, 2=Tuesday, etc.)
+    const dayNameToWeekday: { [key: string]: number } = {
+      Mon: 1,
+      Monday: 1,
+      Tue: 2,
+      Tuesday: 2,
+      Wed: 3,
+      Wednesday: 3,
+      Thu: 4,
+      Thursday: 4,
+      Fri: 5,
+      Friday: 5,
+      Sat: 6,
+      Saturday: 6,
+      Sun: 7,
+      Sunday: 7,
+    };
+
     const recurrenceList = (recurrence || "").split(",").map((r) => r.trim());
-    const hasRecurrence = recurrenceList.some((r) => r !== "0");
+    const hasRecurrence = recurrenceList.some((r) => r !== "0" && r !== "");
     const slots: Slot[] = [];
     const makeId = (m: moment.Moment) => `${m.format("YYYYMMDD")}_${startTime.replace(/:/g, "")}_${endTime.replace(/:/g, "")}`;
+
     if (!hasRecurrence) {
       slots.push({
         date: start.format(DATE_FMT),
@@ -96,8 +132,26 @@ export default function RequestApproval({ requestData, onApprovalComplete, onClo
       });
       return slots;
     }
-    const recurrenceDays = recurrenceList.map(Number).filter((n) => !isNaN(n) && n >= 1 && n <= 7);
+
+    // Convert day names to weekday numbers
+    const recurrenceDays = recurrenceList
+      .map((day) => {
+        const dayTrimmed = day.trim();
+        // Check if it's a day name
+        if (dayNameToWeekday.hasOwnProperty(dayTrimmed)) {
+          return dayNameToWeekday[dayTrimmed];
+        }
+        // Check if it's a number (legacy support)
+        const num = parseInt(dayTrimmed);
+        if (!isNaN(num) && num >= 1 && num <= 7) {
+          return num;
+        }
+        return null;
+      })
+      .filter((day) => day !== null) as number[];
+
     if (recurrenceDays.length === 0) return [];
+
     for (let current = start.clone(); current.isSameOrBefore(last, "day"); current.add(1, "day")) {
       if (recurrenceDays.includes(current.isoWeekday())) {
         slots.push({
@@ -135,8 +189,25 @@ export default function RequestApproval({ requestData, onApprovalComplete, onClo
             end: o.endTime,
             id: `${moment(o.scheduledDate).format("YYYYMMDD")}_${o.startTime.replace(/:/g, "")}_${o.endTime.replace(/:/g, "")}`,
           })) || [];
-        setExistingBookedSlots(existingSlots);
-        return existingSlots;
+
+        // Convert maintenance data to slots
+        const maintenanceSlots = maintenanceData
+          .filter((maintenance) => maintenance.isMainteneceActive)
+          .map((maintenance) => {
+            const startTimeStr = maintenance.startTime.split("T")[1]?.split("Z")[0] || "09:00:00";
+            const endTimeStr = maintenance.endTime.split("T")[1]?.split("Z")[0] || "10:30:00";
+            return {
+              id: `maintenance-${maintenance.id}`,
+              date: moment(maintenance.maintanceDate).format("YYYY-MM-DD"),
+              start: startTimeStr.substring(0, 5),
+              end: endTimeStr.substring(0, 5),
+            };
+          });
+
+        // Combine existing slots with maintenance slots
+        const allExistingSlots = [...existingSlots, ...maintenanceSlots];
+        setExistingBookedSlots(allExistingSlots);
+        return allExistingSlots;
       }
       return [];
     };
@@ -151,7 +222,7 @@ export default function RequestApproval({ requestData, onApprovalComplete, onClo
       startTime: `${slot.start}:00`,
       endTime: `${slot.end}:00`,
       keyAssigned: keys,
-      subRoom:"0",
+      subRoom: "0",
       allocatedRoomID: selectedRoomId,
       buildingId: selectedBuildingId,
       academicSession: academicSession,
@@ -159,7 +230,7 @@ export default function RequestApproval({ requestData, onApprovalComplete, onClo
       allocatedTo: requestData.employeeName,
       isAllocationActive: true,
       remarks: description,
-      types:"3",
+      types: "3",
       allocatedOnDate: moment().format("YYYY-MM-DD"),
       allocatedfrom: requestData.requestID || "",
       allocatedBy: user?.employeeId || "",
@@ -180,6 +251,17 @@ export default function RequestApproval({ requestData, onApprovalComplete, onClo
       setAllocationSlotsList(slots);
 
       if (conflictsFound.length > 0) {
+        // Check if there are any unresolved maintenance conflicts
+        const hasUnresolvedMaintenanceConflicts = conflictsFound.some((slot) => {
+          return existingBookedSlots.some((s) => s.date === slot.date && s.id?.startsWith("maintenance-") && !(s.end <= slot.start || s.start >= slot.end));
+        });
+
+        if (hasUnresolvedMaintenanceConflicts) {
+          alert("❌ Cannot proceed! You have unresolved conflicts with maintenance schedules. Please adjust your time slots to avoid maintenance periods.");
+          setIsLoading(false);
+          return;
+        }
+
         setConflicts(conflictsFound);
         setShowConflictsView(true);
         setIsLoading(false);
@@ -197,7 +279,7 @@ export default function RequestApproval({ requestData, onApprovalComplete, onClo
 
   const processApproval = async (slots: Slot[]) => {
     const allocations = createSpaceAllocations(slots);
-    
+
     // Insert allocations
     let allSucceeded = true;
     for (const allocation of allocations) {
@@ -296,19 +378,32 @@ export default function RequestApproval({ requestData, onApprovalComplete, onClo
           <div className="mb-6 p-4 bg-gray-50 rounded-lg">
             <h3 className="font-semibold text-gray-800 mb-2">Request Details</h3>
             <div className="grid grid-cols-2 gap-4 text-sm">
-              <div><span className="font-medium">Request ID:</span> {requestData.requestID}</div>
-              <div><span className="font-medium">Employee:</span> {requestData.employeeName}</div>
-              <div><span className="font-medium">Department:</span> {requestData.employeeDepartment}</div>
-              <div><span className="font-medium">Purpose:</span> {requestData.purpose}</div>
-              <div><span className="font-medium">Date:</span> {formatDate(requestData.startDate).split(" ")?.[0]} - {formatDate(requestData.endDate).split(" ")?.[0]}</div>
-              <div><span className="font-medium">Time:</span> {formatTime(requestData.startTime)} - {formatTime(requestData.endTime)}</div>
+              <div>
+                <span className="font-medium">Request ID:</span> {requestData.requestID}
+              </div>
+              <div>
+                <span className="font-medium">Employee:</span> {requestData.employeeName}
+              </div>
+              <div>
+                <span className="font-medium">Department:</span> {requestData.employeeDepartment}
+              </div>
+              <div>
+                <span className="font-medium">Purpose:</span> {requestData.purpose}
+              </div>
+              <div>
+                <span className="font-medium">Date:</span> {formatDate(requestData.startDate).split(" ")?.[0]} -{" "}
+                {formatDate(requestData.endDate).split(" ")?.[0]}
+              </div>
+              <div>
+                <span className="font-medium">Time:</span> {formatTime(requestData.startTime)} - {formatTime(requestData.endTime)}
+              </div>
             </div>
           </div>
 
           {/* Room Selection */}
           <div className="space-y-4 mb-6">
             <h3 className="font-semibold text-gray-800">Room Allocation</h3>
-            
+
             <div className="flex flex-col md:flex-row md:space-x-4">
               <div className="w-full">
                 <label className="block text-sm text-gray-700 mb-1">Building</label>
