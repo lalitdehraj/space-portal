@@ -27,6 +27,7 @@ export default function Buildings() {
   const [isLoadingSubrooms, setIsLoadingSubrooms] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(16);
+  const [initialLoad] = useState(8);
   const [searchQuery, setSearchQuery] = useState("");
   const acadmeicYear = useSelector((state: any) => state.dataState.selectedAcademicYear);
   const acadmeicSession = useSelector((state: any) => state.dataState.selectedAcademicSession);
@@ -134,7 +135,7 @@ export default function Buildings() {
     return room.roomName.toLowerCase().includes(searchQuery.toLowerCase()) || room.roomId.toLowerCase().includes(searchQuery.toLowerCase());
   });
 
-  const visibleRooms = searchRooms.slice(0, currentPage * itemsPerPage);
+  const visibleRooms = searchRooms.slice(0, currentPage === 1 ? initialLoad : initialLoad + (currentPage - 1) * itemsPerPage);
   useEffect(() => {
     const fetchSubrooms = async () => {
       if (!selectedRoom) return;
