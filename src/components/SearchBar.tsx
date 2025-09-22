@@ -7,12 +7,8 @@ import { URL_NOT_FOUND } from "@/constants";
 import { useSelector } from "react-redux";
 
 export function AdvancedSearch({ onClose }: { onClose: () => void }) {
-  const academicYear = useSelector(
-    (state: any) => state.dataState.selectedAcademicYear
-  );
-  const acadSession = useSelector(
-    (state: any) => state.dataState.selectedAcademicSession
-  );
+  const academicYear = useSelector((state: any) => state.dataState.selectedAcademicYear);
+  const acadSession = useSelector((state: any) => state.dataState.selectedAcademicSession);
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [allRooms, setAllRooms] = useState<Room[]>([]);
   const [roomInfos, setRoomInfos] = useState<Record<string, RoomInfo>>({});
@@ -29,33 +25,29 @@ export function AdvancedSearch({ onClose }: { onClose: () => void }) {
   const [endTime, setEndTime] = useState("17:00");
 
   const [filteredRooms, setFilteredRooms] = useState<Room[]>([]);
+  const [subroomsForAdvancedSearch, setSubroomsForAdvancedSearch] = useState<Room[]>([]);
+  const [loadingSubrooms, setLoadingSubrooms] = useState(false);
 
   // Load buildings + rooms
   useEffect(() => {
     const fetchBuildingsAndRooms = async () => {
       try {
         setLoading(true);
-        const buildingsRes = await callApi<Building[]>(
-          process.env.NEXT_PUBLIC_GET_BUILDING_LIST || URL_NOT_FOUND,
-          {
-            acadSession: `${acadSession}`,
-            acadYear: `${academicYear}`,
-          }
-        );
+        const buildingsRes = await callApi<Building[]>(process.env.NEXT_PUBLIC_GET_BUILDING_LIST || URL_NOT_FOUND, {
+          acadSession: `${acadSession}`,
+          acadYear: `${academicYear}`,
+        });
         if (!buildingsRes.success) return;
         setBuildings(buildingsRes.data || []);
 
         const rooms: Room[] = [];
         for (const b of buildingsRes.data || []) {
           for (const f of b.floors) {
-            const res = await callApi<Room[]>(
-              process.env.NEXT_PUBLIC_GET_ROOMS_LIST || URL_NOT_FOUND,
-              {
-                buildingNo: b.id,
-                floorID: f.id,
-                curreentTime: moment().format("HH:mm"),
-              }
-            );
+            const res = await callApi<Room[]>(process.env.NEXT_PUBLIC_GET_ROOMS_LIST || URL_NOT_FOUND, {
+              buildingNo: b.id,
+              floorID: f.id,
+              curreentTime: moment().format("HH:mm"),
+            });
             if (res.success && res.data) rooms.push(...res.data);
           }
         }
@@ -80,17 +72,14 @@ export function AdvancedSearch({ onClose }: { onClose: () => void }) {
       try {
         const infos: Record<string, RoomInfo> = {};
         for (const room of allRooms) {
-          const res = await callApi<RoomInfo>(
-            process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND,
-            {
-              roomID: room.parentId ?? room.roomId,
-              subroomID: room.parentId ? room.roomId : 0,
-              academicYr: academicYear,
-              acadSess: acadSession,
-              startDate,
-              endDate,
-            }
-          );
+          const res = await callApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, {
+            roomID: room.parentId ?? room.roomId,
+            subroomID: room.parentId ? room.roomId : 0,
+            academicYr: academicYear,
+            acadSess: acadSession,
+            startDate,
+            endDate,
+          });
           if (res.success && res.data) {
             infos[room.roomId] = res.data;
           }
@@ -111,12 +100,7 @@ export function AdvancedSearch({ onClose }: { onClose: () => void }) {
     if (!info || !info.occupants) return true;
 
     return !info.occupants.some((occ) => {
-      const sameDay = moment(occ.scheduledDate).isBetween(
-        startDate,
-        endDate,
-        "day",
-        "[]"
-      );
+      const sameDay = moment(occ.scheduledDate).isBetween(startDate, endDate, "day", "[]");
       if (!sameDay) return false;
 
       const occStart = moment(occ.startTime, "HH:mm");
@@ -129,7 +113,7 @@ export function AdvancedSearch({ onClose }: { onClose: () => void }) {
   };
 
   // Filter function
-  const handleSearch = () => {
+  const handleSearch = async () => {
     if (availabilityOn) {
       const now = moment();
       const start = moment(`${startDate} ${startTime}`);
@@ -145,16 +129,55 @@ export function AdvancedSearch({ onClose }: { onClose: () => void }) {
       }
     }
 
-    const results = allRooms.filter((room) => {
+    // Filter rooms based on criteria
+    const matchingRooms = allRooms.filter((room) => {
       if (capacity && room.roomCapactiy < parseInt(capacity)) return false;
-      if (status && room.status?.toLowerCase() !== status?.toLowerCase())
-        return false;
-      if (roomType && room.roomType?.toLowerCase() !== roomType?.toLowerCase())
-        return false;
+      if (status && room.status?.toLowerCase() !== status?.toLowerCase()) return false;
+      if (roomType && room.roomType?.toLowerCase() !== roomType?.toLowerCase()) return false;
       if (availabilityOn && !isRoomAvailable(room.roomId)) return false;
       return true;
     });
-    setFilteredRooms(results);
+
+    // Separate parent rooms from regular rooms
+    const parentRooms = matchingRooms.filter((room) => room.hasSubroom);
+    const regularRooms = matchingRooms.filter((room) => !room.hasSubroom);
+
+    // Set regular rooms first
+    setFilteredRooms(regularRooms);
+
+    // Fetch subrooms for parent rooms
+    if (parentRooms.length > 0) {
+      setLoadingSubrooms(true);
+
+      // Add 250ms delay before making API calls
+      await new Promise((resolve) => setTimeout(resolve, 250));
+
+      try {
+        const subroomPromises = parentRooms.map(async (parentRoom) => {
+          const response = await callApi<Room[]>(process.env.NEXT_PUBLIC_GET_SUBROOMS_LIST || URL_NOT_FOUND, {
+            roomID: parentRoom.roomId,
+            buildingNo: parentRoom.buildingId,
+            acadSess: acadSession,
+            acadYr: academicYear,
+          });
+          return response.success ? response.data || [] : [];
+        });
+
+        const subroomArrays = await Promise.all(subroomPromises);
+        const allSubrooms = subroomArrays.flat();
+        setSubroomsForAdvancedSearch(allSubrooms);
+
+        // Update filtered rooms to include subrooms
+        setFilteredRooms([...regularRooms, ...allSubrooms]);
+      } catch (error) {
+        console.error("Error fetching subrooms for advanced search:", error);
+        setSubroomsForAdvancedSearch([]);
+      } finally {
+        setLoadingSubrooms(false);
+      }
+    } else {
+      setSubroomsForAdvancedSearch([]);
+    }
   };
 
   const today = moment().format("YYYY-MM-DD"); // today
@@ -165,13 +188,8 @@ export function AdvancedSearch({ onClose }: { onClose: () => void }) {
       <div className="bg-white w-[95%] md:w-[85%] h-[90%] rounded-lg shadow-lg flex flex-col overflow-hidden">
         {/* Header */}
         <div className="flex justify-between items-center p-4 border-b bg-gray-50">
-          <h2 className="text-lg font-semibold text-gray-700 ">
-            Advanced Search
-          </h2>
-          <button
-            onClick={onClose}
-            className="text-gray-500 hover:text-gray-700 text-xl"
-          >
+          <h2 className="text-lg font-semibold text-gray-700 ">Advanced Search</h2>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700 text-xl">
             ✕
           </button>
         </div>
@@ -222,14 +240,8 @@ export function AdvancedSearch({ onClose }: { onClose: () => void }) {
             </div>
 
             <div className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                checked={availabilityOn}
-                onChange={() => setAvailabilityOn(!availabilityOn)}
-              />
-              <span className="text-sm font-medium text-orange-600">
-                Available
-              </span>
+              <input type="checkbox" checked={availabilityOn} onChange={() => setAvailabilityOn(!availabilityOn)} />
+              <span className="text-sm font-medium text-orange-600">Available</span>
             </div>
             {availabilityOn && (
               <div className="flex flex-col space-y-2">
@@ -266,22 +278,17 @@ export function AdvancedSearch({ onClose }: { onClose: () => void }) {
               </div>
             )}
 
-            <button
-              onClick={handleSearch}
-              className="mt-auto bg-orange-500 text-white py-2 rounded hover:bg-orange-600 text-sm font-medium"
-            >
+            <button onClick={handleSearch} className="mt-auto bg-orange-500 text-white py-2 rounded hover:bg-orange-600 text-sm font-medium">
               Search
             </button>
           </div>
 
           {/* Results */}
           <div className="flex-1 p-4 overflow-y-auto">
-            {loading ? (
+            {loading || loadingSubrooms ? (
               <p>Loading rooms...</p>
             ) : filteredRooms.length === 0 ? (
-              <p className="text-sm text-gray-500">
-                No rooms match the filters.
-              </p>
+              <p className="text-sm text-gray-500">No rooms match the filters.</p>
             ) : (
               <ul className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
                 {filteredRooms.map((room) => (
@@ -290,41 +297,23 @@ export function AdvancedSearch({ onClose }: { onClose: () => void }) {
                     className="p-4 border border-orange-600 rounded-lg shadow-sm hover:shadow-md transition bg-white flex flex-col justify-between"
                   >
                     <div>
-                      <h4 className="font-semibold text-gray-700 mb-1">
-                        {room.roomName}
-                      </h4>
-                      <p className="text-xs text-gray-500 mb-1">
-                        Capacity: {room.roomCapactiy}
-                      </p>
+                      <h4 className="font-semibold text-gray-700 mb-1">{room.roomName}</h4>
+                      <p className="text-xs text-gray-500 mb-1">Capacity: {room.roomCapactiy}</p>
                       <p className="text-xs mb-1">
                         Status:{" "}
                         <span
                           className={`px-2 py-0.5 rounded text-white text-[10px] ${
-                            room.status === "allocated"
-                              ? "bg-green-500"
-                              : room.status === "maintenance"
-                              ? "bg-red-500"
-                              : "bg-gray-400"
+                            room.status === "allocated" ? "bg-green-500" : room.status === "maintenance" ? "bg-red-500" : "bg-gray-400"
                           }`}
                         >
                           {room.status}
                         </span>
                       </p>
-                      <p className="text-xs text-gray-500 mb-1">
-                        Type: {room.roomType}
-                      </p>
+                      <p className="text-xs text-gray-500 mb-1">Type: {room.roomType}</p>
                     </div>
                     {availabilityOn && (
-                      <p
-                        className={`text-xs font-semibold mt-2 ${
-                          isRoomAvailable(room.roomId)
-                            ? "text-green-600"
-                            : "text-red-600"
-                        }`}
-                      >
-                        {isRoomAvailable(room.roomId)
-                          ? "Available"
-                          : "Not Available"}
+                      <p className={`text-xs font-semibold mt-2 ${isRoomAvailable(room.roomId) ? "text-green-600" : "text-red-600"}`}>
+                        {isRoomAvailable(room.roomId) ? "Available" : "Not Available"}
                       </p>
                     )}
                   </li>

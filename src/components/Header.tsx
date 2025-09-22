@@ -54,6 +54,11 @@ export default function Header() {
   const [allRooms, setAllRooms] = useState<Room[]>([]);
   const [loadingBuildingsRooms, setLoadingBuildingsRooms] = useState(false);
 
+  // State for handling subrooms in search
+  const [parentRoomsForSearch, setParentRoomsForSearch] = useState<Room[]>([]);
+  const [subroomsForSearch, setSubroomsForSearch] = useState<Room[]>([]);
+  const [loadingSubrooms, setLoadingSubrooms] = useState(false);
+
   // advanced search placeholder toggle
   const [showAdvancedSearch, setShowAdvancedSearch] = useState(false);
 
@@ -238,6 +243,8 @@ export default function Header() {
   useEffect(() => {
     if (searchText.trim() === "") {
       setSearchResults(null);
+      setParentRoomsForSearch([]);
+      setSubroomsForSearch([]);
       return;
     }
 
@@ -256,14 +263,23 @@ export default function Header() {
               type: "building",
             }));
 
-          const filteredRooms: SearchResult[] = allRooms
-            .filter((r) => r.roomName?.toLowerCase().includes(q) || r.roomId?.toLowerCase().includes(q))
-            .map((r) => ({
-              buildingId: (r as any).buildingId || (r as any).building, // defensive
-              roomId: r.roomId,
-              name: r.roomName,
-              type: "room",
-            }));
+          // Filter rooms that match search query
+          const matchingRooms = allRooms.filter((r) => r.roomName?.toLowerCase().includes(q) || r.roomId?.toLowerCase().includes(q));
+
+          // Separate parent rooms (hasSubroom: true) from regular rooms
+          const parentRooms = matchingRooms.filter((r) => r.hasSubroom);
+          const regularRooms = matchingRooms.filter((r) => !r.hasSubroom);
+
+          // Convert regular rooms to search results
+          const filteredRooms: SearchResult[] = regularRooms.map((r) => ({
+            buildingId: (r as any).buildingId || (r as any).building, // defensive
+            roomId: r.roomId,
+            name: r.roomName,
+            type: "room",
+          }));
+
+          // Store parent rooms for subroom fetching
+          setParentRoomsForSearch(parentRooms);
 
           setSearchResults({
             buildings: filteredBuildings,
@@ -288,11 +304,74 @@ export default function Header() {
     return () => clearTimeout(timer);
   }, [searchText, isLoadedBuildingsRooms, buildingsList, allRooms]);
 
+  // Effect to fetch subrooms for parent rooms that match search
+  useEffect(() => {
+    const fetchSubroomsForSearch = async () => {
+      if (parentRoomsForSearch.length === 0 || !academicYear || !acadSession) {
+        setSubroomsForSearch([]);
+        return;
+      }
+
+      setLoadingSubrooms(true);
+
+      // Add 250ms delay before making API calls
+      await new Promise((resolve) => setTimeout(resolve, 250));
+
+      try {
+        const subroomPromises = parentRoomsForSearch.map(async (parentRoom) => {
+          const response = await callApi<Room[]>(process.env.NEXT_PUBLIC_GET_SUBROOMS_LIST || URL_NOT_FOUND, {
+            roomID: parentRoom.roomId,
+            buildingNo: parentRoom.buildingId,
+            acadSess: acadSession,
+            acadYr: academicYear,
+          });
+          return response.success ? response.data || [] : [];
+        });
+
+        const subroomArrays = await Promise.all(subroomPromises);
+        const allSubrooms = subroomArrays.flat();
+        setSubroomsForSearch(allSubrooms);
+
+        // Update search results to include subrooms
+        setSearchResults((prevResults) => {
+          if (!prevResults) return prevResults;
+
+          const subroomSearchResults: SearchResult[] = allSubrooms.map((subroom) => ({
+            buildingId: subroom.buildingId,
+            roomId: subroom.roomId,
+            name: subroom.roomName,
+            type: "room",
+            parentId: subroom.parentId,
+          }));
+
+          return {
+            buildings: prevResults.buildings,
+            rooms: [...prevResults.rooms, ...subroomSearchResults],
+          };
+        });
+      } catch (error) {
+        console.error("Error fetching subrooms for search:", error);
+        setSubroomsForSearch([]);
+      } finally {
+        setLoadingSubrooms(false);
+      }
+    };
+
+    fetchSubroomsForSearch();
+  }, [parentRoomsForSearch, academicYear, acadSession]);
+
   const handleListClick = (result: SearchResult) => {
     if (result.type === "building") {
       router.push(`/space-portal/buildings/${encrypt(result.buildingId)}`);
     } else {
-      router.push(`/space-portal/buildings/${encrypt(result.buildingId)}/${encrypt(result.roomId || "")}`);
+      // Check if this is a subroom (has parentId)
+      if (result.parentId) {
+        // Navigate to subroom using parentId|roomId format
+        router.push(`/space-portal/buildings/${encrypt(result.buildingId)}/${encrypt(`${result.parentId}|${result.roomId}`)}`);
+      } else {
+        // Navigate to regular room
+        router.push(`/space-portal/buildings/${encrypt(result.buildingId)}/${encrypt(result.roomId || "")}`);
+      }
     }
     setSearchText("");
     setIsSearchFocused(false);
@@ -332,7 +411,7 @@ export default function Header() {
         {/* Simple search dropdown */}
         {isSearchFocused && (
           <>
-            {searchLoading || loadingBuildingsRooms ? (
+            {searchLoading || loadingBuildingsRooms || loadingSubrooms ? (
               <div className="absolute top-full left-0 w-full bg-white border border-gray-200 rounded-lg shadow-lg mt-1 px-4 py-3 text-sm text-gray-500 z-20">
                 Loading...
               </div>

@@ -51,6 +51,7 @@ export interface SearchResult {
   name: string;
   type: string;
   roomId?: string;
+  parentId?: string;
 }
 export interface GraphData {
   time: string;
