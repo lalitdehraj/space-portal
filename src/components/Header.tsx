@@ -4,15 +4,7 @@ import React, { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { callApi } from "@/utils/apiIntercepter";
 import moment from "moment";
-import {
-  SearchResult,
-  AcademicSession,
-  AcademicYear,
-  SearchResults,
-  UserProfile,
-  Building,
-  Room,
-} from "@/types";
+import { SearchResult, AcademicSession, AcademicYear, SearchResults, UserProfile, Building, Room } from "@/types";
 import { URL_NOT_FOUND } from "@/constants";
 import { useDispatch, useSelector } from "react-redux";
 import {
@@ -43,27 +35,17 @@ export default function Header() {
   const { data } = useSession();
 
   // redux values
-  const academicYear = useSelector(
-    (state: any) => state.dataState.selectedAcademicYear
-  );
-  const acadSession = useSelector(
-    (state: any) => state.dataState.selectedAcademicSession
-  );
+  const academicYear = useSelector((state: any) => state.dataState.selectedAcademicYear);
+  const acadSession = useSelector((state: any) => state.dataState.selectedAcademicSession);
 
   // Local state
-  const [academicYearsList, setAcademicYearsList] = useState<
-    AcademicYear[] | undefined
-  >();
-  const [academicSessionsList, setAcademicSessionsList] = useState<
-    AcademicSession[] | undefined
-  >();
+  const [academicYearsList, setAcademicYearsList] = useState<AcademicYear[] | undefined>();
+  const [academicSessionsList, setAcademicSessionsList] = useState<AcademicSession[] | undefined>();
   const [sessionsPerYear, setSessionsPerYear] = useState<string[]>();
 
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [searchText, setSearchText] = useState("");
-  const [searchResults, setSearchResults] = useState<SearchResults | null>(
-    null
-  );
+  const [searchResults, setSearchResults] = useState<SearchResults | null>(null);
   const [searchLoading, setSearchLoading] = useState(false);
 
   // Lazy-load buildings & rooms on first focus
@@ -86,14 +68,9 @@ export default function Header() {
     const fetchUserRoles = async () => {
       if (!data?.user?.email) return;
       try {
-        const response = await callApi<UserProfile[]>(
-          process.env.NEXT_PUBLIC_GET_USER || URL_NOT_FOUND
-        );
+        const response = await callApi<UserProfile[]>(process.env.NEXT_PUBLIC_GET_USER || URL_NOT_FOUND);
         if (response.success) {
-          const user = response.data?.filter(
-            (u) =>
-              u.userEmail.toLowerCase() === data?.user?.email?.toLowerCase()
-          );
+          const user = response.data?.filter((u) => u.userEmail.toLowerCase() === data?.user?.email?.toLowerCase());
           console.log(data.user, user, response.data);
           if (user && user.length > 0) {
             dispatcher(setUserRoleId(user[0].userRole));
@@ -114,21 +91,15 @@ export default function Header() {
   useEffect(() => {
     const getAcadmicCalender = async () => {
       try {
-        const responseYear = await callApi<AcademicYearResponse>(
-          process.env.NEXT_PUBLIC_GET_ACADMIC_YEARS || URL_NOT_FOUND
-        );
+        const responseYear = await callApi<AcademicYearResponse>(process.env.NEXT_PUBLIC_GET_ACADMIC_YEARS || URL_NOT_FOUND);
         if (responseYear.success) {
           const acadYearsList = responseYear.data?.["Academic Year"]?.reverse();
           setAcademicYearsList(acadYearsList);
         }
 
-        const responseSession = await callApi<AcademicSessionResponse>(
-          process.env.NEXT_PUBLIC_GET_ACADMIC_SESSIONS || URL_NOT_FOUND
-        );
+        const responseSession = await callApi<AcademicSessionResponse>(process.env.NEXT_PUBLIC_GET_ACADMIC_SESSIONS || URL_NOT_FOUND);
         if (responseSession.success) {
-          setAcademicSessionsList(
-            responseSession.data?.["Academic Session"] || []
-          );
+          setAcademicSessionsList(responseSession.data?.["Academic Session"] || []);
         }
       } catch (err) {
         console.error("getAcadmicCalender error:", err);
@@ -140,9 +111,7 @@ export default function Header() {
   // build sessionsPerYear based on selected academicYear
   useEffect(() => {
     if (!academicYear || !academicSessionsList || !academicYearsList) return;
-    const filteredList = academicSessionsList?.filter(
-      (year) => year["Academic Year"] == academicYear
-    );
+    const filteredList = academicSessionsList?.filter((year) => year["Academic Year"] == academicYear);
     const unique = new Map<string, string[]>();
     if (!filteredList) return;
     for (const item of filteredList) {
@@ -158,9 +127,7 @@ export default function Header() {
   // when academicYear changes set a default session (preserve original behavior)
   useEffect(() => {
     if (!academicYearsList) return;
-    const currentSession = academicSessionsList?.filter(
-      (s) => s["Academic Year"] === academicYear
-    )?.[0];
+    const currentSession = academicSessionsList?.filter((s) => s["Academic Year"] === academicYear)?.[0];
     dispatcher(setAcademicSessionId(currentSession?.Code));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [academicYear, academicSessionsList, academicYearsList]);
@@ -168,9 +135,7 @@ export default function Header() {
   // set session start/end and isActiveSession (preserve original behavior)
   useEffect(() => {
     if (!acadSession && !academicSessionsList) return;
-    const currentSession = academicSessionsList?.find(
-      (s) => s.Code === acadSession
-    );
+    const currentSession = academicSessionsList?.find((s) => s.Code === acadSession);
     dispatcher(setAcademicSessionStartDate(currentSession?.["Start Session"]));
     dispatcher(setAcademicSessionEndDate(currentSession?.["End Session"]));
     const startDate = moment(currentSession?.["Start Session"], "YYYY-MM-DD");
@@ -183,10 +148,7 @@ export default function Header() {
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (
-        filterRef.current &&
-        !filterRef.current.contains(event.target as Node)
-      ) {
+      if (filterRef.current && !filterRef.current.contains(event.target as Node)) {
         setIsSearchFocused(false);
         setShowAdvancedSearch(false);
       }
@@ -197,16 +159,12 @@ export default function Header() {
 
   useEffect(() => {
     const handleClickOutsideProfile = (event: MouseEvent) => {
-      if (
-        profileRef.current &&
-        !profileRef.current.contains(event.target as Node)
-      ) {
+      if (profileRef.current && !profileRef.current.contains(event.target as Node)) {
         setIsProfileOpen(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutsideProfile);
-    return () =>
-      document.removeEventListener("mousedown", handleClickOutsideProfile);
+    return () => document.removeEventListener("mousedown", handleClickOutsideProfile);
   }, [profileRef]);
 
   const handleSearchFocus = async () => {
@@ -226,13 +184,10 @@ export default function Header() {
     setLoadingBuildingsRooms(true);
 
     try {
-      const buildingsResponse = await callApi<Building[]>(
-        process.env.NEXT_PUBLIC_GET_BUILDING_LIST || URL_NOT_FOUND,
-        {
-          acadSession: `${acadSession}`,
-          acadYear: `${academicYear}`,
-        }
-      );
+      const buildingsResponse = await callApi<Building[]>(process.env.NEXT_PUBLIC_GET_BUILDING_LIST || URL_NOT_FOUND, {
+        acadSession: `${acadSession}`,
+        acadYear: `${academicYear}`,
+      });
 
       if (!buildingsResponse.success || !buildingsResponse.data) {
         setBuildingsList([]);
@@ -245,33 +200,26 @@ export default function Header() {
       const buildings = buildingsResponse.data || [];
       setBuildingsList(buildings);
 
-      // aggregate rooms
+      // aggregate rooms - fetch all rooms at once per building
       const aggregatedRooms: Room[] = [];
 
-      // We'll fetch floors in parallel per building to be faster, but keep it typed
-      for (const building of buildings) {
-        if (!building.floors || building.floors.length === 0) continue;
+      // Fetch all rooms for each building at once using empty floorID
+      const buildingPromises = buildings.map((building) =>
+        callApi<Room[]>(process.env.NEXT_PUBLIC_GET_ROOMS_LIST || URL_NOT_FOUND, {
+          buildingNo: building.id,
+          floorID: "", // Empty floorID to fetch all rooms at once
+          // using moment for consistent time format
+          curreentTime: moment().format("HH:mm"),
+        })
+      );
 
-        const floorPromises = building.floors.map((floor) =>
-          callApi<Room[]>(
-            process.env.NEXT_PUBLIC_GET_ROOMS_LIST || URL_NOT_FOUND,
-            {
-              buildingNo: building.id,
-              floorID: floor.id,
-              // using moment for consistent time format
-              curreentTime: moment().format("HH:mm"),
-            }
-          )
-        );
+      // wait for all buildings
+      const buildingResponses = await Promise.all(buildingPromises);
 
-        // wait for all floors of this building
-        const floorResponses = await Promise.all(floorPromises);
-
-        for (const floorRes of floorResponses) {
-          if (floorRes && (floorRes as any).success && (floorRes as any).data) {
-            // types: callApi returns { success, data, ...}
-            aggregatedRooms.push(...((floorRes as any).data as Room[]));
-          }
+      for (const buildingRes of buildingResponses) {
+        if (buildingRes && (buildingRes as any).success && (buildingRes as any).data) {
+          // types: callApi returns { success, data, ...}
+          aggregatedRooms.push(...((buildingRes as any).data as Room[]));
         }
       }
 
@@ -309,11 +257,7 @@ export default function Header() {
             }));
 
           const filteredRooms: SearchResult[] = allRooms
-            .filter(
-              (r) =>
-                r.roomName?.toLowerCase().includes(q) ||
-                r.roomId?.toLowerCase().includes(q)
-            )
+            .filter((r) => r.roomName?.toLowerCase().includes(q) || r.roomId?.toLowerCase().includes(q))
             .map((r) => ({
               buildingId: (r as any).buildingId || (r as any).building, // defensive
               roomId: r.roomId,
@@ -328,12 +272,9 @@ export default function Header() {
           setSearchLoading(false);
         } else {
           // fallback to original search API
-          const response = await callApi<SearchResults>(
-            process.env.NEXT_PUBLIC_GET_SEARCH || URL_NOT_FOUND,
-            {
-              searchKey: searchText,
-            }
-          );
+          const response = await callApi<SearchResults>(process.env.NEXT_PUBLIC_GET_SEARCH || URL_NOT_FOUND, {
+            searchKey: searchText,
+          });
           setSearchResults(response.data || { buildings: [], rooms: [] });
           setSearchLoading(false);
         }
@@ -351,11 +292,7 @@ export default function Header() {
     if (result.type === "building") {
       router.push(`/space-portal/buildings/${encrypt(result.buildingId)}`);
     } else {
-      router.push(
-        `/space-portal/buildings/${encrypt(result.buildingId)}/${encrypt(
-          result.roomId || ""
-        )}`
-      );
+      router.push(`/space-portal/buildings/${encrypt(result.buildingId)}/${encrypt(result.roomId || "")}`);
     }
     setSearchText("");
     setIsSearchFocused(false);
@@ -376,11 +313,7 @@ export default function Header() {
           aria-label="Search"
         />
 
-        <img
-          src="/images/search-normal.svg"
-          alt="Search icon"
-          className="h-[20px] w-[20px] absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
-        />
+        <img src="/images/search-normal.svg" alt="Search icon" className="h-[20px] w-[20px] absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
 
         {/* Advanced search icon inside the search bar */}
         <button
@@ -393,11 +326,7 @@ export default function Header() {
           }}
           className="absolute right-3 top-1/2 -translate-y-1/2 p-1"
         >
-          <img
-            src="/images/bx-filter-alt.svg"
-            alt="Filter"
-            className="h-5 w-5"
-          />
+          <img src="/images/bx-filter-alt.svg" alt="Filter" className="h-5 w-5" />
         </button>
 
         {/* Simple search dropdown */}
@@ -407,15 +336,11 @@ export default function Header() {
               <div className="absolute top-full left-0 w-full bg-white border border-gray-200 rounded-lg shadow-lg mt-1 px-4 py-3 text-sm text-gray-500 z-20">
                 Loading...
               </div>
-            ) : searchResults &&
-              (searchResults.buildings.length > 0 ||
-                searchResults.rooms.length > 0) ? (
+            ) : searchResults && (searchResults.buildings.length > 0 || searchResults.rooms.length > 0) ? (
               <div className="absolute pt-4 top-full left-0 w-full bg-white border max-h-80 overflow-y-auto border-gray-200 rounded-lg shadow-lg z-20">
                 {searchResults.buildings.length > 0 && (
                   <>
-                    <span className="flex items-center ml-2 text-gray-500">
-                      Buildings
-                    </span>
+                    <span className="flex items-center ml-2 text-gray-500">Buildings</span>
                     <ul className="py-2">
                       {searchResults.buildings.map((result, index) => (
                         <li
@@ -431,9 +356,7 @@ export default function Header() {
                 )}
                 {searchResults.rooms.length > 0 && (
                   <>
-                    <span className="flex items-center ml-2 text-gray-500">
-                      Rooms
-                    </span>
+                    <span className="flex items-center ml-2 text-gray-500">Rooms</span>
                     <ul className="py-2">
                       {searchResults.rooms.map((result, index) => (
                         <li
@@ -450,28 +373,20 @@ export default function Header() {
               </div>
             ) : searchText === "" ? null : (
               <div className="absolute top-full left-0 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg z-20 overflow-hidden">
-                <p className="px-4 py-2 text-sm text-gray-500 text-center">
-                  No results found.
-                </p>
+                <p className="px-4 py-2 text-sm text-gray-500 text-center">No results found.</p>
               </div>
             )}
           </>
         )}
 
         {/* Advanced Search placeholder */}
-        {showAdvancedSearch && (
-          <AdvancedSearch onClose={() => setShowAdvancedSearch(false)} />
-        )}
+        {showAdvancedSearch && <AdvancedSearch onClose={() => setShowAdvancedSearch(false)} />}
       </div>
 
       <div className="flex items-center space-x-2 md:space-x-4">
         <select
-          value={useSelector(
-            (state: any) => state.dataState.selectedAcademicSession
-          )}
-          className={`hidden rounded-md px-2 py-2 text-xs text-gray-700 focus:outline-none ${
-            (sessionsPerYear?.length || 0) > 0 ? "md:block" : ""
-          }`}
+          value={useSelector((state: any) => state.dataState.selectedAcademicSession)}
+          className={`hidden rounded-md px-2 py-2 text-xs text-gray-700 focus:outline-none ${(sessionsPerYear?.length || 0) > 0 ? "md:block" : ""}`}
           onChange={(event) => {
             dispatcher(setAcademicSessionId(event.target.value));
           }}
@@ -498,20 +413,11 @@ export default function Header() {
         </select>
 
         <button className="p-2 text-gray-600 transition-colors hover:text-blue-600 hidden">
-          <img
-            className="h-[24px] w-[24px]"
-            src="/images/messages.svg"
-            alt="Messages"
-          />
+          <img className="h-[24px] w-[24px]" src="/images/messages.svg" alt="Messages" />
         </button>
 
         <button className="p-2 text-gray-600 transition-colors hover:text-blue-600 hidden">
-          <Image
-            src="/images/notification.svg"
-            alt="Notifications"
-            width={24}
-            height={24}
-          />
+          <Image src="/images/notification.svg" alt="Notifications" width={24} height={24} />
         </button>
 
         <div className="relative" ref={profileRef}>
@@ -522,13 +428,7 @@ export default function Header() {
             aria-expanded={isProfileOpen}
             title="User menu"
           >
-            <Image
-              src="/images/avatar-svgrepo-com.svg"
-              alt="User Avatar"
-              width={32}
-              height={32}
-              className="h-8 w-8 rounded-full"
-            />
+            <Image src="/images/avatar-svgrepo-com.svg" alt="User Avatar" width={32} height={32} className="h-8 w-8 rounded-full" />
           </button>
           {isProfileOpen && (
             <div className="absolute right-0 mt-2 w-40 bg-white border border-gray-200 rounded-lg shadow-lg z-20">
@@ -541,10 +441,7 @@ export default function Header() {
               >
                 Profile
               </button>
-              <button
-                onClick={() => signOut({ callbackUrl: "/login" })}
-                className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-              >
+              <button onClick={() => signOut({ callbackUrl: "/login" })} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
                 Sign out
               </button>
             </div>

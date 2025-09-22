@@ -156,7 +156,7 @@ function RoomPage() {
               {allBuildingsData
                 .filter((b) => b.id === roomInfo.building)?.[0]
                 ?.floors?.filter((f) => f.id === roomInfo.floor)?.[0]
-                .name.toUpperCase()}
+                ?.name.toUpperCase()}
               - Room Details
             </h4>
             <span className="text-xs font-semibold text-gray-500 md:ml-2">{allBuildingsData.filter((b) => b.id === roomInfo.building)?.[0]?.name}</span>
