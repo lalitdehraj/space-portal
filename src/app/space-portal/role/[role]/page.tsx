@@ -25,6 +25,9 @@ export default function Buildings() {
   const [isLoadingBuildings, setIsLoadingBuildings] = useState(false);
   const [isLoadingRooms, setIsLoadingRooms] = useState(false);
   const [isLoadingSubrooms, setIsLoadingSubrooms] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(16);
+  const [searchQuery, setSearchQuery] = useState("");
   const acadmeicYear = useSelector((state: any) => state.dataState.selectedAcademicYear);
   const acadmeicSession = useSelector((state: any) => state.dataState.selectedAcademicSession);
   const selectedRoomId = useSelector((state: any) => state.dataState.selectedRoomId);
@@ -117,9 +120,21 @@ export default function Buildings() {
     if (!roomCategories.some((category) => category === selectedRoomType)) dispatcher(setSeletedRoomTypeId("All Rooms"));
   }, [roomCategories]);
 
+  // Reset pagination when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedRoomType, searchQuery]);
+
   const filteredRooms: Room[] = roomsList.filter((room) => {
     return selectedRoomType === "All Rooms" || removeSpaces(room.roomType).toLowerCase().includes(removeSpaces(selectedRoomType).toLowerCase());
   });
+
+  // Apply search filter and pagination
+  const searchRooms = filteredRooms.filter((room) => {
+    return room.roomName.toLowerCase().includes(searchQuery.toLowerCase()) || room.roomId.toLowerCase().includes(searchQuery.toLowerCase());
+  });
+
+  const visibleRooms = searchRooms.slice(0, currentPage * itemsPerPage);
   useEffect(() => {
     const fetchSubrooms = async () => {
       if (!selectedRoom) return;
@@ -148,21 +163,19 @@ export default function Buildings() {
   };
 
   const renderRoomCards = () => {
-    if (!filteredRooms?.length) return;
+    if (!visibleRooms?.length) return;
     const items: JSX.Element[] = [];
     let expandedRowIndex: number | null = null;
     let cardsPerRow = 4;
-    for (let i = 0; i < (filteredRooms?.length || 1); i++) {
-      if (selectedRoom?.roomId === filteredRooms?.[i].roomId) {
+    for (let i = 0; i < visibleRooms.length; i++) {
+      if (selectedRoom?.roomId === visibleRooms[i].roomId) {
         expandedRowIndex = Math.floor(i / cardsPerRow);
         break;
       }
     }
-    const searchRooms = filteredRooms.filter((room) => {
-      return room.roomName.toLowerCase().includes(searchQuery.toLowerCase()) || room.roomId.toLowerCase().includes(searchQuery.toLowerCase());
-    });
-    searchRooms?.length > 0
-      ? searchRooms?.forEach((room, index) => {
+
+    visibleRooms?.length > 0
+      ? visibleRooms?.forEach((room, index) => {
           items.push(
             <RoomCard
               room={room}
@@ -173,7 +186,7 @@ export default function Buildings() {
           );
           const currentRowIndex = Math.floor(index / cardsPerRow);
           const isLastCardInRow = (index + 1) % cardsPerRow === 0;
-          const isLastCardOverall = index === searchRooms.length - 1;
+          const isLastCardOverall = index === visibleRooms.length - 1;
 
           if (selectedRoom !== null && currentRowIndex === expandedRowIndex && (isLastCardInRow || isLastCardOverall)) {
             items.push(
@@ -223,8 +236,6 @@ export default function Buildings() {
 
     return items;
   };
-
-  const [searchQuery, setSearchQuery] = useState("");
 
   return (
     <div>
@@ -304,6 +315,18 @@ export default function Buildings() {
                   ))
                 : renderRoomCards()}
             </div>
+
+            {/* Load More Button */}
+            {!isLoadingRooms && searchRooms.length > 0 && visibleRooms.length < searchRooms.length && (
+              <div className="mt-6 flex justify-center">
+                <button
+                  onClick={() => setCurrentPage((prev) => prev + 1)}
+                  className="px-6 py-2 bg-[#F26722] text-white rounded-lg hover:bg-[#E55A1A] transition-colors duration-300 font-medium"
+                >
+                  Load More ({searchRooms.length - visibleRooms.length} more rooms)
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </section>
