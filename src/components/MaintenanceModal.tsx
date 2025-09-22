@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { RoomInfo, Occupant, Building, Room, Maintenance } from "@/types";
 import { callApi } from "@/utils/apiIntercepter";
-import { URL_NOT_FOUND, INSERT_MAINTENANCE_API, CANCEL_MAINTENANCE_API, GET_MAINTENANCE_DATA_API, credentials } from "@/constants";
+import { URL_NOT_FOUND, credentials } from "@/constants";
 import moment from "moment";
 import { checkSlotConflicts, Slot } from "@/utils/slotsHelper";
 import { useSelector } from "react-redux";
@@ -105,29 +105,20 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
       const rooms: Room[] = [];
       const currentTime = moment().format("HH:mm");
 
-      // Fetch rooms for each building and floor
+      // Fetch rooms for each building using empty floorID to get all rooms
       for (const building of allBuildingsData) {
-        if (!building.floors || building.floors.length === 0) continue;
-
-        const floorPromises = building.floors.map(async (floor) => {
-          try {
-            const response = await callApi<Room[]>(process.env.NEXT_PUBLIC_GET_ROOMS_LIST || URL_NOT_FOUND, {
-              buildingNo: building.id,
-              floorID: floor.id,
-              curreentTime: currentTime,
-            });
-            if (response.success && response.data) {
-              return response.data;
-            }
-            return [];
-          } catch (error) {
-            console.error(`Error fetching rooms for building ${building.id}, floor ${floor.id}:`, error);
-            return [];
+        try {
+          const response = await callApi<Room[]>(process.env.NEXT_PUBLIC_GET_ROOMS_LIST || URL_NOT_FOUND, {
+            buildingNo: building.id,
+            floorID: "",
+            curreentTime: currentTime,
+          });
+          if (response.success && response.data) {
+            rooms.push(...response.data);
           }
-        });
-
-        const floorResults = await Promise.all(floorPromises);
-        rooms.push(...floorResults.flat());
+        } catch (error) {
+          console.error(`Error fetching rooms for building ${building.id}:`, error);
+        }
       }
 
       setAllRooms(rooms);
@@ -148,14 +139,9 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
   // Fetch existing maintenance records
   const fetchExistingMaintenanceRecords = async () => {
     try {
-      console.log("Debug - Fetching maintenance records...");
-      const response = await callApi<Maintenance[]>(GET_MAINTENANCE_DATA_API);
-      console.log("Debug - Maintenance records response:", response);
+      const response = await callApi<Maintenance[]>(process.env.NEXT_PUBLIC_GET_MAINTENANCE_DATA || URL_NOT_FOUND);
       if (response.success && response.data) {
-        console.log("Debug - Setting maintenance records:", response.data.length, "records");
         setExistingMaintenanceRecords(response.data);
-      } else {
-        console.log("Debug - No maintenance records found or API failed");
       }
     } catch (error) {
       console.error("Error fetching maintenance records:", error);
@@ -174,7 +160,7 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
     try {
       const requestbody = {
         roomID: roomId,
-        subroomID: 0,
+        subroomID: "",
         academicYr: academicYear,
         acadSess: academicSession,
         startDate: startDate,
@@ -255,7 +241,7 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
     try {
       const requestbody = {
         roomID: roomId,
-        subroomID: 0,
+        subroomID: "",
         academicYr: academicYear,
         acadSess: academicSession,
         startDate: startDate,
@@ -884,27 +870,20 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
       // Cancel selected maintenance conflicts first
       for (const maintenanceId of selectedMaintenanceConflicts) {
         try {
-          const cancelResponse = await fetch(CANCEL_MAINTENANCE_API, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Basic ${credentials}`,
-            },
-            body: JSON.stringify({
-              id: maintenanceId,
-              isMainteneceActive: "false",
-            }),
+          const cancelResponse = await callApi(process.env.NEXT_PUBLIC_GET_CANCEL_MAINTENANCE || URL_NOT_FOUND, {
+            id: maintenanceId,
+            isMainteneceActive: "false",
           });
 
-          if (!cancelResponse.ok) {
-            console.error(`Failed to cancel maintenance ${maintenanceId}:`, cancelResponse.statusText);
+          if (!cancelResponse.success) {
+            console.error(`Failed to cancel maintenance ${maintenanceId}:`, cancelResponse?.data);
           }
         } catch (error) {
           console.error(`Error cancelling maintenance ${maintenanceId}:`, error);
         }
       }
 
-      const response = await callApi(INSERT_MAINTENANCE_API, maintenanceData);
+      const response = await callApi(process.env.NEXT_PUBLIC_GET_INSERT_MAINTENANCE_DATA || URL_NOT_FOUND, maintenanceData);
 
       if (response.success) {
         alert("Maintenance scheduled successfully");
@@ -982,8 +961,8 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
                   const building = allBuildingsData.find((b) => b.id === room.buildingId);
                   const floor = building?.floors.find((f) => f.id === room.floorId);
                   return (
-                    <option key={room.roomId} value={room.roomId}>
-                      {building?.name} - {floor?.name} - {room.roomName} ({room.roomType})
+                    <option key={`${room.roomId}-${room.buildingId}`} value={room.roomId}>
+                      {building?.name} {floor?.name ? `- ${floor?.name}` : ""} - {room.roomName} {room?.roomType ? `(${room.roomType})` : ""}
                     </option>
                   );
                 })}

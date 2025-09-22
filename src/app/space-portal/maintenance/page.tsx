@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import { useSelector } from "react-redux";
 import { Building, RoomInfo, Occupant, Maintenance } from "@/types";
 import { callApi } from "@/utils/apiIntercepter";
-import { URL_NOT_FOUND, GET_MAINTENANCE_DATA_API, CANCEL_MAINTENANCE_API, credentials } from "@/constants";
+import { URL_NOT_FOUND } from "@/constants";
 import { useBuildingsData } from "@/hooks/useBuildingsData";
 import moment from "moment";
 import MaintenanceModal from "@/components/MaintenanceModal";
@@ -103,19 +103,12 @@ const MaintenancePage = () => {
   const cancelMaintenance = async (maintenanceId: string) => {
     setIsCancelling(true);
     try {
-      const response = await fetch(CANCEL_MAINTENANCE_API, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Basic ${credentials}`,
-        },
-        body: JSON.stringify({
-          id: maintenanceId,
-          isMainteneceActive: "false",
-        }),
+      const response = await callApi(process.env.NEXT_PUBLIC_GET_CANCEL_MAINTENANCE || URL_NOT_FOUND, {
+        id: maintenanceId,
+        isMainteneceActive: "false",
       });
 
-      if (response.ok) {
+      if (response.success) {
         // Refresh the maintenance records after successful cancellation
         await fetchMaintenanceRecords();
         setShowCancelDialog(false);
@@ -123,7 +116,7 @@ const MaintenancePage = () => {
         // You could add a success toast notification here
         alert("Maintenance cancelled successfully!");
       } else {
-        console.error("Failed to cancel maintenance:", response.statusText);
+        console.error("Failed to cancel maintenance:", response?.data);
         alert("Failed to cancel maintenance. Please try again.");
       }
     } catch (error) {
