@@ -155,7 +155,8 @@ export default function Buildings() {
   }, [selectedRoom, acadmeicSession, acadmeicYear]);
   const handleRoomClick = (room: Room) => {
     if (room.hasSubroom) {
-      setSelectedRoom(room.roomId === selectedRoom?.roomId ? undefined : room);
+      const isSameRoom = selectedRoom && selectedRoom.roomId === room.roomId && selectedRoom.buildingId === room.buildingId;
+      setSelectedRoom(isSameRoom ? undefined : room);
     } else {
       setSelectedRoom(undefined);
       if (room.parentId) {
@@ -170,7 +171,7 @@ export default function Buildings() {
     let expandedRowIndex: number | null = null;
     let cardsPerRow = 4;
     for (let i = 0; i < visibleRooms.length; i++) {
-      if (selectedRoom?.roomId === visibleRooms[i].roomId) {
+      if (selectedRoom && selectedRoom.roomId === visibleRooms[i].roomId && selectedRoom.buildingId === visibleRooms[i].buildingId) {
         expandedRowIndex = Math.floor(i / cardsPerRow);
         break;
       }
@@ -181,8 +182,8 @@ export default function Buildings() {
           items.push(
             <RoomCard
               room={room}
-              key={`${room.buildingId}${room.roomId}${index}`}
-              isExpanded={selectedRoom?.roomId === room.roomId}
+              key={`${room.buildingId}-${room.roomId}`}
+              isExpanded={selectedRoom ? selectedRoom.roomId === room.roomId && selectedRoom.buildingId === room.buildingId : false}
               onClick={(room) => handleRoomClick(room)}
             />
           );
@@ -193,7 +194,7 @@ export default function Buildings() {
           if (selectedRoom !== null && currentRowIndex === expandedRowIndex && (isLastCardInRow || isLastCardOverall)) {
             items.push(
               <div
-                key={`details-${selectedRoom?.roomId}`}
+                key={`details-${selectedRoom?.buildingId}-${selectedRoom?.roomId}`}
                 className="
                 col-span-full bg-gray-50 p-8 rounded-xl shadow-inner
                 border border-gray-200
@@ -224,7 +225,7 @@ export default function Buildings() {
                           <div className="h-3 bg-gray-200 rounded w-1/3"></div>
                         </div>
                       ))
-                    : subRooms && subRooms.map((room) => <RoomCard key={room.roomId} onClick={handleRoomClick} room={room} />)}
+                    : subRooms && subRooms.map((room) => <RoomCard key={`${room.buildingId}-${room.roomId}`} onClick={handleRoomClick} room={room} />)}
                 </div>
               </div>
             );

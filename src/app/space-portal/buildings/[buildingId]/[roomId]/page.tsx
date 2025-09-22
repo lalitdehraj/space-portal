@@ -284,6 +284,8 @@ function RoomPage() {
                     academicSessionStartDate={academicSessionStartDate || ""}
                     academicSessionEndDate={academicSessionEndDate || ""}
                     onClickTimeTableSlot={handleTimeTableClick}
+                    roomId={roomId}
+                    roomParentId={roomInfo.parentId}
                   />
                 </div>
               </div>

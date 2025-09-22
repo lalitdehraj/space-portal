@@ -12,11 +12,7 @@ import { removeSpaces } from "@/utils";
 import { callApi } from "@/utils/apiIntercepter";
 import { URL_NOT_FOUND } from "@/constants";
 import { encrypt, decrypt } from "@/utils/encryption";
-import {
-  setSelectedFloorId,
-  setSelectedRoomId,
-  setSeletedRoomTypeId,
-} from "@/app/feature/dataSlice";
+import { setSelectedFloorId, setSelectedRoomId, setSeletedRoomTypeId } from "@/app/feature/dataSlice";
 
 export default function Buildings() {
   const router = useRouter();
@@ -28,21 +24,11 @@ export default function Buildings() {
   const [roomsList, setRoomsList] = useState<Room[]>([]);
   const [selectedRoom, setSelectedRoom] = useState<Room>();
   const [subRooms, setSubRooms] = useState<Room[]>([]);
-  const acadmeicYear = useSelector(
-    (state: any) => state.dataState.selectedAcademicYear
-  );
-  const acadmeicSession = useSelector(
-    (state: any) => state.dataState.selectedAcademicSession
-  );
-  const selectedFloorId = useSelector(
-    (state: any) => state.dataState.selectedFloorId
-  );
-  const selectedRoomId = useSelector(
-    (state: any) => state.dataState.selectedRoomId
-  );
-  const selectedRoomType = useSelector(
-    (state: any) => state.dataState.selectedRoomType
-  );
+  const acadmeicYear = useSelector((state: any) => state.dataState.selectedAcademicYear);
+  const acadmeicSession = useSelector((state: any) => state.dataState.selectedAcademicSession);
+  const selectedFloorId = useSelector((state: any) => state.dataState.selectedFloorId);
+  const selectedRoomId = useSelector((state: any) => state.dataState.selectedRoomId);
+  const selectedRoomType = useSelector((state: any) => state.dataState.selectedRoomType);
   useEffect(() => {
     const fetchBuildings = async () => {
       const reqBody = {
@@ -50,23 +36,14 @@ export default function Buildings() {
         acadYear: `${acadmeicYear}`,
       };
 
-      const response = await callApi<Building[]>(
-        process.env.NEXT_PUBLIC_GET_BUILDING_LIST || URL_NOT_FOUND,
-        reqBody
-      );
+      const response = await callApi<Building[]>(process.env.NEXT_PUBLIC_GET_BUILDING_LIST || URL_NOT_FOUND, reqBody);
       if (response.success) {
-        let building = response.data?.find(
-          (building) => building.id === buildingId
-        );
+        let building = response.data?.find((building) => building.id === buildingId);
         setSelectedBuilding(building);
         console.log(building);
         if ((building?.floors?.length || 0) > 0) {
-          const floor = building?.floors.filter(
-            (f) => f.id === selectedFloorId
-          );
-          setSelectedFloor(
-            floor && (floor?.length || 0) > 0 ? floor?.[0] : building?.floors[0]
-          );
+          const floor = building?.floors.filter((f) => f.id === selectedFloorId);
+          setSelectedFloor(floor && (floor?.length || 0) > 0 ? floor?.[0] : building?.floors[0]);
         }
       }
     };
@@ -85,16 +62,11 @@ export default function Buildings() {
         curreentTime: `${time24h}`,
       };
 
-      const response = await callApi<Room[]>(
-        process.env.NEXT_PUBLIC_GET_ROOMS_LIST || URL_NOT_FOUND,
-        reqBody
-      );
+      const response = await callApi<Room[]>(process.env.NEXT_PUBLIC_GET_ROOMS_LIST || URL_NOT_FOUND, reqBody);
       if (response.success) {
         setRoomsList(response.data || []);
         if (selectedRoomId) {
-          const room = response?.data?.filter(
-            (r) => r.roomId === selectedRoomId
-          );
+          const room = response?.data?.filter((r) => r.roomId === selectedRoomId);
           setSelectedRoom(room?.[0] || undefined);
         }
       }
@@ -111,10 +83,7 @@ export default function Buildings() {
     },
     {
       title: "Occupancy",
-      value: `${Math.ceil(
-        (selectedFloor?.roomOccupied || 0) /
-          (selectedBuilding?.totalOccupancy || 1)
-      )}%`,
+      value: `${Math.ceil((selectedFloor?.roomOccupied || 0) / (selectedBuilding?.totalOccupancy || 1))}%`,
       iconSrc: "/images/floor-plan.svg",
       alt: "Occupancy icon",
     },
@@ -126,24 +95,18 @@ export default function Buildings() {
     },
   ];
 
-  let allRoomsCategories: string[] = [
-    ...new Set(roomsList?.map((room) => room.roomType)),
-  ];
+  let allRoomsCategories: string[] = [...new Set(roomsList?.map((room) => room.roomType).filter((roomType) => roomType && roomType.trim() !== ""))];
   let roomCategories = ["All Rooms"];
   roomCategories = [...roomCategories, ...allRoomsCategories];
 
   useEffect(() => {
-    if (roomCategories.some((category) => category === selectedRoomType))
-      dispatcher(setSeletedRoomTypeId("All Rooms"));
+    if (roomCategories.some((category) => category === selectedRoomType)) dispatcher(setSeletedRoomTypeId("All Rooms"));
   }, [selectedFloor]);
 
   const filteredRooms: Room[] = roomsList.filter((room) => {
-    return (
-      selectedRoomType === "All Rooms" ||
-      removeSpaces(room.roomType)
-        .toLowerCase()
-        .includes(removeSpaces(selectedRoomType).toLowerCase())
-    );
+    if (selectedRoomType === "All Rooms") return true;
+    if (!room.roomType || room.roomType.trim() === "") return false;
+    return removeSpaces(room.roomType).toLowerCase().includes(removeSpaces(selectedRoomType).toLowerCase());
   });
 
   const handleRoomTypesClick = (roomType: string) => {
@@ -158,10 +121,7 @@ export default function Buildings() {
         acadSess: acadmeicSession,
         acadYr: acadmeicYear,
       };
-      let response = callApi<Room[]>(
-        process.env.NEXT_PUBLIC_GET_SUBROOMS_LIST || URL_NOT_FOUND,
-        requestBody
-      );
+      let response = callApi<Room[]>(process.env.NEXT_PUBLIC_GET_SUBROOMS_LIST || URL_NOT_FOUND, requestBody);
       let res = await response;
       console.log(res);
       setSubRooms(res.data || []);
@@ -176,21 +136,13 @@ export default function Buildings() {
   const handleRoomClick = (room: Room) => {
     if (room.hasSubroom) {
       dispatcher(setSelectedRoomId(room.roomId));
-      setSelectedRoom(room.roomId === selectedRoom?.roomId ? undefined : room);
+      const isSameRoom = selectedRoom && selectedRoom.roomId === room.roomId && selectedRoom.buildingId === room.buildingId;
+      setSelectedRoom(isSameRoom ? undefined : room);
     } else {
       dispatcher(setSelectedRoomId(""));
       if (room.parentId) {
-        router.push(
-          `/space-portal/buildings/${encrypt(buildingId)}/${encrypt(
-            `${room.parentId}|${room.roomId}`
-          )}`
-        );
-      } else
-        router.push(
-          `/space-portal/buildings/${encrypt(buildingId)}/${encrypt(
-            room.roomId
-          )}`
-        );
+        router.push(`/space-portal/buildings/${encrypt(buildingId)}/${encrypt(`${room.parentId}|${room.roomId}`)}`);
+      } else router.push(`/space-portal/buildings/${encrypt(buildingId)}/${encrypt(room.roomId)}`);
     }
   };
 
@@ -200,7 +152,7 @@ export default function Buildings() {
     let expandedRowIndex: number | null = null;
     let cardsPerRow = 4;
     for (let i = 0; i < (filteredRooms?.length || 1); i++) {
-      if (selectedRoom?.roomId === filteredRooms?.[i].roomId) {
+      if (selectedRoom && selectedRoom.roomId === filteredRooms?.[i].roomId && selectedRoom.buildingId === filteredRooms?.[i].buildingId) {
         expandedRowIndex = Math.floor(i / cardsPerRow);
         break;
       }
@@ -209,8 +161,8 @@ export default function Buildings() {
       items.push(
         <RoomCard
           room={room}
-          key={room.roomId}
-          isExpanded={selectedRoom?.roomId === room.roomId}
+          key={`${room.buildingId}-${room.roomId}`}
+          isExpanded={selectedRoom ? selectedRoom.roomId === room.roomId && selectedRoom.buildingId === room.buildingId : false}
           onClick={(room) => handleRoomClick(room)}
         />
       );
@@ -218,14 +170,10 @@ export default function Buildings() {
       const isLastCardInRow = (index + 1) % cardsPerRow === 0;
       const isLastCardOverall = index === filteredRooms.length - 1;
 
-      if (
-        selectedRoom !== null &&
-        currentRowIndex === expandedRowIndex &&
-        (isLastCardInRow || isLastCardOverall)
-      ) {
+      if (selectedRoom !== null && currentRowIndex === expandedRowIndex && (isLastCardInRow || isLastCardOverall)) {
         items.push(
           <div
-            key={`details-${selectedRoom?.roomId}`}
+            key={`details-${selectedRoom?.buildingId}-${selectedRoom?.roomId}`}
             className="
                 col-span-full bg-gray-50 p-8 rounded-xl shadow-inner
                 border border-gray-200
@@ -251,13 +199,7 @@ export default function Buildings() {
             </h4>
             <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3">
               {subRooms &&
-                subRooms?.map((room) => (
-                  <RoomCard
-                    key={`${room.parentId}${room.roomId}`}
-                    onClick={handleRoomClick}
-                    room={room}
-                  />
-                ))}
+                subRooms?.map((room) => <RoomCard key={`${room.buildingId}-${room.parentId}-${room.roomId}`} onClick={handleRoomClick} room={room} />)}
             </div>
           </div>
         );
@@ -274,12 +216,8 @@ export default function Buildings() {
           <div className="flex-1 overflow-y-auto">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between">
               <div>
-                <h2 className="text-base font-semibold text-gray-800 md:ml-2">
-                  {selectedBuilding?.name}
-                </h2>
-                <h4 className="text-xs font-semibold text-gray-500 md:ml-2">
-                  Floors
-                </h4>
+                <h2 className="text-base font-semibold text-gray-800 md:ml-2">{selectedBuilding?.name}</h2>
+                <h4 className="text-xs font-semibold text-gray-500 md:ml-2">Floors</h4>
               </div>
 
               <button
@@ -296,9 +234,7 @@ export default function Buildings() {
                 <button
                   key={floor.id}
                   className={`flex items-center rounded-md px-4 py-2 text-xs transition-all ${
-                    selectedFloor?.id === floor.id
-                      ? "bg-[#F26722] text-white shadow-md"
-                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    selectedFloor?.id === floor.id ? "bg-[#F26722] text-white shadow-md" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                   }`}
                   onClick={() => handleFloorClick(floor)}
                 >
@@ -311,21 +247,10 @@ export default function Buildings() {
             <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
               {kpiCards.map((card) =>
                 card.value ? (
-                  <div
-                    key={card.title}
-                    className="rounded-lg bg-white p-4 pl-6 shadow-sm"
-                  >
-                    <Image
-                      src={card.iconSrc}
-                      alt={card.alt}
-                      height={24}
-                      width={24}
-                      className="mb-2 h-6 w-6"
-                    />
+                  <div key={card.title} className="rounded-lg bg-white p-4 pl-6 shadow-sm">
+                    <Image src={card.iconSrc} alt={card.alt} height={24} width={24} className="mb-2 h-6 w-6" />
                     <h3 className="text-xs text-black">{card.title}</h3>
-                    <h5 className="text-xl font-semibold text-black">
-                      {card.value}
-                    </h5>
+                    <h5 className="text-xl font-semibold text-black">{card.value}</h5>
                   </div>
                 ) : null
               )}
@@ -333,17 +258,13 @@ export default function Buildings() {
 
             {filteredRooms.length ? (
               <div>
-                <h4 className="mt-6 text-xs font-semibold text-gray-500 md:ml-2">
-                  Rooms
-                </h4>
+                <h4 className="mt-6 text-xs font-semibold text-gray-500 md:ml-2">Rooms</h4>
                 <div className="mt-4 flex gap-2 overflow-x-auto pb-2">
                   {roomCategories?.map((roomType) => (
                     <button
                       key={roomType}
                       className={`flex items-center rounded-md px-3 py-1 text-xs font-medium transition-all ${
-                        selectedRoomType === roomType
-                          ? "bg-[#F26722] text-white shadow-md"
-                          : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                        selectedRoomType === roomType ? "bg-[#F26722] text-white shadow-md" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                       }`}
                       onClick={() => handleRoomTypesClick(roomType)}
                     >
@@ -351,14 +272,10 @@ export default function Buildings() {
                     </button>
                   ))}
                 </div>
-                <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                  {renderRoomCards()}
-                </div>
+                <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{renderRoomCards()}</div>
               </div>
             ) : (
-              <div className="mt-6 text-gray-500 justify-center items-center w-full h-full">
-                No Rooms Found
-              </div>
+              <div className="mt-6 text-gray-500 justify-center items-center w-full h-full">No Rooms Found</div>
             )}
           </div>
         </div>

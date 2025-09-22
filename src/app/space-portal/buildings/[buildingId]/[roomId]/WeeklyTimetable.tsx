@@ -20,6 +20,8 @@ type WeeklyTimetableProps = {
   academicSessionEndDate: string;
   onClickTimeTableSlot: (date: string, slot: { start: string; end: string }) => void;
   refreshData: () => void;
+  roomId: string;
+  roomParentId?: string;
 };
 
 function WeeklyTimetable({
@@ -32,6 +34,8 @@ function WeeklyTimetable({
   academicSessionStartDate,
   academicSessionEndDate,
   refreshData,
+  roomId,
+  roomParentId,
 }: WeeklyTimetableProps) {
   const startHour = 9;
   const endHour = 18;
@@ -268,7 +272,14 @@ function WeeklyTimetable({
                     {maintenanceData
                       .filter((maintenance) => {
                         const maintenanceDate = new Date(maintenance.maintanceDate);
-                        return maintenanceDate.toDateString() === date.toDateString() && maintenance.isMainteneceActive;
+                        const isDateMatch = maintenanceDate.toDateString() === date.toDateString();
+                        const isActive = maintenance.isMainteneceActive;
+
+                        // Check if maintenance is for this room or its parent room
+                        const isRoomMatch = maintenance.roomid === roomId;
+                        const isParentMatch = roomParentId && maintenance.roomid === roomParentId;
+
+                        return isDateMatch && isActive && (isRoomMatch || isParentMatch);
                       })
                       .map((maintenance) => {
                         // Parse time from the API format (e.g., "0001-01-02T09:00:00Z")
