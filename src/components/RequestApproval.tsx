@@ -29,7 +29,6 @@ export default function RequestApproval({ requestData, onApprovalComplete, onClo
 
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [selectedBuildingId, setSelectedBuildingId] = useState<string>("");
-  const [selectedFloorId, setSelectedFloorId] = useState<string>("");
   const [rooms, setRooms] = useState<Room[]>([]);
   const [selectedRoomId, setSelectedRoomId] = useState<string>("");
   const [description, setDescription] = useState<string>("");
@@ -51,16 +50,15 @@ export default function RequestApproval({ requestData, onApprovalComplete, onClo
     fetchBuildings();
   }, [academicSession, academicYear]);
 
-  // Fetch rooms for selected building/floor
+  // Fetch rooms for selected building
   useEffect(() => {
     const fetchRoomsForBuilding = async (buildingId: string) => {
       const building = buildings.find((b) => b.id === buildingId);
       if (!building) return setRooms([]);
-      const floorIds = building.floors?.map((f) => f.id) || [];
-      if (floorIds.length === 0) return setRooms([]);
+
       const reqBody = {
         buildingNo: buildingId,
-        floorID: selectedFloorId,
+        floorID: "", // Empty to get all rooms from the building
         curreentTime: moment().format("HH:mm"),
       };
       const response = await callApi<Room[]>(process.env.NEXT_PUBLIC_GET_ROOMS_LIST || URL_NOT_FOUND, reqBody);
@@ -70,7 +68,7 @@ export default function RequestApproval({ requestData, onApprovalComplete, onClo
       fetchRoomsForBuilding(selectedBuildingId);
       setSelectedRoomId("");
     } else setRooms([]);
-  }, [selectedBuildingId, selectedFloorId, buildings, academicSession, academicYear]);
+  }, [selectedBuildingId, buildings, academicSession, academicYear]);
 
   // Fetch maintenance data
   useEffect(() => {
@@ -219,8 +217,8 @@ export default function RequestApproval({ requestData, onApprovalComplete, onClo
     if (!requestData) return [];
     return slots.map((slot) => ({
       allocationDate: slot.date,
-      startTime: `${slot.start}:00`,
-      endTime: `${slot.end}:00`,
+      startTime: `${slot.start}`,
+      endTime: `${slot.end}`,
       keyAssigned: keys,
       subRoom: "0",
       allocatedRoomID: selectedRoomId,
@@ -420,40 +418,29 @@ export default function RequestApproval({ requestData, onApprovalComplete, onClo
                   ))}
                 </select>
               </div>
-              <div className="md:w-1/2 w-full mt-4 md:mt-0">
-                <label className="block text-sm text-gray-700 mb-1">Floor</label>
-                <select
-                  className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
-                  value={selectedFloorId}
-                  onChange={(e) => setSelectedFloorId(e.target.value)}
-                  disabled={!selectedBuildingId}
-                >
-                  <option value="">Select floor</option>
-                  {buildings
-                    .filter((b) => b.id === selectedBuildingId)
-                    .map((b) =>
-                      b.floors.map((f) => (
-                        <option key={f.id} value={f.id}>
-                          {f.name}
-                        </option>
-                      ))
-                    )}
-                </select>
-              </div>
-              <div className="md:w-1/2 w-full mt-4 md:mt-0">
+              <div className="w-full mt-4 md:mt-0">
                 <label className="block text-sm text-gray-700 mb-1">Room</label>
                 <select
                   className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
                   value={selectedRoomId}
                   onChange={(e) => setSelectedRoomId(e.target.value)}
-                  disabled={!selectedFloorId}
+                  disabled={!selectedBuildingId}
                 >
                   <option value="">Select room</option>
-                  {rooms.map((r) => (
-                    <option key={r.roomId} value={r.roomId}>
-                      {r.roomName}
-                    </option>
-                  ))}
+                  {rooms
+                    .filter((r) => !r.hasSubroom) // Only show rooms where hasSubroom is false
+                    .map((r) => {
+                      const roomName = r.roomName || "Unknown Room";
+                      const roomId = r.roomId || "N/A";
+                      const roomType = r.roomType && r.roomType.trim() !== "" ? r.roomType : "N/A";
+                      const capacity = r.roomCapactiy || 0;
+
+                      return (
+                        <option key={r.roomId} value={r.roomId}>
+                          {roomName} ({roomId} • {roomType} • {capacity})
+                        </option>
+                      );
+                    })}
                 </select>
               </div>
             </div>

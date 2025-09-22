@@ -957,15 +957,17 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
                 disabled={isLoadingRooms}
               >
                 <option value="">{isLoadingRooms ? "Loading rooms..." : "Select a room..."}</option>
-                {allRooms.map((room) => {
-                  const building = allBuildingsData.find((b) => b.id === room.buildingId);
-                  const floor = building?.floors.find((f) => f.id === room.floorId);
-                  return (
-                    <option key={`${room.roomId}-${room.buildingId}`} value={room.roomId}>
-                      {building?.name} {floor?.name ? `- ${floor?.name}` : ""} - {room.roomName} {room?.roomType ? `(${room.roomType})` : ""}
-                    </option>
-                  );
-                })}
+                {allRooms
+                  .filter((room) => !room.hasSubroom) // Only show rooms where hasSubroom is false
+                  .map((room) => {
+                    const building = allBuildingsData.find((b) => b.id === room.buildingId);
+                    const floor = building?.floors.find((f) => f.id === room.floorId);
+                    return (
+                      <option key={`${room.roomId}-${room.buildingId}`} value={room.roomId}>
+                        {building?.name} {floor?.name ? `- ${floor?.name}` : ""} - {room.roomName} {room?.roomType ? `(${room.roomType})` : ""}
+                      </option>
+                    );
+                  })}
               </select>
               {isLoadingRoomInfo && <div className="text-sm text-gray-500 mt-1">Loading room information...</div>}
               {selectedRoomInfo && (
@@ -1202,15 +1204,17 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
                                 disabled={isLoadingRooms}
                               >
                                 <option value="">{isLoadingRooms ? "Loading rooms..." : "Select Room"}</option>
-                                {allRooms.map((room) => {
-                                  const building = allBuildingsData.find((b) => b.id === room.buildingId);
-                                  const floor = building?.floors.find((f) => f.id === room.floorId);
-                                  return (
-                                    <option key={room.roomId} value={room.roomId}>
-                                      {building?.name} - {floor?.name} - {room.roomName}
-                                    </option>
-                                  );
-                                })}
+                                {allRooms
+                                  .filter((room) => !room.hasSubroom) // Only show rooms where hasSubroom is false
+                                  .map((room) => {
+                                    const building = allBuildingsData.find((b) => b.id === room.buildingId);
+                                    const floor = building?.floors.find((f) => f.id === room.floorId);
+                                    return (
+                                      <option key={`${room.roomId}-${room.buildingId}`} value={room.roomId}>
+                                        {building?.name} {floor?.name ? `- ${floor?.name}` : ""} - {room.roomName} {room?.roomType ? `(${room.roomType})` : ""}
+                                      </option>
+                                    );
+                                  })}
                               </select>
                               <input
                                 type="date"
