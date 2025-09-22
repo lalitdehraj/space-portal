@@ -6,6 +6,7 @@ import moment from "moment";
 import { Occupant, Maintenance } from "@/types";
 import AllocationDetailsModal from "@/components/AllocationDetailsModal";
 import UpdateSlotModal from "@/components/UpdateSlotModal";
+import MaintenanceInfoModal from "@/components/MaintenanceInfoModal";
 import { callApi } from "@/utils/apiIntercepter";
 import { URL_NOT_FOUND } from "@/constants";
 
@@ -88,6 +89,7 @@ function WeeklyTimetable({
 
   const [selectedOccupant, setSelectedOccupant] = React.useState<Occupant | null>(null);
   const [showUpdateModal, setShowUpdateModal] = React.useState<boolean>(false);
+  const [selectedMaintenance, setSelectedMaintenance] = React.useState<Maintenance | null>(null);
 
   /** Navigation */
   const handlePrevWeek = () => {
@@ -237,7 +239,7 @@ function WeeklyTimetable({
                         const top = ((startMins - dayStartMins) / slotInterval) * slotHeight;
                         const height = ((endMins - startMins) / slotInterval) * slotHeight;
 
-                        const isEditable = occupant.isEditable === "true" || occupant.isEditable === true;
+                        const isEditable = occupant.isEditable === "true";
                         const bgColor = isEditable ? "bg-blue-100" : "bg-yellow-100";
                         const borderColor = isEditable ? "border-blue-300" : "border-yellow-300";
                         const hoverColor = isEditable ? "hover:bg-blue-200" : "hover:bg-yellow-200";
@@ -283,7 +285,11 @@ function WeeklyTimetable({
                         return (
                           <div
                             key={`maintenance-${maintenance.id}`}
-                            className="absolute left-1 right-1 bg-red-100 border border-red-300 rounded-md px-2 py-1 text-xs shadow-sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedMaintenance(maintenance);
+                            }}
+                            className="absolute left-1 right-1 bg-red-100 border border-red-300 rounded-md px-2 py-1 text-xs cursor-pointer hover:bg-red-200 transition-colors shadow-sm"
                             style={{ top, height }}
                           >
                             <div className="font-medium text-red-800 truncate">🔧 Maintenance</div>
@@ -322,6 +328,8 @@ function WeeklyTimetable({
           academicSessionEndDate={academicSessionEndDate}
         />
       )}
+
+      {selectedMaintenance && <MaintenanceInfoModal maintenance={selectedMaintenance} onClose={() => setSelectedMaintenance(null)} />}
     </div>
   );
 }
