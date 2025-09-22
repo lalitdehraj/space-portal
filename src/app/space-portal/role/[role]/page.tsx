@@ -18,7 +18,6 @@ export default function Buildings() {
   const params = useParams();
   let role = params.role?.toString().replace("%20", " ");
   let [buildings, setBuildings] = useState<Building[]>();
-  const [selectedFloor, setSelectedFloor] = useState<Floor | null>(null);
   const [roomsList, setRoomsList] = useState<Room[]>([]);
   const [selectedRoom, setSelectedRoom] = useState<Room>();
   const [subRooms, setSubRooms] = useState<Room[]>([]);
@@ -82,7 +81,7 @@ export default function Buildings() {
         });
 
         const roomLists = await Promise.all(promises);
-        setRoomsList(roomLists.flat());
+        setRoomsList(roomLists.flat().sort((a, b) => a.roomName.localeCompare(b.roomName)));
       } catch (error) {
         console.error("Error fetching rooms:", error);
       } finally {
@@ -114,7 +113,7 @@ export default function Buildings() {
     },
   ];
 
-  let allRoomsCategories: string[] = [...new Set(roomsList.map((room) => room.roomType))];
+  let allRoomsCategories: string[] = [...new Set(roomsList.map((room) => room.roomType).filter((roomType) => roomType && roomType.trim() !== ""))];
   let roomCategories = ["All Rooms"];
   roomCategories = [...roomCategories, ...allRoomsCategories];
   useEffect(() => {
@@ -127,7 +126,9 @@ export default function Buildings() {
   }, [selectedRoomType, searchQuery]);
 
   const filteredRooms: Room[] = roomsList.filter((room) => {
-    return selectedRoomType === "All Rooms" || removeSpaces(room.roomType).toLowerCase().includes(removeSpaces(selectedRoomType).toLowerCase());
+    if (selectedRoomType === "All Rooms") return true;
+    if (!room.roomType || room.roomType.trim() === "") return false;
+    return removeSpaces(room.roomType).toLowerCase().includes(removeSpaces(selectedRoomType).toLowerCase());
   });
 
   // Apply search filter and pagination
