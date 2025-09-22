@@ -7,6 +7,7 @@ import { callApi } from "@/utils/apiIntercepter";
 import { URL_NOT_FOUND } from "@/constants";
 import { decrypt } from "@/utils/encryption";
 import { useSelector } from "react-redux";
+import { useBuildingsData } from "@/hooks/useBuildingsData";
 import WeeklyTimetable from "./WeeklyTimetable";
 import AddAssignmentForm from "./AddAssignmentForm";
 import moment from "moment";
@@ -34,29 +35,13 @@ function RoomPage() {
     start: string;
     end: string;
   } | null>(null);
-  const [allBuildingsData, setAllBuildingsData] = useState<Building[]>([]);
   const [selectedWeekStart, setSelectedWeekStart] = useState(() => moment().startOf("isoWeek").toDate());
   const [maintenanceData, setMaintenanceData] = useState<Maintenance[]>([]);
 
-  const MAX_WEEKLY_MINUTES = 63 * 60; // adjustable max weekly minutes
+  // Use custom hook for buildings data
+  const { buildings: allBuildingsData } = useBuildingsData();
 
-  /** Fetch all buildings */
-  useEffect(() => {
-    const fetchBuildings = async () => {
-      if (!acadmeicSession && !acadmeicYear) return;
-      try {
-        const reqBody = {
-          acadSession: `${acadmeicSession}`,
-          acadYear: `${acadmeicYear}`,
-        };
-        const response = await callApi<Building[]>(process.env.NEXT_PUBLIC_GET_BUILDING_LIST || URL_NOT_FOUND, reqBody);
-        if (response.success) setAllBuildingsData(response.data || []);
-      } catch (error) {
-        console.error("Error fetching buildings:", error);
-      }
-    };
-    fetchBuildings();
-  }, [acadmeicSession, acadmeicYear]);
+  const MAX_WEEKLY_MINUTES = 63 * 60; // adjustable max weekly minutes
 
   /** Fetch room info */
   const fetchRoomInfo = async () => {
@@ -102,7 +87,7 @@ function RoomPage() {
 
   useEffect(() => {
     fetchMaintenanceData();
-  }, []);
+  }, [buildingId, roomId]);
 
   /** Handle timetable slot click */
   const handleTimeTableClick = (date: string, slot: { start: string; end: string }) => {

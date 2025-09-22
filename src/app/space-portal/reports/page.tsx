@@ -7,6 +7,7 @@ import { useSelector } from "react-redux";
 import { Building, Report, AcademicSession, AcademicYear, Room, Department, Faculty } from "@/types";
 import { formatDate, formatDateOnly, formatFileSize } from "@/utils";
 import { AcademicYearResponse, AcademicSessionResponse } from "@/components/Header";
+import { useBuildingsData } from "@/hooks/useBuildingsData";
 import moment from "moment";
 
 /**
@@ -413,8 +414,10 @@ function GenerateReportForm({ onClosePressed, startJob, setJobId, setReady, setP
   const [selectedFaculty, setSelectedFaculty] = useState<string>("");
   const [selectedDepartment, setSelectedDepartment] = useState<string>("");
   const [selectedFloorId, setSelectedFloorId] = useState<string>("");
-  const [buildings, setBuildings] = useState<Building[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
+
+  // Use custom hook for buildings data
+  const { buildings } = useBuildingsData();
   const [reportType, setReportType] = useState("room");
   const [academicYearsList, setAcademicYearsList] = useState<AcademicYear[]>();
   const [academicSessionsList, setAcademicSessionsList] = useState<AcademicSession[]>();
@@ -451,25 +454,6 @@ function GenerateReportForm({ onClosePressed, startJob, setJobId, setReady, setP
     };
     getAcadmicCalender();
   }, []);
-
-  useEffect(() => {
-    const fetchBuildings = async () => {
-      try {
-        const reqBody = {
-          acadSession: `${acadmeicSession}`,
-          acadYear: `${acadmeicYear}`,
-        };
-
-        const response = await callApi<Building[]>(process.env.NEXT_PUBLIC_GET_BUILDING_LIST || URL_NOT_FOUND, reqBody);
-        if (response.success) {
-          setBuildings(response.data || []);
-        }
-      } catch (err) {
-        console.error("Error fetching buildings:", err);
-      }
-    };
-    fetchBuildings();
-  }, [acadmeicSession, acadmeicYear]);
 
   // fetch departments & faculties (endpoints are optional; set env vars if available)
   useEffect(() => {

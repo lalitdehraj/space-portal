@@ -1,53 +1,44 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import Image from "next/image";
-import {
-  Building as Build,
-  Users,
-  AlertTriangle,
-  TrendingUp,
-} from "lucide-react";
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from "recharts";
+import { Building as Build, Users, AlertTriangle, TrendingUp } from "lucide-react";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { callApi } from "@/utils/apiIntercepter";
 import { URL_NOT_FOUND } from "@/constants";
 import { useSelector } from "react-redux";
 import { Building, DashboardDataResponse } from "@/types";
+import { useBuildingsData } from "@/hooks/useBuildingsData";
+import { isValidDateRange } from "@/utils";
 import moment from "moment";
 
 export default function Dashboard() {
   const [data, setData] = useState<DashboardDataResponse | null>(null);
   const [isLoadingDashboard, setIsLoadingDashboard] = useState(false);
-  const [isLoadingBuildings, setIsLoadingBuildings] = useState(false);
-  const acadmeicYear = useSelector(
-    (state: any) => state.dataState.selectedAcademicYear
-  );
-  const isActiveSession = useSelector(
-    (state: any) => state.dataState.isActiveSession
-  );
-  const sessionStartDate = useSelector(
-    (state: any) => state.dataState.selectedAcademicSessionStartDate
-  );
-  const sessionEndDate = useSelector(
-    (state: any) => state.dataState.selectedAcademicSessionEndDate
-  );
-  const acadmeicSession = useSelector(
-    (state: any) => state.dataState.selectedAcademicSession
-  );
+  const acadmeicYear = useSelector((state: any) => state.dataState.selectedAcademicYear);
+  const isActiveSession = useSelector((state: any) => state.dataState.isActiveSession);
+  const sessionStartDate = useSelector((state: any) => state.dataState.selectedAcademicSessionStartDate);
+  const sessionEndDate = useSelector((state: any) => state.dataState.selectedAcademicSessionEndDate);
+  const acadmeicSession = useSelector((state: any) => state.dataState.selectedAcademicSession);
   const [days, setDays] = useState("7");
 
-  const [allBuildingsData, setAllBuildingsData] = useState<Building[]>([]);
+  // Use custom hook for buildings data
+  const { buildings: allBuildingsData, isLoading: isLoadingBuildings } = useBuildingsData();
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   useEffect(() => {
     const fetchDashboardData = async () => {
+      // Avoid API call if required data is insufficient
+      if (!startDate || !endDate || !acadmeicSession) {
+        console.log("Skipping dashboard API call - insufficient data:", { startDate, endDate, acadmeicSession });
+        return;
+      }
+
+      // Validate date range using utility function
+      if (!isValidDateRange(startDate, endDate)) {
+        console.log("Skipping dashboard API call - invalid date range:", { startDate, endDate });
+        return;
+      }
+
       setIsLoadingDashboard(true);
       try {
         const requestBody = {
@@ -58,7 +49,8 @@ export default function Dashboard() {
         };
         let response = await callApi<DashboardDataResponse>(
           process.env.NEXT_PUBLIC_DASHBOARD_URL || URL_NOT_FOUND,
-          requestBody
+          requestBody,
+          { ttl: 2 * 60 * 1000 } // Cache for 2 minutes
         );
         console.log(response.data);
         setData(response.data || null);
@@ -69,19 +61,10 @@ export default function Dashboard() {
       }
     };
     fetchDashboardData();
-  }, [startDate, endDate]);
+  }, [startDate, endDate, acadmeicSession]);
 
   useEffect(() => {
-    if (
-      !(
-        days &&
-        acadmeicSession &&
-        acadmeicYear &&
-        sessionEndDate &&
-        sessionEndDate
-      )
-    )
-      return;
+    if (!(days && acadmeicSession && acadmeicYear && sessionEndDate && sessionEndDate)) return;
     if (isActiveSession) {
       setEndDate(moment().format("YYYY-MM-DD"));
       setStartDate(
@@ -94,31 +77,6 @@ export default function Dashboard() {
       setEndDate(sessionEndDate);
     }
   }, [days, acadmeicSession, acadmeicYear, sessionStartDate, sessionEndDate]);
-  useEffect(() => {
-    const fetchBuildings = async () => {
-      if (!acadmeicSession && !acadmeicYear) return;
-      setIsLoadingBuildings(true);
-      try {
-        const reqBody = {
-          acadSession: `${acadmeicSession}`,
-          acadYear: `${acadmeicYear}`,
-        };
-        const response = await callApi<Building[]>(
-          process.env.NEXT_PUBLIC_GET_BUILDING_LIST || URL_NOT_FOUND,
-          reqBody
-        );
-        console.log(response);
-        if (response.success) {
-          setAllBuildingsData(response.data || []);
-        }
-      } catch (error) {
-        console.error("Error fetching buildings:", error);
-      } finally {
-        setIsLoadingBuildings(false);
-      }
-    };
-    fetchBuildings();
-  }, []);
 
   const kpiCards = [
     {
@@ -151,13 +109,7 @@ export default function Dashboard() {
       alt: "Seat icon",
       extraContent: isActiveSession && (
         <div className="flex items-center">
-          <Image
-            src="/images/calendar.svg"
-            alt="Calendar icon"
-            height={16}
-            width={16}
-            className="mr-2"
-          />
+          <Image src="/images/calendar.svg" alt="Calendar icon" height={16} width={16} className="mr-2" />
           <select
             value={days}
             onChange={(e) => setDays(e.target.value)}
@@ -200,8 +152,7 @@ export default function Dashboard() {
           <LineChart
             data={data?.graphDataPoints.map((g) => {
               return {
-                OccupancyRate:
-                  Math.ceil(parseFloat(g.OccupancyRate) * 100) / 100,
+                OccupancyRate: Math.ceil(parseFloat(g.OccupancyRate) * 100) / 100,
                 time: moment(new Date(g.time)).format("DD-MM"),
               };
             })}
@@ -213,12 +164,7 @@ export default function Dashboard() {
             }}
           >
             <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
-            <XAxis
-              className="text-xs"
-              dataKey="time"
-              tickLine={false}
-              axisLine={{ stroke: "#666666" }}
-            />
+            <XAxis className="text-xs" dataKey="time" tickLine={false} axisLine={{ stroke: "#666666" }} />
             <YAxis
               className="text-xs"
               tickFormatter={(value) => `${value}%`}
@@ -335,17 +281,12 @@ export default function Dashboard() {
   return (
     <div>
       <section className="mb-8">
-        <h2 className="mb-4 text-base font-semibold text-gray-800 md:ml-2">
-          Key Metrics
-        </h2>
+        <h2 className="mb-4 text-base font-semibold text-gray-800 md:ml-2">Key Metrics</h2>
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-6 md:grid-cols-3">
           {isLoadingDashboard || isLoadingBuildings
             ? // Loading skeleton for KPI cards
               Array.from({ length: 6 }).map((_, index) => (
-                <div
-                  key={index}
-                  className="rounded-lg bg-white p-4 shadow-sm animate-pulse"
-                >
+                <div key={index} className="rounded-lg bg-white p-4 shadow-sm animate-pulse">
                   <div className="mb-2 flex items-center justify-between">
                     <div className="h-6 w-6 bg-gray-200 rounded"></div>
                     <div className="h-4 w-16 bg-gray-200 rounded"></div>
@@ -355,66 +296,33 @@ export default function Dashboard() {
                 </div>
               ))
             : kpiCards.map((card) => (
-                <div
-                  key={card.title}
-                  className="rounded-lg bg-white p-4 shadow-sm"
-                >
+                <div key={card.title} className="rounded-lg bg-white p-4 shadow-sm">
                   <div className="mb-2 flex items-center justify-between">
-                    <Image
-                      src={card.iconSrc}
-                      alt={card.alt}
-                      height={24}
-                      width={24}
-                      className="h-6 w-6"
-                    />
+                    <Image src={card.iconSrc} alt={card.alt} height={24} width={24} className="h-6 w-6" />
                     {card.extraContent}
                   </div>
                   <p className="text-xs text-gray-600">{card.title}</p>
-                  <p className="text-xl font-semibold text-gray-900">
-                    {card.value}
-                  </p>
+                  <p className="text-xl font-semibold text-gray-900">{card.value}</p>
                 </div>
               ))}
         </div>
       </section>
 
       <section>
-        <h2 className="mb-4 text-base font-semibold text-gray-800 md:ml-2">
-          Building Occupancy Comparison
-        </h2>
+        <h2 className="mb-4 text-base font-semibold text-gray-800 md:ml-2">Building Occupancy Comparison</h2>
         <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-sm font-semibold text-gray-800">
-                Occupancy Performance
-              </h3>
-              <p className="text-[10px] text-gray-500">
-                Comparative analysis across all campus facilities
-              </p>
+              <h3 className="text-sm font-semibold text-gray-800">Occupancy Performance</h3>
+              <p className="text-[10px] text-gray-500">Comparative analysis across all campus facilities</p>
             </div>
             <div className=" flex space-x-4 hidden ">
-              <button
-                type="button"
-                className="flex items-center text-xs text-gray-800 transition-colors hover:text-gray-600"
-              >
-                <img
-                  src="/images/bx-filter-alt.svg"
-                  alt="Filter icon"
-                  className="mr-1 h-[16px] w-[16px]"
-                />
+              <button type="button" className="flex items-center text-xs text-gray-800 transition-colors hover:text-gray-600">
+                <img src="/images/bx-filter-alt.svg" alt="Filter icon" className="mr-1 h-[16px] w-[16px]" />
                 Filter
               </button>
-              <button
-                type="button"
-                className="flex items-center text-xs text-gray-800 transition-colors hover:text-gray-600"
-              >
-                <Image
-                  src="/images/bx-download.svg"
-                  alt="Download icon"
-                  height={16}
-                  width={16}
-                  className="mr-1"
-                />
+              <button type="button" className="flex items-center text-xs text-gray-800 transition-colors hover:text-gray-600">
+                <Image src="/images/bx-download.svg" alt="Download icon" height={16} width={16} className="mr-1" />
                 Export
               </button>
             </div>
@@ -445,27 +353,28 @@ export default function Dashboard() {
   );
 }
 
-
-
-
-type getReportData=  ( roomId:string,startDate:"YYYY-MM-DD",endDate:"YYYY-MM-DD")=>{
-  roomNo:string // room id would be passed here 
-  programName: string// program fetch program name using room allocation,
-  programCode:string// program code using room allocation
-  roomType:string// type of room 
-  facultyName :string// Employee name 
-  employeeId:string//Employee id to which the room is allocated
-  buildingId:string//buildingId of the particular building of that room
-  facultyBlockName:string // in case of faculty block type write name here 
-  keys:string // keys of the room 
-  roomCapacity:string // capacity of that room 
-  occupancyMon:string// in the selected date range find all mondays and calculate the total time in minutes
-  occupancyTues:string// in the selected date range find all tuesdays and calculate the total time in minutes
-  occupancyWed:string// in the selected date range find all wednesdays and calculate the total time in minutes
-  occupancyThus:string// in the selected date range find all thursdays and calculate the total time in minutes
-  occupancyFri:string// in the selected date range find all fridays and calculate the total time in minutes
-  occupancySat:string// in the selected date range find all saturdays and calculate the total time in minutes
-  occupancySun:string// in the selected date range find all sundays and calculate the total time in minutes
-  occupancyWeekly:string// sum up all occupancies above
-  totalOccupancy: string // in our case 9 hour * 60 minutes 
-}
+type getReportData = (
+  roomId: string,
+  startDate: "YYYY-MM-DD",
+  endDate: "YYYY-MM-DD"
+) => {
+  roomNo: string; // room id would be passed here
+  programName: string; // program fetch program name using room allocation,
+  programCode: string; // program code using room allocation
+  roomType: string; // type of room
+  facultyName: string; // Employee name
+  employeeId: string; //Employee id to which the room is allocated
+  buildingId: string; //buildingId of the particular building of that room
+  facultyBlockName: string; // in case of faculty block type write name here
+  keys: string; // keys of the room
+  roomCapacity: string; // capacity of that room
+  occupancyMon: string; // in the selected date range find all mondays and calculate the total time in minutes
+  occupancyTues: string; // in the selected date range find all tuesdays and calculate the total time in minutes
+  occupancyWed: string; // in the selected date range find all wednesdays and calculate the total time in minutes
+  occupancyThus: string; // in the selected date range find all thursdays and calculate the total time in minutes
+  occupancyFri: string; // in the selected date range find all fridays and calculate the total time in minutes
+  occupancySat: string; // in the selected date range find all saturdays and calculate the total time in minutes
+  occupancySun: string; // in the selected date range find all sundays and calculate the total time in minutes
+  occupancyWeekly: string; // sum up all occupancies above
+  totalOccupancy: string; // in our case 9 hour * 60 minutes
+};

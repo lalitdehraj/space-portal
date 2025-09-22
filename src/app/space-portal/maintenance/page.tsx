@@ -5,6 +5,7 @@ import { useSelector } from "react-redux";
 import { Building, RoomInfo, Occupant, Maintenance } from "@/types";
 import { callApi } from "@/utils/apiIntercepter";
 import { URL_NOT_FOUND, GET_MAINTENANCE_DATA_API, CANCEL_MAINTENANCE_API, credentials } from "@/constants";
+import { useBuildingsData } from "@/hooks/useBuildingsData";
 import moment from "moment";
 import MaintenanceModal from "@/components/MaintenanceModal";
 
@@ -24,31 +25,15 @@ const MaintenancePage = () => {
   const academicSessionEndDate = useSelector((state: any) => state.dataState.selectedAcademicSessionEndDate);
 
   const [isMaintenanceModalVisible, setIsMaintenanceModalVisible] = useState(false);
-  const [allBuildingsData, setAllBuildingsData] = useState<Building[]>([]);
   const [maintenanceRecords, setMaintenanceRecords] = useState<MaintenanceRecord[]>([]);
+
+  // Use custom hook for buildings data
+  const { buildings: allBuildingsData } = useBuildingsData();
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [maintenanceToCancel, setMaintenanceToCancel] = useState<MaintenanceRecord | null>(null);
   const [isCancelling, setIsCancelling] = useState(false);
-
-  // Fetch all buildings
-  useEffect(() => {
-    const fetchBuildings = async () => {
-      if (!academicSession && !academicYear) return;
-      try {
-        const reqBody = {
-          acadSession: `${academicSession}`,
-          acadYear: `${academicYear}`,
-        };
-        const response = await callApi<Building[]>(process.env.NEXT_PUBLIC_GET_BUILDING_LIST || URL_NOT_FOUND, reqBody);
-        if (response.success) setAllBuildingsData(response.data || []);
-      } catch (error) {
-        console.error("Error fetching buildings:", error);
-      }
-    };
-    fetchBuildings();
-  }, [academicSession, academicYear]);
 
   // Fetch maintenance records
   const fetchMaintenanceRecords = async () => {

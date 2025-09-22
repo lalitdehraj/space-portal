@@ -2,6 +2,32 @@ export function removeSpaces(str: string): string {
   return str.replace(/ /g, "");
 }
 
+/**
+ * Validates if a date string is in YYYY-MM-DD format and not empty
+ * @param dateString - The date string to validate
+ * @returns boolean - true if valid, false otherwise
+ */
+export function isValidDateFormat(dateString: string): boolean {
+  if (!dateString || dateString.trim() === "") return false;
+  const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+  return dateRegex.test(dateString);
+}
+
+/**
+ * Validates if both start and end dates are valid and start date is not after end date
+ * @param startDate - Start date string in YYYY-MM-DD format
+ * @param endDate - End date string in YYYY-MM-DD format
+ * @returns boolean - true if both dates are valid and start <= end
+ */
+export function isValidDateRange(startDate: string, endDate: string): boolean {
+  if (!isValidDateFormat(startDate) || !isValidDateFormat(endDate)) return false;
+
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+
+  return start <= end;
+}
+
 export function formatDate(dateString: Date | string) {
   const date = dateString instanceof Date ? dateString : new Date(dateString);
 
