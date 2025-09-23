@@ -24,6 +24,7 @@ export default function Buildings() {
   const [roomsList, setRoomsList] = useState<Room[]>([]);
   const [selectedRoom, setSelectedRoom] = useState<Room>();
   const [subRooms, setSubRooms] = useState<Room[]>([]);
+  const [allBuildingSubrooms, setAllBuildingSubrooms] = useState<Room[]>([]);
   const acadmeicYear = useSelector((state: any) => state.dataState.selectedAcademicYear);
   const acadmeicSession = useSelector((state: any) => state.dataState.selectedAcademicSession);
   const selectedFloorId = useSelector((state: any) => state.dataState.selectedFloorId);
@@ -109,25 +110,34 @@ export default function Buildings() {
     return removeSpaces(room.roomType).toLowerCase().includes(removeSpaces(selectedRoomType).toLowerCase());
   });
 
-  const handleRoomTypesClick = (roomType: string) => {
-    dispatcher(setSeletedRoomTypeId(roomType));
-  };
   useEffect(() => {
-    const fetchSubrooms = async () => {
-      if (!selectedRoom) return;
+    const fetchAllBuildingSubrooms = async () => {
+      if (!selectedBuilding?.id) return;
       const requestBody = {
-        roomID: selectedRoom?.roomId,
-        buildingNo: selectedBuilding?.id,
+        roomID: "", // Use blank roomID to get all subrooms for the building
+        buildingNo: selectedBuilding.id,
         acadSess: acadmeicSession,
         acadYr: acadmeicYear,
       };
       let response = callApi<Room[]>(process.env.NEXT_PUBLIC_GET_SUBROOMS_LIST || URL_NOT_FOUND, requestBody);
       let res = await response;
-      console.log(res);
-      setSubRooms(res.data || []);
+      console.log("All building subrooms:", res);
+      setAllBuildingSubrooms(res.data || []);
+    };
+    fetchAllBuildingSubrooms();
+  }, [selectedBuilding?.id, acadmeicSession, acadmeicYear]);
+  useEffect(() => {
+    const fetchSubrooms = async () => {
+      if (!selectedRoom) {
+        setSubRooms([]);
+        return;
+      }
+      // Filter subrooms from the already fetched building subrooms
+      const filteredSubrooms = allBuildingSubrooms.filter((subroom) => subroom.parentId === selectedRoom.roomId);
+      setSubRooms(filteredSubrooms);
     };
     fetchSubrooms();
-  }, [selectedRoom, acadmeicSession, acadmeicYear]);
+  }, [selectedRoom, allBuildingSubrooms]);
   const handleFloorClick = (floor: Floor) => {
     setSelectedFloor(floor);
     dispatcher(setSelectedFloorId(floor.id));
@@ -164,6 +174,7 @@ export default function Buildings() {
           key={`${room.buildingId}-${room.roomId}`}
           isExpanded={selectedRoom ? selectedRoom.roomId === room.roomId && selectedRoom.buildingId === room.buildingId : false}
           onClick={(room) => handleRoomClick(room)}
+          cachedSubrooms={allBuildingSubrooms}
         />
       );
       const currentRowIndex = Math.floor(index / cardsPerRow);
@@ -199,7 +210,14 @@ export default function Buildings() {
             </h4>
             <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3">
               {subRooms &&
-                subRooms?.map((room) => <RoomCard key={`${room.buildingId}-${room.parentId}-${room.roomId}`} onClick={handleRoomClick} room={room} />)}
+                subRooms?.map((room) => (
+                  <RoomCard
+                    key={`${room.buildingId}-${room.parentId}-${room.roomId}`}
+                    onClick={handleRoomClick}
+                    room={room}
+                    cachedSubrooms={allBuildingSubrooms}
+                  />
+                ))}
             </div>
           </div>
         );
@@ -266,7 +284,7 @@ export default function Buildings() {
                       className={`flex items-center rounded-md px-3 py-1 text-xs font-medium transition-all ${
                         selectedRoomType === roomType ? "bg-[#F26722] text-white shadow-md" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                       }`}
-                      onClick={() => handleRoomTypesClick(roomType)}
+                      onClick={() => dispatcher(setSeletedRoomTypeId(roomType))}
                     >
                       {roomType}
                     </button>

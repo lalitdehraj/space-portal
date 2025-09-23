@@ -9,6 +9,7 @@ interface RoomCardProps {
   room: Room;
   isExpanded?: boolean;
   onClick?: (room: Room) => void;
+  cachedSubrooms?: Room[]; // Optional prop for cached subrooms
 }
 const WORK_HOURS_PER_DAY = 9;
 
@@ -19,7 +20,7 @@ const getOccupancyStatus = (room: Room): "low" | "medium" | "high" => {
   return "medium";
 };
 
-export default function RoomCard({ room, isExpanded = false, onClick }: RoomCardProps) {
+export default function RoomCard({ room, isExpanded = false, onClick, cachedSubrooms }: RoomCardProps) {
   const occupancyStatus = getOccupancyStatus(room);
 
   const statusClasses = {
@@ -58,9 +59,9 @@ export default function RoomCard({ room, isExpanded = false, onClick }: RoomCard
       try {
         setLoading(true);
         // Determine start/end dates depending on session
-        const startDate = isActiveSession ? moment().startOf("week").format("YYYY-MM-DD") : moment(academicSessionStartDate).format("YYYY-MM-DD");
+        const startDate = isActiveSession ? moment().startOf("isoWeek").format("YYYY-MM-DD") : moment(academicSessionStartDate).format("YYYY-MM-DD");
 
-        const endDate = isActiveSession ? moment().endOf("week").format("YYYY-MM-DD") : moment(academicSessionEndDate).format("YYYY-MM-DD");
+        const endDate = isActiveSession ? moment().endOf("isoWeek").format("YYYY-MM-DD") : moment(academicSessionEndDate).format("YYYY-MM-DD");
 
         if (room.hasSubroom) {
           // Handle parent room with subrooms
@@ -79,21 +80,33 @@ export default function RoomCard({ room, isExpanded = false, onClick }: RoomCard
 
     const fetchParentRoomOccupancy = async (startDate: string, endDate: string) => {
       try {
-        // First, fetch all subrooms for this parent room
-        const subroomsResponse = await callApi<Room[]>(process.env.NEXT_PUBLIC_GET_SUBROOMS_LIST || URL_NOT_FOUND, {
-          roomID: room.roomId,
-          buildingNo: room.buildingId,
-          acadSess: acadmeicSession,
-          acadYr: acadmeicYear,
-        });
+        let subrooms: Room[] = [];
 
-        if (!subroomsResponse.success || !subroomsResponse.data || subroomsResponse.data.length === 0) {
+        // Use cached subrooms if available, otherwise fetch them
+        if (cachedSubrooms && cachedSubrooms.length > 0) {
+          subrooms = cachedSubrooms.filter((subroom) => subroom.parentId === room.roomId);
+        } else {
+          // Fallback to individual API call if no cached subrooms
+          const subroomsResponse = await callApi<Room[]>(process.env.NEXT_PUBLIC_GET_SUBROOMS_LIST || URL_NOT_FOUND, {
+            roomID: room.roomId,
+            buildingNo: room.buildingId,
+            acadSess: acadmeicSession,
+            acadYr: acadmeicYear,
+          });
+
+          if (!subroomsResponse.success || !subroomsResponse.data || subroomsResponse.data.length === 0) {
+            setTotalOccupants(0);
+            setOccupancyPercent(0);
+            return;
+          }
+          subrooms = subroomsResponse.data;
+        }
+
+        if (subrooms.length === 0) {
           setTotalOccupants(0);
           setOccupancyPercent(0);
           return;
         }
-
-        const subrooms = subroomsResponse.data;
         let totalSubroomOccupants = 0;
         let totalSubroomOccupancyPercent = 0;
 
@@ -115,8 +128,8 @@ export default function RoomCard({ room, isExpanded = false, onClick }: RoomCard
             const occupants = roomData.occupants?.length || 0;
 
             // Calculate occupancy percentage for this subroom
-            const startDateMoment = isActiveSession ? moment().startOf("week") : moment(academicSessionStartDate);
-            const endDateMoment = isActiveSession ? moment().endOf("week") : moment(academicSessionEndDate);
+            const startDateMoment = isActiveSession ? moment().startOf("isoWeek") : moment(academicSessionStartDate);
+            const endDateMoment = isActiveSession ? moment().endOf("isoWeek") : moment(academicSessionEndDate);
 
             const weeklyOccupants: Occupant[] =
               roomData.occupants?.filter((o) => {
@@ -176,8 +189,8 @@ export default function RoomCard({ room, isExpanded = false, onClick }: RoomCard
 
         setTotalOccupants(response.data.occupants?.length || 0);
         // Determine date range
-        const startDateMoment = isActiveSession ? moment().startOf("week") : moment(academicSessionStartDate);
-        const endDateMoment = isActiveSession ? moment().endOf("week") : moment(academicSessionEndDate);
+        const startDateMoment = isActiveSession ? moment().startOf("isoWeek") : moment(academicSessionStartDate);
+        const endDateMoment = isActiveSession ? moment().endOf("isoWeek") : moment(academicSessionEndDate);
 
         const weeklyOccupants: Occupant[] =
           roomData.occupants?.filter((o) => {

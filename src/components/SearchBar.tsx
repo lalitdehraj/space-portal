@@ -153,22 +153,30 @@ export function AdvancedSearch({ onClose }: { onClose: () => void }) {
       await new Promise((resolve) => setTimeout(resolve, 250));
 
       try {
-        const subroomPromises = parentRooms.map(async (parentRoom) => {
+        // Get unique buildings from parent rooms
+        const uniqueBuildings = [...new Set(parentRooms.map((room) => room.buildingId))];
+
+        // Fetch all subrooms for each building at once using blank roomID
+        const buildingSubroomPromises = uniqueBuildings.map(async (buildingId) => {
           const response = await callApi<Room[]>(process.env.NEXT_PUBLIC_GET_SUBROOMS_LIST || URL_NOT_FOUND, {
-            roomID: parentRoom.roomId,
-            buildingNo: parentRoom.buildingId,
+            roomID: "", // Use blank roomID to get all subrooms for the building
+            buildingNo: buildingId,
             acadSess: acadSession,
             acadYr: academicYear,
           });
           return response.success ? response.data || [] : [];
         });
 
-        const subroomArrays = await Promise.all(subroomPromises);
-        const allSubrooms = subroomArrays.flat();
-        setSubroomsForAdvancedSearch(allSubrooms);
+        const buildingSubroomArrays = await Promise.all(buildingSubroomPromises);
+        const allBuildingSubrooms = buildingSubroomArrays.flat();
+
+        // Filter subrooms that belong to the parent rooms we're searching for
+        const relevantSubrooms = allBuildingSubrooms.filter((subroom) => parentRooms.some((parentRoom) => parentRoom.roomId === subroom.parentId));
+
+        setSubroomsForAdvancedSearch(relevantSubrooms);
 
         // Update filtered rooms to include subrooms
-        setFilteredRooms([...regularRooms, ...allSubrooms]);
+        setFilteredRooms([...regularRooms, ...relevantSubrooms]);
       } catch (error) {
         console.error("Error fetching subrooms for advanced search:", error);
         setSubroomsForAdvancedSearch([]);

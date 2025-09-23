@@ -318,25 +318,33 @@ export default function Header() {
       await new Promise((resolve) => setTimeout(resolve, 250));
 
       try {
-        const subroomPromises = parentRoomsForSearch.map(async (parentRoom) => {
+        // Get unique buildings from parent rooms
+        const uniqueBuildings = [...new Set(parentRoomsForSearch.map((room) => room.buildingId))];
+
+        // Fetch all subrooms for each building at once using blank roomID
+        const buildingSubroomPromises = uniqueBuildings.map(async (buildingId) => {
           const response = await callApi<Room[]>(process.env.NEXT_PUBLIC_GET_SUBROOMS_LIST || URL_NOT_FOUND, {
-            roomID: parentRoom.roomId,
-            buildingNo: parentRoom.buildingId,
+            roomID: "", // Use blank roomID to get all subrooms for the building
+            buildingNo: buildingId,
             acadSess: acadSession,
             acadYr: academicYear,
           });
           return response.success ? response.data || [] : [];
         });
 
-        const subroomArrays = await Promise.all(subroomPromises);
-        const allSubrooms = subroomArrays.flat();
-        setSubroomsForSearch(allSubrooms);
+        const buildingSubroomArrays = await Promise.all(buildingSubroomPromises);
+        const allBuildingSubrooms = buildingSubroomArrays.flat();
+
+        // Filter subrooms that belong to the parent rooms we're searching for
+        const relevantSubrooms = allBuildingSubrooms.filter((subroom) => parentRoomsForSearch.some((parentRoom) => parentRoom.roomId === subroom.parentId));
+
+        setSubroomsForSearch(relevantSubrooms);
 
         // Update search results to include subrooms
         setSearchResults((prevResults) => {
           if (!prevResults) return prevResults;
 
-          const subroomSearchResults: SearchResult[] = allSubrooms.map((subroom) => ({
+          const subroomSearchResults: SearchResult[] = relevantSubrooms.map((subroom: Room) => ({
             buildingId: subroom.buildingId,
             roomId: subroom.roomId,
             name: subroom.roomName,

@@ -21,6 +21,7 @@ export default function Buildings() {
   const [roomsList, setRoomsList] = useState<Room[]>([]);
   const [selectedRoom, setSelectedRoom] = useState<Room>();
   const [subRooms, setSubRooms] = useState<Room[]>([]);
+  const [allBuildingSubrooms, setAllBuildingSubrooms] = useState<Room[]>([]);
   const [isLoadingBuildings, setIsLoadingBuildings] = useState(false);
   const [isLoadingRooms, setIsLoadingRooms] = useState(false);
   const [isLoadingSubrooms, setIsLoadingSubrooms] = useState(false);
@@ -92,6 +93,32 @@ export default function Buildings() {
     fetchRooms();
   }, [acadmeicSession, acadmeicYear, buildings, role]);
 
+  // Fetch all subrooms for all buildings at once
+  useEffect(() => {
+    const fetchAllBuildingSubrooms = async () => {
+      if (!buildings || buildings.length === 0) return;
+      try {
+        const promises = buildings.map(async (building) => {
+          const requestBody = {
+            roomID: "", // Use blank roomID to get all subrooms for the building
+            buildingNo: building.id,
+            acadSess: acadmeicSession,
+            acadYr: acadmeicYear,
+          };
+          const response = await callApi<Room[]>(process.env.NEXT_PUBLIC_GET_SUBROOMS_LIST || URL_NOT_FOUND, requestBody);
+          return response.data || [];
+        });
+
+        const allSubrooms = await Promise.all(promises);
+        setAllBuildingSubrooms(allSubrooms.flat());
+        console.log("All building subrooms:", allSubrooms.flat());
+      } catch (error) {
+        console.error("Error fetching building subrooms:", error);
+      }
+    };
+    fetchAllBuildingSubrooms();
+  }, [buildings, acadmeicSession, acadmeicYear]);
+
   const kpiCards = [
     {
       title: "Total Rooms Managed",
@@ -139,20 +166,16 @@ export default function Buildings() {
   const visibleRooms = searchRooms.slice(0, currentPage === 1 ? initialLoad : initialLoad + (currentPage - 1) * itemsPerPage);
   useEffect(() => {
     const fetchSubrooms = async () => {
-      if (!selectedRoom) return;
-      const requestBody = {
-        roomID: selectedRoom?.roomId,
-        buildingNo: selectedRoom.buildingId,
-        acadSess: acadmeicSession,
-        acadYr: acadmeicYear,
-      };
-      let response = callApi<Room[]>(process.env.NEXT_PUBLIC_GET_SUBROOMS_LIST || URL_NOT_FOUND, requestBody);
-      let res = await response;
-      console.log(res);
-      setSubRooms(res.data || []);
+      if (!selectedRoom) {
+        setSubRooms([]);
+        return;
+      }
+      // Filter subrooms from the already fetched building subrooms
+      const filteredSubrooms = allBuildingSubrooms.filter((subroom) => subroom.parentId === selectedRoom.roomId);
+      setSubRooms(filteredSubrooms);
     };
     fetchSubrooms();
-  }, [selectedRoom, acadmeicSession, acadmeicYear]);
+  }, [selectedRoom, allBuildingSubrooms]);
   const handleRoomClick = (room: Room) => {
     if (room.hasSubroom) {
       const isSameRoom = selectedRoom && selectedRoom.roomId === room.roomId && selectedRoom.buildingId === room.buildingId;
@@ -185,6 +208,7 @@ export default function Buildings() {
               key={`${room.buildingId}-${room.roomId}`}
               isExpanded={selectedRoom ? selectedRoom.roomId === room.roomId && selectedRoom.buildingId === room.buildingId : false}
               onClick={(room) => handleRoomClick(room)}
+              cachedSubrooms={allBuildingSubrooms}
             />
           );
           const currentRowIndex = Math.floor(index / cardsPerRow);
@@ -225,7 +249,10 @@ export default function Buildings() {
                           <div className="h-3 bg-gray-200 rounded w-1/3"></div>
                         </div>
                       ))
-                    : subRooms && subRooms.map((room) => <RoomCard key={`${room.buildingId}-${room.roomId}`} onClick={handleRoomClick} room={room} />)}
+                    : subRooms &&
+                      subRooms.map((room) => (
+                        <RoomCard key={`${room.buildingId}-${room.roomId}`} onClick={handleRoomClick} room={room} cachedSubrooms={allBuildingSubrooms} />
+                      ))}
                 </div>
               </div>
             );

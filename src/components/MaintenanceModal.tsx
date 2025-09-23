@@ -234,21 +234,32 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
         return roomInfo && roomInfo.hasSubtype === true;
       });
 
-      // Fetch subrooms for each room with hasSubtype === true
-      for (const room of roomsWithSubtype) {
+      // Get unique buildings from rooms with subtype
+      const uniqueBuildings = [...new Set(roomsWithSubtype.map((room) => room.buildingId))];
+
+      // Fetch all subrooms for each building at once using blank roomID
+      for (const buildingId of uniqueBuildings) {
         try {
           const response = await callApi<Room[]>(process.env.NEXT_PUBLIC_GET_SUBROOMS_LIST || URL_NOT_FOUND, {
-            roomID: room.roomId,
-            buildingNo: room.buildingId,
+            roomID: "", // Use blank roomID to get all subrooms for the building
+            buildingNo: buildingId,
             acadSess: academicSession,
             acadYr: academicYear,
           });
 
           if (response.success && response.data) {
-            subroomsMap[room.roomId] = response.data;
+            // Group subrooms by their parent room ID
+            response.data.forEach((subroom) => {
+              if (subroom.parentId) {
+                if (!subroomsMap[subroom.parentId]) {
+                  subroomsMap[subroom.parentId] = [];
+                }
+                subroomsMap[subroom.parentId].push(subroom);
+              }
+            });
           }
         } catch (error) {
-          console.error(`Error fetching subrooms for room ${room.roomId}:`, error);
+          console.error(`Error fetching subrooms for building ${buildingId}:`, error);
         }
       }
 
@@ -999,6 +1010,71 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
           }
         } catch (error) {
           console.error(`Error cancelling maintenance ${maintenanceId}:`, error);
+        }
+      }
+
+      // Update resolved conflicts with their new room, date, and time values
+      for (const conflictId of selectedConflicts) {
+        const conflict = conflicts.find((c) => c.occupant.Id === conflictId);
+        if (conflict && conflict.isEditable) {
+          const newRoomId = conflictRoomSelections[conflictId];
+          const newDate = conflictDates[conflictId];
+          const newStartTime = conflictStartTimes[conflictId];
+          const newEndTime = conflictEndTimes[conflictId];
+
+          if (newRoomId && newDate && newStartTime && newEndTime) {
+            try {
+              // Find the room object to determine if it's a subroom
+              let roomObject: Room | undefined;
+              let isSubroom = false;
+              let parentRoomId: string | undefined;
+
+              // First check in allRooms (parent rooms)
+              roomObject = allRooms.find((r) => r.roomId === newRoomId);
+
+              if (!roomObject) {
+                // Then check in subrooms
+                for (const [parentId, subrooms] of Object.entries(subroomsForConflictResolution)) {
+                  roomObject = subrooms.find((r) => r.roomId === newRoomId);
+                  if (roomObject) {
+                    isSubroom = true;
+                    parentRoomId = parentId;
+                    break;
+                  }
+                }
+              }
+
+              if (!roomObject) {
+                console.error(`Room not found for roomId: ${newRoomId}`);
+                alert(`Room not found for roomId: ${newRoomId}. Please try again.`);
+                return;
+              }
+
+              // Update the occupant slot with new values
+              const updateData = {
+                allocationEntNo: conflictId,
+                isAllocationActive: true,
+                startTime: moment(newStartTime, "HH:mm").format("HH:mm:ss"),
+                endTime: moment(newEndTime, "HH:mm").format("HH:mm:ss"),
+                scheduledDate: moment(newDate).format("YYYY-MM-DD"),
+                roomID: isSubroom ? parentRoomId : newRoomId, // Use parent room ID if it's a subroom
+                subRoomID: isSubroom ? newRoomId : undefined, // Use subroom ID if it's a subroom
+                remarks: "Updated for maintenance conflict resolution",
+              };
+
+              const updateResponse = await callApi(process.env.NEXT_PUBLIC_UPDATE_SPACE_ALLOCATION_ENTRY || URL_NOT_FOUND, updateData);
+
+              if (!updateResponse.success) {
+                console.error(`Failed to update occupant slot ${conflictId}:`, updateResponse?.data);
+                alert(`Failed to update slot for ${conflict.occupant.occupantName}. Please try again.`);
+                return;
+              }
+            } catch (error) {
+              console.error(`Error updating occupant slot ${conflictId}:`, error);
+              alert(`Failed to update slot for ${conflict.occupant.occupantName}. Please try again.`);
+              return;
+            }
+          }
         }
       }
 

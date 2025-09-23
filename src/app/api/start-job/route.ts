@@ -53,245 +53,217 @@ async function createBigXLS(filePath: string, jsonObject: any) {
     const worksheetFaculty = workbook.addWorksheet("faculty_seating");
 
     worksheet.columns = [
-    {
-      header: "Room No",
-      key: "roomNo",
-      width: 12,
-    },
-    {
-      header: "Program Name",
-      key: "programName",
-      width: 18,
-    },
-    {
-      header: "Program Code",
-      key: "programCode",
-      width: 15,
-    },
-    {
-      header: "Room Type",
-      key: "roomType",
-      width: 12,
-    },
-    {
-      header: "Block No",
-      key: "buildingId",
-      width: 12,
-    },
-    {
-      header: "Room Capacity",
-      key: "roomCapacity",
-      width: 15,
-    },
-    // Occupancy
-    {
-      header: "Occupancy - Monday",
-      key: "occupancyMon",
-      width: 18,
-    },
-    {
-      header: "Occupancy - Tuesday",
-      key: "occupancyTue",
-      width: 18,
-    },
-    {
-      header: "Occupancy - Wednesday",
-      key: "occupancyWed",
-      width: 18,
-    },
-    {
-      header: "Occupancy - Thursday",
-      key: "occupancyThu",
-      width: 18,
-    },
-    {
-      header: "Occupancy - Friday",
-      key: "occupancyFri",
-      width: 18,
-    },
-    {
-      header: "Occupancy - Saturday",
-      key: "occupancySat",
-      width: 18,
-    },
-    {
-      header: "Occupancy - Sunday",
-      key: "occupancySun",
-      width: 18,
-    },
-    {
-      header: "Weekly Occupancy",
-      key: "occupancyWeekly",
-      width: 20,
-    },
-    // Vacant
-    {
-      header: "Vacant - Monday",
-      key: "vacantMon",
-      width: 18,
-    },
-    {
-      header: "Vacant - Tuesday",
-      key: "vacantTue",
-      width: 18,
-    },
-    {
-      header: "Vacant - Wednesday",
-      key: "vacantWed",
-      width: 18,
-    },
-    {
-      header: "Vacant - Thursday",
-      key: "vacantThu",
-      width: 18,
-    },
-    {
-      header: "Vacant - Friday",
-      key: "vacantFri",
-      width: 18,
-    },
-    {
-      header: "Vacant - Saturday",
-      key: "vacantSat",
-      width: 18,
-    },
-    {
-      header: "Vacant - Sunday",
-      key: "vacantSun",
-      width: 18,
-    },
-  ];
-  type FacultyRow = {
-    employeeId: string;
-    facultyName: string;
-    programCode: string;
-    programName: string;
-    academicBlock: string;
-    facultyBlock: string;
-    workStation: string;
-    cabinNo: string;
-    occupancy: string;
-    keyNo: string;
-  };
+      {
+        header: "Room No",
+        key: "roomNo",
+        width: 12,
+      },
+      {
+        header: "Program Name",
+        key: "programName",
+        width: 18,
+      },
+      {
+        header: "Program Code",
+        key: "programCode",
+        width: 15,
+      },
+      {
+        header: "Room Type",
+        key: "roomType",
+        width: 12,
+      },
+      {
+        header: "Block No",
+        key: "buildingId",
+        width: 12,
+      },
+      {
+        header: "Room Capacity",
+        key: "roomCapacity",
+        width: 15,
+      },
+      // Occupancy
+      {
+        header: "Occupancy - Monday",
+        key: "occupancyMon",
+        width: 18,
+      },
+      {
+        header: "Occupancy - Tuesday",
+        key: "occupancyTue",
+        width: 18,
+      },
+      {
+        header: "Occupancy - Wednesday",
+        key: "occupancyWed",
+        width: 18,
+      },
+      {
+        header: "Occupancy - Thursday",
+        key: "occupancyThu",
+        width: 18,
+      },
+      {
+        header: "Occupancy - Friday",
+        key: "occupancyFri",
+        width: 18,
+      },
+      {
+        header: "Occupancy - Saturday",
+        key: "occupancySat",
+        width: 18,
+      },
+      {
+        header: "Occupancy - Sunday",
+        key: "occupancySun",
+        width: 18,
+      },
+      {
+        header: "Weekly Occupancy",
+        key: "occupancyWeekly",
+        width: 20,
+      },
+      // Vacant
+      {
+        header: "Vacant - Monday",
+        key: "vacantMon",
+        width: 18,
+      },
+      {
+        header: "Vacant - Tuesday",
+        key: "vacantTue",
+        width: 18,
+      },
+      {
+        header: "Vacant - Wednesday",
+        key: "vacantWed",
+        width: 18,
+      },
+      {
+        header: "Vacant - Thursday",
+        key: "vacantThu",
+        width: 18,
+      },
+      {
+        header: "Vacant - Friday",
+        key: "vacantFri",
+        width: 18,
+      },
+      {
+        header: "Vacant - Saturday",
+        key: "vacantSat",
+        width: 18,
+      },
+      {
+        header: "Vacant - Sunday",
+        key: "vacantSun",
+        width: 18,
+      },
+    ];
+    type FacultyRow = {
+      employeeId: string;
+      facultyName: string;
+      programCode: string;
+      programName: string;
+      academicBlock: string;
+      facultyBlock: string;
+      workStation: string;
+      cabinNo: string;
+      occupancy: string;
+      keyNo: string;
+    };
 
-  worksheetFaculty.columns = [
-    {
-      header: "Employee Id",
-      key: "employeeId",
-      width: 15,
-    },
-    {
-      header: "Faculty Name",
-      key: "facultyName",
-      width: 20,
-    },
-    {
-      header: "Program Code",
-      key: "programCode",
-      width: 15,
-    },
-    {
-      header: "Program Name",
-      key: "programName",
-      width: 18,
-    },
-    {
-      header: "Academic Block",
-      key: "academicBlock",
-      width: 12,
-    },
-    {
-      header: "Faculty Block Name",
-      key: "facultyBlock",
-      width: 20,
-    },
-    {
-      header: "Work Station No",
-      key: "workStation",
-      width: 12,
-    },
-    {
-      header: "Cabin No.",
-      key: "cabinNo",
-      width: 12,
-    },
-    {
-      header: "Keys",
-      key: "keyNo",
-      width: 10,
-    },
-    {
-      header: "Room Capacity",
-      key: "occupancy",
-      width: 15,
-    },
-  ];
+    worksheetFaculty.columns = [
+      {
+        header: "Employee Id",
+        key: "employeeId",
+        width: 15,
+      },
+      {
+        header: "Faculty Name",
+        key: "facultyName",
+        width: 20,
+      },
+      {
+        header: "Program Code",
+        key: "programCode",
+        width: 15,
+      },
+      {
+        header: "Program Name",
+        key: "programName",
+        width: 18,
+      },
+      {
+        header: "Academic Block",
+        key: "academicBlock",
+        width: 12,
+      },
+      {
+        header: "Faculty Block Name",
+        key: "facultyBlock",
+        width: 20,
+      },
+      {
+        header: "Work Station No",
+        key: "workStation",
+        width: 12,
+      },
+      {
+        header: "Cabin No.",
+        key: "cabinNo",
+        width: 12,
+      },
+      {
+        header: "Keys",
+        key: "keyNo",
+        width: 10,
+      },
+      {
+        header: "Room Capacity",
+        key: "occupancy",
+        width: 15,
+      },
+    ];
 
-  const { data: programs } = await callApi<any>(process.env.NEXT_PUBLIC_GET_PROGRAM || URL_NOT_FOUND);
-  const { data: employees } = await callApi<Employee[]>(process.env.NEXT_PUBLIC_GET_EMPLOYEES || URL_NOT_FOUND, {
-    employeeCode: "",
-  });
-  const { data: departments } = await callApi<Department[]>(process.env.NEXT_PUBLIC_GET_FACULTY_OR_DEPARTMENT || URL_NOT_FOUND, {
-    filterValue: "DEPARTMENT",
-  });
-  const { data: faculties } = await callApi<Faculty[]>(process.env.NEXT_PUBLIC_GET_FACULTY_OR_DEPARTMENT || URL_NOT_FOUND, {
-    filterValue: "FACULTY",
-  });
+    const { data: programs } = await callApi<any>(process.env.NEXT_PUBLIC_GET_PROGRAM || URL_NOT_FOUND);
+    const { data: employees } = await callApi<Employee[]>(process.env.NEXT_PUBLIC_GET_EMPLOYEES || URL_NOT_FOUND, {
+      employeeCode: "",
+    });
+    const { data: departments } = await callApi<Department[]>(process.env.NEXT_PUBLIC_GET_FACULTY_OR_DEPARTMENT || URL_NOT_FOUND, {
+      filterValue: "DEPARTMENT",
+    });
+    const { data: faculties } = await callApi<Faculty[]>(process.env.NEXT_PUBLIC_GET_FACULTY_OR_DEPARTMENT || URL_NOT_FOUND, {
+      filterValue: "FACULTY",
+    });
 
-  const { data: roomAllocation } = await callApi<Allocation[]>(process.env.NEXT_PUBLIC_GET_ROOM_ALLOCATIONS || URL_NOT_FOUND, {
-    acadSession: jsonObject.acadSess,
-    acadYear: jsonObject.academicYr,
-  });
+    const { data: roomAllocation } = await callApi<Allocation[]>(process.env.NEXT_PUBLIC_GET_ROOM_ALLOCATIONS || URL_NOT_FOUND, {
+      acadSession: jsonObject.acadSess,
+      acadYear: jsonObject.academicYr,
+    });
 
-  const handleRoom = async (roomData: any) => {
-    const allocations = roomAllocation?.filter((a) => a.roomNo === roomData.id);
+    const handleRoom = async (roomData: any) => {
+      const allocations = roomAllocation?.filter((a) => a.roomNo === roomData.id);
 
-    let occupants = roomData?.occupants;
-    if (jsonObject.reportType === "department") occupants = occupants.filter((o: Occupant) => o.department === jsonObject.departmentId);
-    if (jsonObject.reportType === "faculty") occupants = occupants.filter((o: Occupant) => o.department === jsonObject.facultyId);
+      let occupants = roomData?.occupants;
+      if (jsonObject.reportType === "department") occupants = occupants.filter((o: Occupant) => o.department === jsonObject.departmentId);
+      if (jsonObject.reportType === "faculty") occupants = occupants.filter((o: Occupant) => o.department === jsonObject.facultyId);
 
-    const week = getRoomOccupancyByWeekday(occupants || []);
-    const vacant = getVacantSlotsByWeekday(occupants || []);
-    const programsCode: string[] = allocations?.map((a) => a.program) ?? [];
-    const startRow = worksheet.rowCount + 1;
+      const week = getRoomOccupancyByWeekday(occupants || []);
+      const vacant = getVacantSlotsByWeekday(occupants || []);
+      const programsCode: string[] = allocations?.map((a) => a.program) ?? [];
+      const startRow = worksheet.rowCount + 1;
 
-    // Check if there are no programs.
-    if (programsCode.length === 0) {
-      const rowEntry: ReportData = {
-        roomNo: String(roomData.parentId ? `${roomData?.parentId} - ${roomData?.id}` : `${roomData?.id}`),
-        roomType: roomData?.roomType ?? "",
-        buildingId: roomData?.building ?? "",
-        roomCapacity: String(roomData?.capacity ?? ""),
-        programCode: "",
-        programName: "",
-        occupancyMon: String((((week.Monday ?? 0) * 100) / 540).toFixed(2)),
-        occupancyTue: String((((week.Tuesday ?? 0) * 100) / 540).toFixed(2)),
-        occupancyWed: String((((week.Wednesday ?? 0) * 100) / 540).toFixed(2)),
-        occupancyThu: String((((week.Thursday ?? 0) * 100) / 540).toFixed(2)),
-        occupancyFri: String((((week.Friday ?? 0) * 100) / 540).toFixed(2)),
-        occupancySat: String((((week.Saturday ?? 0) * 100) / 540).toFixed(2)),
-        occupancySun: String((((week.Sunday ?? 0) * 100) / 540).toFixed(2)),
-        occupancyWeekly: String((((week.Weekly ?? 0) * 100) / (540 * 7)).toFixed(2)),
-        vacantMon: String(vacant.Monday.toString()),
-        vacantTue: String(vacant.Tuesday.toString()),
-        vacantWed: String(vacant.Wednesday.toString()),
-        vacantThu: String(vacant.Thursday.toString()),
-        vacantFri: String(vacant.Friday.toString()),
-        vacantSat: String(vacant.Saturday.toString()),
-        vacantSun: String(vacant.Sunday.toString()),
-      };
-      worksheet.addRow(rowEntry);
-    } else {
-      // If there are programs, process them normally.
-      programsCode.forEach((code) => {
-        const program = programs?.programCode?.find((p: any) => p.code === code);
+      // Check if there are no programs.
+      if (programsCode.length === 0) {
         const rowEntry: ReportData = {
           roomNo: String(roomData.parentId ? `${roomData?.parentId} - ${roomData?.id}` : `${roomData?.id}`),
           roomType: roomData?.roomType ?? "",
           buildingId: roomData?.building ?? "",
           roomCapacity: String(roomData?.capacity ?? ""),
-          programCode: code,
-          programName: program ? program.description : "",
+          programCode: "",
+          programName: "",
           occupancyMon: String((((week.Monday ?? 0) * 100) / 540).toFixed(2)),
           occupancyTue: String((((week.Tuesday ?? 0) * 100) / 540).toFixed(2)),
           occupancyWed: String((((week.Wednesday ?? 0) * 100) / 540).toFixed(2)),
@@ -309,109 +281,186 @@ async function createBigXLS(filePath: string, jsonObject: any) {
           vacantSun: String(vacant.Sunday.toString()),
         };
         worksheet.addRow(rowEntry);
-      });
-
-      // Merge cells only if there were multiple programs
-      const endRow = worksheet.rowCount;
-      if (programsCode.length > 1) {
-        const mergeCols = ["A", "E", "F", "D", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U"];
-        mergeCols.forEach((col) => {
-          worksheet.mergeCells(`${col}${startRow}:${col}${endRow}`);
+      } else {
+        // If there are programs, process them normally.
+        programsCode.forEach((code) => {
+          const program = programs?.programCode?.find((p: any) => p.code === code);
+          const rowEntry: ReportData = {
+            roomNo: String(roomData.parentId ? `${roomData?.parentId} - ${roomData?.id}` : `${roomData?.id}`),
+            roomType: roomData?.roomType ?? "",
+            buildingId: roomData?.building ?? "",
+            roomCapacity: String(roomData?.capacity ?? ""),
+            programCode: code,
+            programName: program ? program.description : "",
+            occupancyMon: String((((week.Monday ?? 0) * 100) / 540).toFixed(2)),
+            occupancyTue: String((((week.Tuesday ?? 0) * 100) / 540).toFixed(2)),
+            occupancyWed: String((((week.Wednesday ?? 0) * 100) / 540).toFixed(2)),
+            occupancyThu: String((((week.Thursday ?? 0) * 100) / 540).toFixed(2)),
+            occupancyFri: String((((week.Friday ?? 0) * 100) / 540).toFixed(2)),
+            occupancySat: String((((week.Saturday ?? 0) * 100) / 540).toFixed(2)),
+            occupancySun: String((((week.Sunday ?? 0) * 100) / 540).toFixed(2)),
+            occupancyWeekly: String((((week.Weekly ?? 0) * 100) / (540 * 7)).toFixed(2)),
+            vacantMon: String(vacant.Monday.toString()),
+            vacantTue: String(vacant.Tuesday.toString()),
+            vacantWed: String(vacant.Wednesday.toString()),
+            vacantThu: String(vacant.Thursday.toString()),
+            vacantFri: String(vacant.Friday.toString()),
+            vacantSat: String(vacant.Saturday.toString()),
+            vacantSun: String(vacant.Sunday.toString()),
+          };
+          worksheet.addRow(rowEntry);
         });
+
+        // Merge cells only if there were multiple programs
+        const endRow = worksheet.rowCount;
+        if (programsCode.length > 1) {
+          const mergeCols = ["A", "E", "F", "D", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U"];
+          mergeCols.forEach((col) => {
+            worksheet.mergeCells(`${col}${startRow}:${col}${endRow}`);
+          });
+        }
       }
-    }
-  };
-
-  const handleFacultySeating = async (emp: Employee, roomData: any) => {
-    const program = programs?.programCode?.find((p: Program) => p.code === emp.programCode);
-
-    const roomsMap: Record<string, any> = {};
-
-    if (jsonObject.reportType === "building") {
-      roomData.forEach((r: any) => {
-        r?.occupants?.forEach((o: Occupant) => {
-          if (o.occupantId === emp.employeeCode) {
-            roomsMap[r.id] = r; // keyed by room id
-          }
-        });
-      });
-    }
-    if (jsonObject.reportType === "department") {
-      roomData.forEach((r: any) => {
-        r?.occupants?.forEach((o: Occupant) => {
-          if (o.department && o.department === jsonObject.departmentId) {
-            roomsMap[r.id] = r; // keyed by room id
-          }
-        });
-      });
-    }
-    if (jsonObject.reportType === "faculty") {
-      roomData.forEach((r: any) => {
-        r?.occupants?.forEach((o: Occupant) => {
-          if (o.facultyCode && o.facultyCode === jsonObject.facultyId) {
-            roomsMap[r.id] = r; // keyed by room id
-          }
-        });
-      });
-    }
-
-    // Convert hashmap back to array if needed
-    const roomsInWhichEmp: any[] = Object.values(roomsMap);
-    const startRow = worksheetFaculty.rowCount + 1;
-
-    // // Add one row per matched room
-    for (let i = 0; i < (roomsInWhichEmp.length === 0 ? 1 : roomsInWhichEmp.length); i++) {
-      let room = roomsInWhichEmp.length === 0 ? null : roomsInWhichEmp[i];
-      const row: FacultyRow = {
-        employeeId: String(emp.employeeCode ?? ""),
-        facultyName: String(emp.employeeName ?? ""),
-        programCode: String(emp.programCode ?? ""),
-        programName: program ? program.description : "",
-        academicBlock: String(room?.building ?? ""),
-        facultyBlock: String(room?.isRoom ? room?.id : room?.parentId ?? ""),
-        workStation: String(room?.roomType.replace(" ", "").toLowerCase() === "workstation" ? room?.id : ""),
-        cabinNo: String(room?.roomType.toLowerCase() === "cubical" ? room?.id : ""),
-        keyNo: String(room?.keys ?? ""),
-        occupancy: String(room?.capacity ?? ""),
-      };
-
-      worksheetFaculty.addRow(row);
-    }
-
-    const endRow = worksheetFaculty.rowCount;
-
-    // Merge common columns (Employee + Program info)
-    if (roomsInWhichEmp.length > 1) {
-      const mergeCols = ["A", "B", "C", "D"]; // employeeId, facultyName, programCode, programName
-      mergeCols.forEach((col) => {
-        worksheetFaculty.mergeCells(`${col}${startRow}:${col}${endRow}`);
-      });
-    }
-  };
-
-  const dataManupulation = async (object: any) => {
-    const reqBody = {
-      roomID: object.roomID,
-      subroomID: 0,
-      academicYr: object.academicYr,
-      acadSess: object.acadSess,
-      startDate: object.startDate,
-      endDate: object.endDate,
     };
 
-    const roomInfoResponse = await callApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, reqBody);
-    if (roomInfoResponse.success) {
-      if (!roomInfoResponse.data?.roomType.toLowerCase().includes("faculty")) {
+    const handleFacultySeating = async (emp: Employee, roomData: any) => {
+      const program = programs?.programCode?.find((p: Program) => p.code === emp.programCode);
+
+      const roomsMap: Record<string, any> = {};
+
+      if (jsonObject.reportType === "building") {
+        roomData.forEach((r: any) => {
+          r?.occupants?.forEach((o: Occupant) => {
+            if (o.occupantId === emp.employeeCode) {
+              roomsMap[r.id] = r; // keyed by room id
+            }
+          });
+        });
+      }
+      if (jsonObject.reportType === "department") {
+        roomData.forEach((r: any) => {
+          r?.occupants?.forEach((o: Occupant) => {
+            if (o.department && o.department === jsonObject.departmentId) {
+              roomsMap[r.id] = r; // keyed by room id
+            }
+          });
+        });
+      }
+      if (jsonObject.reportType === "faculty") {
+        roomData.forEach((r: any) => {
+          r?.occupants?.forEach((o: Occupant) => {
+            if (o.facultyCode && o.facultyCode === jsonObject.facultyId) {
+              roomsMap[r.id] = r; // keyed by room id
+            }
+          });
+        });
+      }
+
+      // Convert hashmap back to array if needed
+      const roomsInWhichEmp: any[] = Object.values(roomsMap);
+      const startRow = worksheetFaculty.rowCount + 1;
+
+      // // Add one row per matched room
+      for (let i = 0; i < (roomsInWhichEmp.length === 0 ? 1 : roomsInWhichEmp.length); i++) {
+        let room = roomsInWhichEmp.length === 0 ? null : roomsInWhichEmp[i];
+        const row: FacultyRow = {
+          employeeId: String(emp.employeeCode ?? ""),
+          facultyName: String(emp.employeeName ?? ""),
+          programCode: String(emp.programCode ?? ""),
+          programName: program ? program.description : "",
+          academicBlock: String(room?.building ?? ""),
+          facultyBlock: String(room?.isRoom ? room?.id : room?.parentId ?? ""),
+          workStation: String(room?.roomType.replace(" ", "").toLowerCase() === "workstation" ? room?.id : ""),
+          cabinNo: String(room?.roomType.toLowerCase() === "cubical" ? room?.id : ""),
+          keyNo: String(room?.keys ?? ""),
+          occupancy: String(room?.capacity ?? ""),
+        };
+
+        worksheetFaculty.addRow(row);
+      }
+
+      const endRow = worksheetFaculty.rowCount;
+
+      // Merge common columns (Employee + Program info)
+      if (roomsInWhichEmp.length > 1) {
+        const mergeCols = ["A", "B", "C", "D"]; // employeeId, facultyName, programCode, programName
+        mergeCols.forEach((col) => {
+          worksheetFaculty.mergeCells(`${col}${startRow}:${col}${endRow}`);
+        });
+      }
+    };
+
+    const dataManupulation = async (object: any) => {
+      const reqBody = {
+        roomID: object.roomID,
+        subroomID: 0,
+        academicYr: object.academicYr,
+        acadSess: object.acadSess,
+        startDate: object.startDate,
+        endDate: object.endDate,
+      };
+
+      const roomInfoResponse = await callApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, reqBody);
+      if (roomInfoResponse.success) {
+        if (!roomInfoResponse.data?.roomType.toLowerCase().includes("faculty")) {
+          if (roomInfoResponse.data?.hasSubtype) {
+            // 🔹 CASE 1: Room has subrooms
+            const subroomsResponse = await callApi<Room[]>(process.env.NEXT_PUBLIC_GET_SUBROOMS_LIST || URL_NOT_FOUND, {
+              roomID: object.roomID,
+              buildingNo: roomInfoResponse.data.building,
+              acadSess: object.acadSess,
+              acadYr: object.academicYr,
+            });
+
+            const subrooms = subroomsResponse?.data || [];
+            for (const sub of subrooms) {
+              const subRoomReqBody = {
+                ...reqBody,
+                subroomID: sub.roomId,
+              };
+
+              const subRoomInfoResponse = await callApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, subRoomReqBody);
+
+              if (subRoomInfoResponse.success) {
+                await handleRoom(subRoomInfoResponse.data);
+              }
+            }
+          } else {
+            // 🔹 CASE 2: Normal room
+            await handleRoom(roomInfoResponse.data);
+          }
+        }
+      }
+    };
+
+    if (jsonObject.reportType === "room") {
+      await dataManupulation(jsonObject);
+
+      // Add faculty seating logic for room reports if it's a faculty room
+      const reqBody = {
+        roomID: jsonObject.roomID,
+        subroomID: 0,
+        academicYr: jsonObject.academicYr,
+        acadSess: jsonObject.acadSess,
+        startDate: jsonObject.startDate,
+        endDate: jsonObject.endDate,
+      };
+
+      const roomInfoResponse = await callApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, reqBody);
+
+      if (roomInfoResponse.success && roomInfoResponse.data?.roomType.toLowerCase().includes("faculty")) {
+        // Handle subrooms for faculty seating
         if (roomInfoResponse.data?.hasSubtype) {
           // 🔹 CASE 1: Room has subrooms
           const subroomsResponse = await callApi<Room[]>(process.env.NEXT_PUBLIC_GET_SUBROOMS_LIST || URL_NOT_FOUND, {
-            roomID: object.roomID,
+            roomID: jsonObject.roomID,
             buildingNo: roomInfoResponse.data.building,
-            acadSess: object.acadSess,
-            acadYr: object.academicYr,
+            acadSess: jsonObject.acadSess,
+            acadYr: jsonObject.academicYr,
           });
 
           const subrooms = subroomsResponse?.data || [];
+          const subroomInfoResponses = [];
+
           for (const sub of subrooms) {
             const subRoomReqBody = {
               ...reqBody,
@@ -421,148 +470,143 @@ async function createBigXLS(filePath: string, jsonObject: any) {
             const subRoomInfoResponse = await callApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, subRoomReqBody);
 
             if (subRoomInfoResponse.success) {
-              await handleRoom(subRoomInfoResponse.data);
+              subroomInfoResponses.push(subRoomInfoResponse.data);
+            }
+          }
+
+          // Process faculty seating for all subrooms
+          for (const subroomData of subroomInfoResponses) {
+            const roomOccupants = subroomData?.occupants || [];
+            const employeeIds = roomOccupants.map((o) => o.occupantId).filter((id) => id);
+
+            const filteredEmployees =
+              employees?.filter((e) => {
+                return employeeIds.includes(e.employeeCode);
+              }) || [];
+
+            for (const emp of filteredEmployees) {
+              await handleFacultySeating(emp, [subroomData]);
             }
           }
         } else {
-          // 🔹 CASE 2: Normal room
-          await handleRoom(roomInfoResponse.data);
-        }
-      }
-    }
-  };
+          // 🔹 CASE 2: Normal faculty room
+          const roomOccupants = roomInfoResponse.data?.occupants || [];
+          const employeeIds = roomOccupants.map((o) => o.occupantId).filter((id) => id);
 
-    if (jsonObject.reportType === "room") {
-    await dataManupulation(jsonObject);
-    
-    // Add faculty seating logic for room reports if it's a faculty room
-    const reqBody = {
-      roomID: jsonObject.roomID,
-      subroomID: 0,
-      academicYr: jsonObject.academicYr,
-      acadSess: jsonObject.acadSess,
-      startDate: jsonObject.startDate,
-      endDate: jsonObject.endDate,
-    };
-
-    const roomInfoResponse = await callApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, reqBody);
-    
-    if (roomInfoResponse.success && roomInfoResponse.data?.roomType.toLowerCase().includes("faculty")) {
-      // Handle subrooms for faculty seating
-      if (roomInfoResponse.data?.hasSubtype) {
-        // 🔹 CASE 1: Room has subrooms
-        const subroomsResponse = await callApi<Room[]>(process.env.NEXT_PUBLIC_GET_SUBROOMS_LIST || URL_NOT_FOUND, {
-          roomID: jsonObject.roomID,
-          buildingNo: roomInfoResponse.data.building,
-          acadSess: jsonObject.acadSess,
-          acadYr: jsonObject.academicYr,
-        });
-
-        const subrooms = subroomsResponse?.data || [];
-        const subroomInfoResponses = [];
-        
-        for (const sub of subrooms) {
-          const subRoomReqBody = {
-            ...reqBody,
-            subroomID: sub.roomId,
-          };
-
-          const subRoomInfoResponse = await callApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, subRoomReqBody);
-
-          if (subRoomInfoResponse.success) {
-            subroomInfoResponses.push(subRoomInfoResponse.data);
-          }
-        }
-
-        // Process faculty seating for all subrooms
-        for (const subroomData of subroomInfoResponses) {
-          const roomOccupants = subroomData?.occupants || [];
-          const employeeIds = roomOccupants.map(o => o.occupantId).filter(id => id);
-          
-          const filteredEmployees = employees?.filter((e) => {
-            return employeeIds.includes(e.employeeCode);
-          }) || [];
+          const filteredEmployees =
+            employees?.filter((e) => {
+              return employeeIds.includes(e.employeeCode);
+            }) || [];
 
           for (const emp of filteredEmployees) {
-            await handleFacultySeating(emp, [subroomData]);
+            await handleFacultySeating(emp, [roomInfoResponse.data]);
           }
         }
-      } else {
-        // 🔹 CASE 2: Normal faculty room
-        const roomOccupants = roomInfoResponse.data?.occupants || [];
-        const employeeIds = roomOccupants.map(o => o.occupantId).filter(id => id);
-        
-        const filteredEmployees = employees?.filter((e) => {
-          return employeeIds.includes(e.employeeCode);
-        }) || [];
-
-        for (const emp of filteredEmployees) {
-          await handleFacultySeating(emp, [roomInfoResponse.data]);
-        }
       }
+
+      await workbook.xlsx.writeFile(filePath);
+
+      // Insert file information into database after successful creation
+      await insertFileInfo(filePath, jsonObject);
     }
-    
-    await workbook.xlsx.writeFile(filePath);
-    
-    // Insert file information into database after successful creation
-    await insertFileInfo(filePath, jsonObject);
-  }
 
     if (jsonObject.reportType === "building") {
-    let { data: buildings } = await callApi<Building[]>(process.env.NEXT_PUBLIC_GET_BUILDING_LIST || URL_NOT_FOUND, {
-      acadSession: jsonObject.acadSess,
-      acadYear: jsonObject.academicYr,
-    });
-
-    if (jsonObject.buildingId !== "allBuildings") {
-      buildings = buildings?.filter((b) => b.id === jsonObject.buildingId);
-    }
-
-    for (const b of buildings || []) {
-      const { data: roomsList } = await callApi<Room[]>(process.env.NEXT_PUBLIC_GET_ROOMS_LIST || URL_NOT_FOUND, {
-        buildingNo: b.id,
-        floorID: ``,
-        curreentTime: moment().format("HH:mm"),
+      let { data: buildings } = await callApi<Building[]>(process.env.NEXT_PUBLIC_GET_BUILDING_LIST || URL_NOT_FOUND, {
+        acadSession: jsonObject.acadSess,
+        acadYear: jsonObject.academicYr,
       });
-      for (const room of roomsList || []) {
-        await dataManupulation({ ...jsonObject, roomID: room.roomId });
+
+      if (jsonObject.buildingId !== "allBuildings") {
+        buildings = buildings?.filter((b) => b.id === jsonObject.buildingId);
       }
-    }
 
-    // this is used to insert data into second Sheet
-    const allRooms: Room[] = (
-      await Promise.all(
-        buildings?.map(async (b) => {
-          const { data: roomsList } = await callApi<Room[]>(process.env.NEXT_PUBLIC_GET_ROOMS_LIST || URL_NOT_FOUND, {
-            buildingNo: b.id,
-            floorID: ``,
-            curreentTime: moment().format("HH:mm"),
-          });
-          return roomsList ?? [];
-        }) ?? []
-      )
-    )
-      .flat()
-      .filter((r) => r.roomType.toLowerCase().includes("faculty"));
-
-    // Prepare promises for rooms and subrooms
-    const roomInfoPromises = allRooms.map(async (room) => {
-      if (room.hasSubroom) {
-        // Fetch subrooms
-        const { data: subrooms } = await callApi<Room[]>(process.env.NEXT_PUBLIC_GET_SUBROOMS_LIST || URL_NOT_FOUND, {
-          roomID: room.roomId,
-          buildingNo: room.buildingId,
-          acadSess: jsonObject.acadSess,
-          acadYr: jsonObject.academicYr,
+      for (const b of buildings || []) {
+        const { data: roomsList } = await callApi<Room[]>(process.env.NEXT_PUBLIC_GET_ROOMS_LIST || URL_NOT_FOUND, {
+          buildingNo: b.id,
+          floorID: ``,
+          curreentTime: moment().format("HH:mm"),
         });
+        for (const room of roomsList || []) {
+          await dataManupulation({ ...jsonObject, roomID: room.roomId });
+        }
+      }
 
-        if (!subrooms || subrooms.length === 0) return [];
+      // this is used to insert data into second Sheet
+      const allRooms: Room[] = (
+        await Promise.all(
+          buildings?.map(async (b) => {
+            const { data: roomsList } = await callApi<Room[]>(process.env.NEXT_PUBLIC_GET_ROOMS_LIST || URL_NOT_FOUND, {
+              buildingNo: b.id,
+              floorID: ``,
+              curreentTime: moment().format("HH:mm"),
+            });
+            return roomsList ?? [];
+          }) ?? []
+        )
+      )
+        .flat()
+        .filter((r) => r.roomType.toLowerCase().includes("faculty"));
 
-        // Fetch info for each subroom
-        const subRoomInfoPromises = subrooms.map((sub) => {
+      // First, fetch all subrooms for all buildings at once to optimize API calls
+      const uniqueBuildings = [...new Set(allRooms.map((room) => room.buildingId))];
+      const allBuildingSubroomsMap: Record<string, Room[]> = {};
+
+      for (const buildingId of uniqueBuildings) {
+        try {
+          const { data: subrooms } = await callApi<Room[]>(process.env.NEXT_PUBLIC_GET_SUBROOMS_LIST || URL_NOT_FOUND, {
+            roomID: "", // Use blank roomID to get all subrooms for the building
+            buildingNo: buildingId,
+            acadSess: jsonObject.acadSess,
+            acadYr: jsonObject.academicYr,
+          });
+
+          if (subrooms) {
+            // Group subrooms by their parent room ID
+            subrooms.forEach((subroom) => {
+              if (subroom.parentId) {
+                if (!allBuildingSubroomsMap[subroom.parentId]) {
+                  allBuildingSubroomsMap[subroom.parentId] = [];
+                }
+                allBuildingSubroomsMap[subroom.parentId].push(subroom);
+              }
+            });
+          }
+        } catch (error) {
+          console.error(`Error fetching subrooms for building ${buildingId}:`, error);
+        }
+      }
+
+      // Prepare promises for rooms and subrooms
+      const roomInfoPromises = allRooms.map(async (room) => {
+        if (room.hasSubroom) {
+          // Use cached subrooms instead of making individual API calls
+          const subrooms = allBuildingSubroomsMap[room.roomId] || [];
+
+          if (!subrooms || subrooms.length === 0) return [];
+
+          // Fetch info for each subroom
+          const subRoomInfoPromises = subrooms.map((sub) => {
+            const reqBody = {
+              roomID: room.roomId, // parent
+              subroomID: sub.roomId, // subroom
+              academicYr: jsonObject.academicYr,
+              acadSess: jsonObject.acadSess,
+              startDate: jsonObject.startDate,
+              endDate: jsonObject.endDate,
+            };
+
+            return callApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, reqBody).then((res) => ({
+              ...res.data,
+              isRoom: false,
+            }));
+          });
+
+          return Promise.all(subRoomInfoPromises);
+        } else {
+          // Normal room
           const reqBody = {
-            roomID: room.roomId, // parent
-            subroomID: sub.roomId, // subroom
+            roomID: room.roomId,
+            subroomID: 0,
             academicYr: jsonObject.academicYr,
             acadSess: jsonObject.acadSess,
             startDate: jsonObject.startDate,
@@ -571,97 +615,97 @@ async function createBigXLS(filePath: string, jsonObject: any) {
 
           return callApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, reqBody).then((res) => ({
             ...res.data,
-            isRoom: false,
+            isRoom: true,
           }));
-        });
+        }
+      });
 
-        return Promise.all(subRoomInfoPromises);
-      } else {
-        // Normal room
-        const reqBody = {
-          roomID: room.roomId,
-          subroomID: 0,
-          academicYr: jsonObject.academicYr,
-          acadSess: jsonObject.acadSess,
-          startDate: jsonObject.startDate,
-          endDate: jsonObject.endDate,
-        };
+      // Run everything in parallel and flatten
+      const roomInfoResponses = (await Promise.all(roomInfoPromises)).flat().filter((r) => (r.occupants?.length || 0) > 0);
 
-        return callApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, reqBody).then((res) => ({
-          ...res.data,
-          isRoom: true,
-        }));
+      // console.log(roomInfoResponses);
+
+      for (const emp of employees || []) {
+        await handleFacultySeating(emp, roomInfoResponses);
       }
-    });
 
-    // Run everything in parallel and flatten
-    const roomInfoResponses = (await Promise.all(roomInfoPromises)).flat().filter((r) => (r.occupants?.length || 0) > 0);
+      await workbook.xlsx.writeFile(filePath);
 
-    // console.log(roomInfoResponses);
-
-    for (const emp of employees || []) {
-      await handleFacultySeating(emp, roomInfoResponses);
+      // Insert file information into database after successful creation
+      await insertFileInfo(filePath, jsonObject);
     }
-
-    await workbook.xlsx.writeFile(filePath);
-    
-    // Insert file information into database after successful creation
-    await insertFileInfo(filePath, jsonObject);
-  }
 
     if (jsonObject.reportType === "department") {
-    let { data: buildings } = await callApi<Building[]>(process.env.NEXT_PUBLIC_GET_BUILDING_LIST || URL_NOT_FOUND, {
-      acadSession: jsonObject.acadSess,
-      acadYear: jsonObject.academicYr,
-    });
-
-    if (jsonObject.buildingId !== "allBuildings") {
-      buildings = buildings?.filter((b) => b.id === jsonObject.buildingId);
-    }
-
-    for (const b of buildings || []) {
-      const { data: roomsList } = await callApi<Room[]>(process.env.NEXT_PUBLIC_GET_ROOMS_LIST || URL_NOT_FOUND, {
-        buildingNo: b.id,
-        floorID: ``,
-        curreentTime: moment().format("HH:mm"),
+      let { data: buildings } = await callApi<Building[]>(process.env.NEXT_PUBLIC_GET_BUILDING_LIST || URL_NOT_FOUND, {
+        acadSession: jsonObject.acadSess,
+        acadYear: jsonObject.academicYr,
       });
-      for (const room of roomsList || []) {
-        await dataManupulation({ ...jsonObject, roomID: room.roomId });
+
+      if (jsonObject.buildingId !== "allBuildings") {
+        buildings = buildings?.filter((b) => b.id === jsonObject.buildingId);
       }
-    }
 
-    // this is used to insert data into second Sheet
-    const allRooms: Room[] = (
-      await Promise.all(
-        buildings?.map(async (b) => {
-          const { data: roomsList } = await callApi<Room[]>(process.env.NEXT_PUBLIC_GET_ROOMS_LIST || URL_NOT_FOUND, {
-            buildingNo: b.id,
-            floorID: ``,
-            curreentTime: moment().format("HH:mm"),
-          });
-          return roomsList ?? [];
-        }) ?? []
-      )
-    ).flat();
-
-    // Prepare promises for rooms and subrooms
-    const roomInfoPromises = allRooms.map(async (room) => {
-      if (room.hasSubroom) {
-        // Fetch subrooms
-        const { data: subrooms } = await callApi<Room[]>(process.env.NEXT_PUBLIC_GET_SUBROOMS_LIST || URL_NOT_FOUND, {
-          roomID: room.roomId,
-          buildingNo: room.buildingId,
-          acadSess: jsonObject.acadSess,
-          acadYr: jsonObject.academicYr,
+      for (const b of buildings || []) {
+        const { data: roomsList } = await callApi<Room[]>(process.env.NEXT_PUBLIC_GET_ROOMS_LIST || URL_NOT_FOUND, {
+          buildingNo: b.id,
+          floorID: ``,
+          curreentTime: moment().format("HH:mm"),
         });
+        for (const room of roomsList || []) {
+          await dataManupulation({ ...jsonObject, roomID: room.roomId });
+        }
+      }
 
-        if (!subrooms || subrooms.length === 0) return [];
+      // this is used to insert data into second Sheet
+      const allRooms: Room[] = (
+        await Promise.all(
+          buildings?.map(async (b) => {
+            const { data: roomsList } = await callApi<Room[]>(process.env.NEXT_PUBLIC_GET_ROOMS_LIST || URL_NOT_FOUND, {
+              buildingNo: b.id,
+              floorID: ``,
+              curreentTime: moment().format("HH:mm"),
+            });
+            return roomsList ?? [];
+          }) ?? []
+        )
+      ).flat();
 
-        // Fetch info for each subroom
-        const subRoomInfoPromises = subrooms.map((sub) => {
+      // Prepare promises for rooms and subrooms
+      const roomInfoPromises = allRooms.map(async (room) => {
+        if (room.hasSubroom) {
+          // Fetch subrooms
+          const { data: subrooms } = await callApi<Room[]>(process.env.NEXT_PUBLIC_GET_SUBROOMS_LIST || URL_NOT_FOUND, {
+            roomID: room.roomId,
+            buildingNo: room.buildingId,
+            acadSess: jsonObject.acadSess,
+            acadYr: jsonObject.academicYr,
+          });
+
+          if (!subrooms || subrooms.length === 0) return [];
+
+          // Fetch info for each subroom
+          const subRoomInfoPromises = subrooms.map((sub) => {
+            const reqBody = {
+              roomID: room.roomId, // parent
+              subroomID: sub.roomId, // subroom
+              academicYr: jsonObject.academicYr,
+              acadSess: jsonObject.acadSess,
+              startDate: jsonObject.startDate,
+              endDate: jsonObject.endDate,
+            };
+
+            return callApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, reqBody).then((res) => ({
+              ...res.data,
+              isRoom: false,
+            }));
+          });
+
+          return Promise.all(subRoomInfoPromises);
+        } else {
+          // Normal room
           const reqBody = {
-            roomID: room.roomId, // parent
-            subroomID: sub.roomId, // subroom
+            roomID: room.roomId,
+            subroomID: 0,
             academicYr: jsonObject.academicYr,
             acadSess: jsonObject.acadSess,
             startDate: jsonObject.startDate,
@@ -670,99 +714,100 @@ async function createBigXLS(filePath: string, jsonObject: any) {
 
           return callApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, reqBody).then((res) => ({
             ...res.data,
-            isRoom: false,
+            isRoom: true,
           }));
-        });
+        }
+      });
 
-        return Promise.all(subRoomInfoPromises);
-      } else {
-        // Normal room
-        const reqBody = {
-          roomID: room.roomId,
-          subroomID: 0,
-          academicYr: jsonObject.academicYr,
-          acadSess: jsonObject.acadSess,
-          startDate: jsonObject.startDate,
-          endDate: jsonObject.endDate,
-        };
+      // Run everything in parallel and flatten
+      const roomInfoResponses = (await Promise.all(roomInfoPromises)).flat().filter((r) => (r.occupants?.length || 0) > 0);
 
-        return callApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, reqBody).then((res) => ({
-          ...res.data,
-          isRoom: true,
-        }));
+      const filteredEmployees =
+        employees?.filter((e) => {
+          return e.departmentCode === jsonObject.departmentId;
+        }) || [];
+
+      for (const emp of filteredEmployees) {
+        await handleFacultySeating(emp, roomInfoResponses);
       }
-    });
 
-    // Run everything in parallel and flatten
-    const roomInfoResponses = (await Promise.all(roomInfoPromises)).flat().filter((r) => (r.occupants?.length || 0) > 0);
+      await workbook.xlsx.writeFile(filePath);
 
-    const filteredEmployees = employees?.filter((e) => {
-      return e.departmentCode === jsonObject.departmentId;
-    }) || [];
-
-    for (const emp of filteredEmployees) {
-      await handleFacultySeating(emp, roomInfoResponses);
+      // Insert file information into database after successful creation
+      await insertFileInfo(filePath, jsonObject);
     }
-
-    await workbook.xlsx.writeFile(filePath);
-    
-    // Insert file information into database after successful creation
-    await insertFileInfo(filePath, jsonObject);
-  }
 
     if (jsonObject.reportType === "faculty") {
-    let { data: buildings } = await callApi<Building[]>(process.env.NEXT_PUBLIC_GET_BUILDING_LIST || URL_NOT_FOUND, {
-      acadSession: jsonObject.acadSess,
-      acadYear: jsonObject.academicYr,
-    });
-
-    if (jsonObject.buildingId !== "allBuildings") {
-      buildings = buildings?.filter((b) => b.id === jsonObject.buildingId);
-    }
-
-    for (const b of buildings || []) {
-      const { data: roomsList } = await callApi<Room[]>(process.env.NEXT_PUBLIC_GET_ROOMS_LIST || URL_NOT_FOUND, {
-        buildingNo: b.id,
-        floorID: ``,
-        curreentTime: moment().format("HH:mm"),
+      let { data: buildings } = await callApi<Building[]>(process.env.NEXT_PUBLIC_GET_BUILDING_LIST || URL_NOT_FOUND, {
+        acadSession: jsonObject.acadSess,
+        acadYear: jsonObject.academicYr,
       });
-      for (const room of roomsList || []) {
-        await dataManupulation({ ...jsonObject, roomID: room.roomId });
+
+      if (jsonObject.buildingId !== "allBuildings") {
+        buildings = buildings?.filter((b) => b.id === jsonObject.buildingId);
       }
-    }
 
-    // this is used to insert data into second Sheet
-    const allRooms: Room[] = (
-      await Promise.all(
-        buildings?.map(async (b) => {
-          const { data: roomsList } = await callApi<Room[]>(process.env.NEXT_PUBLIC_GET_ROOMS_LIST || URL_NOT_FOUND, {
-            buildingNo: b.id,
-            floorID: ``,
-            curreentTime: moment().format("HH:mm"),
-          });
-          return roomsList ?? [];
-        }) ?? []
-      )
-    ).flat();
-
-    // Prepare promises for rooms and subrooms
-    const roomInfoPromises = allRooms.map(async (room) => {
-      if (room.hasSubroom) {
-        // Fetch subrooms
-        const { data: subrooms } = await callApi<Room[]>(process.env.NEXT_PUBLIC_GET_SUBROOMS_LIST || URL_NOT_FOUND, {
-          roomID: room.roomId,
-          buildingNo: room.buildingId,
-          acadSess: jsonObject.acadSess,
-          acadYr: jsonObject.academicYr,
+      for (const b of buildings || []) {
+        const { data: roomsList } = await callApi<Room[]>(process.env.NEXT_PUBLIC_GET_ROOMS_LIST || URL_NOT_FOUND, {
+          buildingNo: b.id,
+          floorID: ``,
+          curreentTime: moment().format("HH:mm"),
         });
+        for (const room of roomsList || []) {
+          await dataManupulation({ ...jsonObject, roomID: room.roomId });
+        }
+      }
 
-        if (!subrooms || subrooms.length === 0) return [];
+      // this is used to insert data into second Sheet
+      const allRooms: Room[] = (
+        await Promise.all(
+          buildings?.map(async (b) => {
+            const { data: roomsList } = await callApi<Room[]>(process.env.NEXT_PUBLIC_GET_ROOMS_LIST || URL_NOT_FOUND, {
+              buildingNo: b.id,
+              floorID: ``,
+              curreentTime: moment().format("HH:mm"),
+            });
+            return roomsList ?? [];
+          }) ?? []
+        )
+      ).flat();
 
-        // Fetch info for each subroom
-        const subRoomInfoPromises = subrooms.map((sub) => {
+      // Prepare promises for rooms and subrooms
+      const roomInfoPromises = allRooms.map(async (room) => {
+        if (room.hasSubroom) {
+          // Fetch subrooms
+          const { data: subrooms } = await callApi<Room[]>(process.env.NEXT_PUBLIC_GET_SUBROOMS_LIST || URL_NOT_FOUND, {
+            roomID: room.roomId,
+            buildingNo: room.buildingId,
+            acadSess: jsonObject.acadSess,
+            acadYr: jsonObject.academicYr,
+          });
+
+          if (!subrooms || subrooms.length === 0) return [];
+
+          // Fetch info for each subroom
+          const subRoomInfoPromises = subrooms.map((sub) => {
+            const reqBody = {
+              roomID: room.roomId, // parent
+              subroomID: sub.roomId, // subroom
+              academicYr: jsonObject.academicYr,
+              acadSess: jsonObject.acadSess,
+              startDate: jsonObject.startDate,
+              endDate: jsonObject.endDate,
+            };
+
+            return callApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, reqBody).then((res) => ({
+              ...res.data,
+              isRoom: false,
+            }));
+          });
+
+          return Promise.all(subRoomInfoPromises);
+        } else {
+          // Normal room
           const reqBody = {
-            roomID: room.roomId, // parent
-            subroomID: sub.roomId, // subroom
+            roomID: room.roomId,
+            subroomID: 0,
             academicYr: jsonObject.academicYr,
             acadSess: jsonObject.acadSess,
             startDate: jsonObject.startDate,
@@ -771,60 +816,43 @@ async function createBigXLS(filePath: string, jsonObject: any) {
 
           return callApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, reqBody).then((res) => ({
             ...res.data,
-            isRoom: false,
+            isRoom: true,
           }));
-        });
+        }
+      });
 
-        return Promise.all(subRoomInfoPromises);
-      } else {
-        // Normal room
-        const reqBody = {
-          roomID: room.roomId,
-          subroomID: 0,
-          academicYr: jsonObject.academicYr,
-          acadSess: jsonObject.acadSess,
-          startDate: jsonObject.startDate,
-          endDate: jsonObject.endDate,
-        };
+      // Run everything in parallel and flatten
+      const roomInfoResponses = (await Promise.all(roomInfoPromises)).flat().filter((r) => (r.occupants?.length || 0) > 0);
 
-        return callApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, reqBody).then((res) => ({
-          ...res.data,
-          isRoom: true,
-        }));
+      const filteredEmployees =
+        employees?.filter((e) => {
+          return e.facultyCode === jsonObject.facultyId;
+        }) || [];
+
+      for (const emp of filteredEmployees) {
+        // await handleFacultySeating(employees?.[1473]!, roomInfoResponses);
+        await handleFacultySeating(emp, roomInfoResponses);
       }
-    });
 
-    // Run everything in parallel and flatten
-    const roomInfoResponses = (await Promise.all(roomInfoPromises)).flat().filter((r) => (r.occupants?.length || 0) > 0);
+      await workbook.xlsx.writeFile(filePath);
 
-    const filteredEmployees = employees?.filter((e) => {
-      return e.facultyCode === jsonObject.facultyId;
-    }) || [];
-
-    for (const emp of filteredEmployees) {
-      // await handleFacultySeating(employees?.[1473]!, roomInfoResponses);
-      await handleFacultySeating(emp, roomInfoResponses);
+      // Insert file information into database after successful creation
+      await insertFileInfo(filePath, jsonObject);
     }
-
-    await workbook.xlsx.writeFile(filePath);
-    
-    // Insert file information into database after successful creation
-    await insertFileInfo(filePath, jsonObject);
+  } catch (error) {
+    console.error("Error creating Excel file:", error);
+    // You could add additional error handling here, such as:
+    // - Writing error to a log file
+    // - Sending notification to admin
+    // - Creating a fallback error report
   }
-} catch (error) {
-  console.error("Error creating Excel file:", error);
-  // You could add additional error handling here, such as:
-  // - Writing error to a log file
-  // - Sending notification to admin
-  // - Creating a fallback error report
-}
 }
 async function insertFileInfo(filePath: string, jsonObject: any) {
   try {
     const fileName = path.basename(filePath);
     const stats = fs.statSync(filePath);
     const fileSize = stats.size.toString();
-    
+
     const insertData = {
       fileName: fileName,
       reportType: jsonObject.reportType || "room",
@@ -832,13 +860,13 @@ async function insertFileInfo(filePath: string, jsonObject: any) {
       isActiveSession: true,
       startDate: jsonObject.startDate || "",
       endDate: jsonObject.endDate || "",
-      filePath: filePath
+      filePath: filePath,
     };
 
     console.log("Inserting file info:", insertData);
-    
+
     const response = await callApi(INSERT_ALLOCATION_UTILIZATION_REPORT_API, insertData);
-    
+
     if (response.success) {
       console.log("File information inserted successfully");
     } else {
@@ -891,4 +919,4 @@ type FacultyRow = {
   cabinNo: string;
   occupancy: string;
   keyNo: string;
-}
+};
