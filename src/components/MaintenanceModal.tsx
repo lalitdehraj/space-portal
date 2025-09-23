@@ -63,6 +63,8 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
   const [conflictRoomConflictStatus, setConflictRoomConflictStatus] = useState<{ [key: string]: boolean }>({});
   const [timeValidationErrors, setTimeValidationErrors] = useState<{ [key: string]: string }>({});
   const [existingMaintenanceRecords, setExistingMaintenanceRecords] = useState<Maintenance[]>([]);
+  const [roomSearchInput, setRoomSearchInput] = useState("");
+  const [showRoomDropdown, setShowRoomDropdown] = useState(false);
 
   // Helper function to find a room (either parent room or subroom) by roomId
   const findRoomById = (roomId: string): Room | undefined => {
@@ -333,6 +335,16 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
     }
   };
 
+  // Filter rooms based on search input
+  const filteredRooms = allRooms.filter((room) => {
+    const building = allBuildingsData.find((b) => b.id === room.buildingId);
+    const floor = building?.floors.find((f) => f.id === room.floorId);
+    const roomDisplayText = `${building?.name} ${floor?.name ? `- ${floor?.name}` : ""} - ${room.roomName} ${
+      room?.roomType ? `(${room.roomType})` : ""
+    }`.toLowerCase();
+    return roomDisplayText.includes(roomSearchInput.toLowerCase());
+  });
+
   // Handle room selection
   const handleRoomSelection = (roomId: string) => {
     setSelectedRoomId(roomId);
@@ -351,9 +363,23 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
     setShowConflictRoomSchedule({});
     setConflictAvailableSlots({});
     setConflictRoomConflictStatus({});
+    // Clear search input and hide dropdown
+    setRoomSearchInput("");
+    setShowRoomDropdown(false);
     if (roomId) {
       fetchRoomInfo(roomId);
     } else {
+      setSelectedRoomInfo(null);
+    }
+  };
+
+  // Handle search input change
+  const handleRoomSearchChange = (value: string) => {
+    setRoomSearchInput(value);
+    setShowRoomDropdown(true); // Always show dropdown when typing
+    // If input is cleared, clear selection
+    if (value === "") {
+      setSelectedRoomId("");
       setSelectedRoomInfo(null);
     }
   };
@@ -1142,31 +1168,60 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
           <div className="space-y-4">
             <h3 className="text-lg font-medium text-gray-700">Maintenance Details</h3>
 
-            <div>
+            <div className="relative">
               <label className="block text-sm font-medium text-gray-700 mb-1">Select Room *</label>
-              <select
-                value={selectedRoomId}
-                onChange={(e) => handleRoomSelection(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-                required
-                disabled={isLoadingRooms}
-              >
-                <option value="">{isLoadingRooms ? "Loading rooms..." : "Select a room..."}</option>
-                {allRooms.map((room) => {
-                  const building = allBuildingsData.find((b) => b.id === room.buildingId);
-                  const floor = building?.floors.find((f) => f.id === room.floorId);
-                  return (
-                    <option key={`${room.roomId}-${room.buildingId}`} value={room.roomId}>
-                      {building?.name} {floor?.name ? `- ${floor?.name}` : ""} - {room.roomName} {room?.roomType ? `(${room.roomType})` : ""}
-                    </option>
-                  );
-                })}
-              </select>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={roomSearchInput}
+                  onChange={(e) => handleRoomSearchChange(e.target.value)}
+                  onFocus={() => setShowRoomDropdown(true)}
+                  placeholder={isLoadingRooms ? "Loading rooms..." : "Search and select a room..."}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  required
+                  disabled={isLoadingRooms}
+                />
+
+                {/* Dropdown with filtered rooms */}
+                {showRoomDropdown && (
+                  <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                    {(() => {
+                      const roomsToShow = roomSearchInput.length > 0 ? filteredRooms : allRooms;
+                      return roomsToShow.length > 0 ? (
+                        roomsToShow.map((room) => {
+                          const building = allBuildingsData.find((b) => b.id === room.buildingId);
+                          const floor = building?.floors.find((f) => f.id === room.floorId);
+                          const roomDisplayText = `${building?.name} ${floor?.name ? `- ${floor?.name}` : ""} - ${room.roomName} ${
+                            room?.roomType ? `(${room.roomType})` : ""
+                          }`;
+
+                          return (
+                            <div
+                              key={`${room.roomId}-${room.buildingId}`}
+                              onClick={() => handleRoomSelection(room.roomId)}
+                              className="px-3 py-2 hover:bg-orange-50 cursor-pointer border-b border-gray-100 last:border-b-0"
+                            >
+                              <div className="text-sm text-gray-800">{roomDisplayText}</div>
+                              {room.roomCapactiy && room.roomCapactiy > 0 && <div className="text-xs text-gray-500">Capacity: {room.roomCapactiy}</div>}
+                            </div>
+                          );
+                        })
+                      ) : (
+                        <div className="px-3 py-2 text-sm text-gray-500 italic">No rooms found matching "{roomSearchInput}"</div>
+                      );
+                    })()}
+                  </div>
+                )}
+              </div>
+
+              {/* Click outside to close dropdown */}
+              {showRoomDropdown && <div className="fixed inset-0 z-5" onClick={() => setShowRoomDropdown(false)} />}
+
               {isLoadingRoomInfo && <div className="text-sm text-gray-500 mt-1">Loading room information...</div>}
               {selectedRoomInfo && (
                 <div className="text-sm text-gray-600 mt-1">
                   Selected: {selectedRoomInfo.roomName || selectedRoomInfo.id}
-                  {selectedRoomInfo.capacity && ` (Capacity: ${selectedRoomInfo.capacity})`}
+                  {selectedRoomInfo.capacity !== 0 && ` (Capacity: ${selectedRoomInfo.capacity})`}
                 </div>
               )}
             </div>
