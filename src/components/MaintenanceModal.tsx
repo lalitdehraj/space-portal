@@ -573,7 +573,7 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
         // Calculate available slots for the conflict date if it's set
         const conflictDate = conflictDates[conflictId];
         if (conflictDate) {
-          calculateConflictAvailableSlots(conflictId, res.data, conflictDate);
+          calculateConflictAvailableSlots(conflictId, res.data, conflictDate, roomId);
         }
 
         // Trigger conflict check after room info is loaded
@@ -592,7 +592,7 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
   };
 
   // Calculate available slots for a given conflict room and date
-  const calculateConflictAvailableSlots = (conflictId: string, roomInfo: RoomInfo, date: string) => {
+  const calculateConflictAvailableSlots = (conflictId: string, roomInfo: RoomInfo, date: string, roomId?: string) => {
     const today = new Date().toISOString().split("T")[0];
     const currentTime = new Date();
     if (new Date(date) < new Date(today)) {
@@ -603,7 +603,8 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
     const workingStart = 9 * 60; // 9:00 AM in minutes
     const workingEnd = 18 * 60; // 6:00 PM in minutes
 
-    const occupiedIntervals = (roomInfo.occupants || [])
+    // Get occupants intervals
+    const occupantIntervals = (roomInfo.occupants || [])
       .filter((occupant) => {
         const occupantDate = moment(occupant.scheduledDate).format("YYYY-MM-DD");
         return occupantDate === date;
@@ -611,8 +612,34 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
       .map((occupant) => ({
         start: parseInt(occupant.startTime.split(":")[0]) * 60 + parseInt(occupant.startTime.split(":")[1]),
         end: parseInt(occupant.endTime.split(":")[0]) * 60 + parseInt(occupant.endTime.split(":")[1]),
-      }))
-      .sort((a, b) => a.start - b.start);
+      }));
+
+    // Get maintenance intervals for the same room and date
+    const maintenanceIntervals = existingMaintenanceRecords
+      .filter((maintenance) => {
+        // Only consider active maintenance records
+        if (!maintenance.isMainteneceActive) return false;
+
+        // Check if maintenance is for the same room
+        if (roomId && maintenance.roomid !== roomId) return false;
+
+        // Check if maintenance is on the same date
+        const maintenanceDate = moment(maintenance.maintanceDate).format("YYYY-MM-DD");
+        return maintenanceDate === date;
+      })
+      .map((maintenance) => {
+        // Parse maintenance times - handle both formats
+        const startTime = maintenance.startTime.includes("T") ? maintenance.startTime.split("T")[1]?.split(":").slice(0, 2).join(":") : maintenance.startTime;
+        const endTime = maintenance.endTime.includes("T") ? maintenance.endTime.split("T")[1]?.split(":").slice(0, 2).join(":") : maintenance.endTime;
+
+        return {
+          start: parseInt(startTime.split(":")[0]) * 60 + parseInt(startTime.split(":")[1]),
+          end: parseInt(endTime.split(":")[0]) * 60 + parseInt(endTime.split(":")[1]),
+        };
+      });
+
+    // Combine all occupied intervals (occupants + maintenance)
+    const occupiedIntervals = [...occupantIntervals, ...maintenanceIntervals].sort((a, b) => a.start - b.start);
 
     let freeIntervals: { start: number; end: number }[] = [];
     let currentPosition = workingStart;
@@ -980,12 +1007,45 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
         return newSlotStart.isBefore(occupantEnd) && newSlotEnd.isAfter(occupantStart);
       });
 
-      const hasConflicts = conflictingOccupants.length > 0;
-      console.log("Occupant conflicts found:", conflictingOccupants.length, "Has conflicts:", hasConflicts);
+      // Check for conflicts with existing maintenance records in the new room
+      const conflictingMaintenance = existingMaintenanceRecords.filter((maintenance) => {
+        // Only consider active maintenance records
+        if (!maintenance.isMainteneceActive) return false;
+
+        // Check if maintenance is for the same room
+        if (maintenance.roomid !== roomId) return false;
+
+        // Check if maintenance is on the same date
+        const maintenanceDate = moment(maintenance.maintanceDate).format("YYYY-MM-DD");
+        if (maintenanceDate !== date) return false;
+
+        // Parse maintenance times - handle both formats
+        const startTime = maintenance.startTime.includes("T") ? maintenance.startTime.split("T")[1]?.split(":").slice(0, 2).join(":") : maintenance.startTime;
+        const endTime = maintenance.endTime.includes("T") ? maintenance.endTime.split("T")[1]?.split(":").slice(0, 2).join(":") : maintenance.endTime;
+
+        const maintenanceStart = moment(`${maintenanceDate} ${startTime}`, "YYYY-MM-DD HH:mm");
+        const maintenanceEnd = moment(`${maintenanceDate} ${endTime}`, "YYYY-MM-DD HH:mm");
+
+        // Check for time overlap
+        return newSlotStart.isBefore(maintenanceEnd) && newSlotEnd.isAfter(maintenanceStart);
+      });
+
+      const hasConflicts = conflictingOccupants.length > 0 || conflictingMaintenance.length > 0;
+      console.log(
+        "Occupant conflicts found:",
+        conflictingOccupants.length,
+        "Maintenance conflicts found:",
+        conflictingMaintenance.length,
+        "Has conflicts:",
+        hasConflicts
+      );
 
       // Update the conflict status immediately
       setConflictRoomConflictStatus((prev) => ({ ...prev, [conflictId]: hasConflicts }));
-      setConflictRoomConflictType((prev) => ({ ...prev, [conflictId]: hasConflicts ? "occupant" : "" }));
+      setConflictRoomConflictType((prev) => ({
+        ...prev,
+        [conflictId]: hasConflicts ? (conflictingMaintenance.length > 0 ? "existing_maintenance" : "occupant") : "",
+      }));
 
       return hasConflicts;
     } catch (error) {
@@ -1014,7 +1074,7 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
       if (newRoomId === selectedRoomId && newDate === maintenanceDate) {
         alert("The selected time slot conflicts with the scheduled maintenance time. Please choose a different time or room.");
       } else {
-        alert("The selected time slot conflicts with existing occupants in the new room. Please choose a different time or room.");
+        alert("The selected time slot conflicts with existing occupants or maintenance in the new room. Please choose a different time or room.");
       }
       return;
     }
@@ -1759,8 +1819,9 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
                                   const date = e.target.value;
                                   setConflictDates((prev) => ({ ...prev, [conflict.occupant.Id]: date }));
                                   const roomInfo = conflictRoomInfos[conflict.occupant.Id];
-                                  if (roomInfo && date) {
-                                    calculateConflictAvailableSlots(conflict.occupant.Id, roomInfo, date);
+                                  const roomId = conflictRoomSelections[conflict.occupant.Id];
+                                  if (roomInfo && date && roomId) {
+                                    calculateConflictAvailableSlots(conflict.occupant.Id, roomInfo, date, roomId);
                                   }
                                   // Clear conflict status when date changes
                                   setConflictRoomConflictStatus((prev) => ({ ...prev, [conflict.occupant.Id]: false }));
@@ -1772,7 +1833,6 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
                                     validateTimeSlot(date, startTime, endTime, `conflict-${conflict.occupant.Id}`);
                                   }
                                   // Immediately check for conflicts if we have all required data
-                                  const roomId = conflictRoomSelections[conflict.occupant.Id];
                                   if (roomId && startTime && endTime) {
                                     checkConflictRoomConflicts(conflict.occupant.Id, roomId, date, startTime, endTime);
                                   }
@@ -1806,9 +1866,9 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
                                       validateTimeSlot(date, startTime, endTime, `conflict-${conflict.occupant.Id}`);
                                     }
                                     // Check for conflicts when time changes
-                                    const roomId = conflictRoomSelections[conflict.occupant.Id];
-                                    if (roomId && date && startTime && endTime) {
-                                      checkConflictRoomConflicts(conflict.occupant.Id, roomId, date, startTime, endTime);
+                                    const conflictRoomId = conflictRoomSelections[conflict.occupant.Id];
+                                    if (conflictRoomId && date && startTime && endTime) {
+                                      checkConflictRoomConflicts(conflict.occupant.Id, conflictRoomId, date, startTime, endTime);
                                     }
                                   }}
                                   min={conflictDates[conflict.occupant.Id] === moment().format("YYYY-MM-DD") ? moment().format("HH:mm") : undefined}
@@ -1855,9 +1915,9 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
                                       validateTimeSlot(date, startTime, endTime, `conflict-${conflict.occupant.Id}`);
                                     }
                                     // Check for conflicts when time changes
-                                    const roomId = conflictRoomSelections[conflict.occupant.Id];
-                                    if (roomId && date && startTime && endTime) {
-                                      checkConflictRoomConflicts(conflict.occupant.Id, roomId, date, startTime, endTime);
+                                    const conflictRoomId = conflictRoomSelections[conflict.occupant.Id];
+                                    if (conflictRoomId && date && startTime && endTime) {
+                                      checkConflictRoomConflicts(conflict.occupant.Id, conflictRoomId, date, startTime, endTime);
                                     }
                                   }}
                                   min={
@@ -1916,6 +1976,8 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
                                   {conflictRoomConflictStatus[conflict.occupant.Id]
                                     ? conflictRoomConflictType[conflict.occupant.Id] === "maintenance"
                                       ? "⚠️ This time slot conflicts with scheduled maintenance"
+                                      : conflictRoomConflictType[conflict.occupant.Id] === "existing_maintenance"
+                                      ? "⚠️ This time slot conflicts with existing maintenance"
                                       : conflictRoomConflictType[conflict.occupant.Id] === "subroom"
                                       ? "⚠️ Cannot resolve because parent room during maintenance timeframe"
                                       : "⚠️ This time slot conflicts with existing occupants"
