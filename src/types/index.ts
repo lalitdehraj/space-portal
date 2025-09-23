@@ -38,6 +38,8 @@ export interface Occupant {
   occupantName?: string;
   type?: string;
   Id: string;
+  roomId?: string;
+  subroomId?: string;
   department?: string;
   facultyCode?: string;
   startTime: string;

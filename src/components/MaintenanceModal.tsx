@@ -53,7 +53,6 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
   const [isLoadingRoomInfo, setIsLoadingRoomInfo] = useState(false);
   const [allRooms, setAllRooms] = useState<Room[]>([]);
   const [isLoadingRooms, setIsLoadingRooms] = useState(false);
-  const [roomInfos, setRoomInfos] = useState<Record<string, RoomInfo>>({});
   const [subroomsForConflictResolution, setSubroomsForConflictResolution] = useState<Record<string, Room[]>>({});
   const [isLoadingConflictResolutionRooms, setIsLoadingConflictResolutionRooms] = useState(false);
   const [conflictRoomInfos, setConflictRoomInfos] = useState<{ [key: string]: RoomInfo }>({});
@@ -61,10 +60,15 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
   const [showConflictRoomSchedule, setShowConflictRoomSchedule] = useState<{ [key: string]: boolean }>({});
   const [conflictAvailableSlots, setConflictAvailableSlots] = useState<{ [key: string]: string[] }>({});
   const [conflictRoomConflictStatus, setConflictRoomConflictStatus] = useState<{ [key: string]: boolean }>({});
+  const [conflictRoomConflictType, setConflictRoomConflictType] = useState<{ [key: string]: string }>({});
   const [timeValidationErrors, setTimeValidationErrors] = useState<{ [key: string]: string }>({});
   const [existingMaintenanceRecords, setExistingMaintenanceRecords] = useState<Maintenance[]>([]);
   const [roomSearchInput, setRoomSearchInput] = useState("");
   const [showRoomDropdown, setShowRoomDropdown] = useState(false);
+  const [roomSearchError, setRoomSearchError] = useState("");
+  const [conflictRoomSearchInputs, setConflictRoomSearchInputs] = useState<{ [key: string]: string }>({});
+  const [showConflictRoomDropdowns, setShowConflictRoomDropdowns] = useState<{ [key: string]: boolean }>({});
+  const [conflictRoomSearchErrors, setConflictRoomSearchErrors] = useState<{ [key: string]: string }>({});
 
   // Helper function to find a room (either parent room or subroom) by roomId
   const findRoomById = (roomId: string): Room | undefined => {
@@ -182,47 +186,7 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
     }
   }, [allBuildingsData]);
 
-  // Fetch room info for all rooms to get hasSubtype property
-  const fetchAllRoomInfos = async () => {
-    if (!allRooms.length || !academicYear || !academicSession || !startDate || !endDate) return;
-
-    try {
-      const infos: Record<string, RoomInfo> = {};
-      for (const room of allRooms) {
-        try {
-          // For regular rooms: roomID = room.roomId, subroomID = ""
-          // For subrooms: roomID = room.parentId, subroomID = room.roomId
-          const requestbody = {
-            roomID: room.parentId || room.roomId, // Use parentId if it exists (subroom), otherwise use roomId (regular room)
-            subroomID: room.parentId ? room.roomId : "", // If parentId exists, this is a subroom, so use roomId as subroomID
-            academicYr: academicYear,
-            acadSess: academicSession,
-            startDate: startDate,
-            endDate: endDate,
-          };
-
-          const res = await callApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, requestbody);
-          if (res.success && res.data) {
-            infos[room.roomId] = res.data;
-          }
-        } catch (error) {
-          console.error(`Error fetching room info for ${room.roomId}:`, error);
-        }
-      }
-      setRoomInfos(infos);
-    } catch (error) {
-      console.error("Error fetching all room infos:", error);
-    }
-  };
-
-  // Fetch room infos when rooms are loaded and required data is available
-  useEffect(() => {
-    if (allRooms.length > 0 && academicYear && academicSession && startDate && endDate) {
-      fetchAllRoomInfos();
-    }
-  }, [allRooms, academicYear, academicSession, startDate, endDate]);
-
-  // Fetch subrooms for rooms that have hasSubtype === true
+  // Fetch subrooms for all buildings
   const fetchSubroomsForConflictResolution = async () => {
     if (!academicYear || !academicSession) return;
 
@@ -230,14 +194,8 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
     try {
       const subroomsMap: Record<string, Room[]> = {};
 
-      // Find rooms that have hasSubtype === true
-      const roomsWithSubtype = allRooms.filter((room) => {
-        const roomInfo = roomInfos[room.roomId];
-        return roomInfo && roomInfo.hasSubtype === true;
-      });
-
-      // Get unique buildings from rooms with subtype
-      const uniqueBuildings = [...new Set(roomsWithSubtype.map((room) => room.buildingId))];
+      // Get unique buildings from allRooms
+      const uniqueBuildings = [...new Set(allRooms.map((room) => room.buildingId))];
 
       // Fetch all subrooms for each building at once using blank roomID
       for (const buildingId of uniqueBuildings) {
@@ -273,22 +231,22 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
     }
   };
 
-  // Fetch subrooms when room infos are loaded
+  // Fetch subrooms when allRooms are loaded
   useEffect(() => {
-    if (Object.keys(roomInfos).length > 0 && academicYear && academicSession) {
+    if (allRooms.length > 0 && academicYear && academicSession) {
       fetchSubroomsForConflictResolution();
     }
-  }, [roomInfos, academicYear, academicSession]);
+  }, [allRooms, academicYear, academicSession]);
 
   // Fetch conflict resolution room data as soon as conflicts are detected
   useEffect(() => {
-    if (conflicts.length > 0 && Object.keys(roomInfos).length > 0 && academicYear && academicSession) {
+    if (conflicts.length > 0 && allRooms.length > 0 && academicYear && academicSession) {
       // Ensure subrooms are fetched for conflict resolution
       if (Object.keys(subroomsForConflictResolution).length === 0) {
         fetchSubroomsForConflictResolution();
       }
     }
-  }, [conflicts, roomInfos, academicYear, academicSession, subroomsForConflictResolution]);
+  }, [conflicts, allRooms, academicYear, academicSession, subroomsForConflictResolution]);
 
   // Fetch existing maintenance records
   const fetchExistingMaintenanceRecords = async () => {
@@ -345,6 +303,47 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
     return roomDisplayText.includes(roomSearchInput.toLowerCase());
   });
 
+  // Filter conflict rooms based on search input
+  const getFilteredConflictRooms = (conflictId: string) => {
+    const searchInput = conflictRoomSearchInputs[conflictId] || "";
+
+    // Get all available rooms (regular rooms + subrooms)
+    const regularRooms = allRooms.filter((room) => !room.hasSubroom);
+    const allSubrooms: Room[] = [];
+    Object.values(subroomsForConflictResolution).forEach((subrooms) => {
+      allSubrooms.push(...subrooms);
+    });
+    const allAvailableRooms = [...regularRooms, ...allSubrooms];
+
+    return allAvailableRooms.filter((room) => {
+      const building = allBuildingsData.find((b) => b.id === room.buildingId);
+      const isSubroom = allSubrooms.includes(room);
+
+      // Find parent room for subrooms
+      let parentRoomId = "";
+      if (isSubroom) {
+        for (const [parentId, subrooms] of Object.entries(subroomsForConflictResolution)) {
+          if (subrooms.some((subroom) => subroom.roomId === room.roomId)) {
+            parentRoomId = parentId;
+            break;
+          }
+        }
+      }
+
+      // Format the display text based on room type
+      let roomDisplayText = "";
+      const capacity = room.roomCapactiy && room.roomCapactiy > 0 ? room.roomCapactiy : null;
+
+      if (isSubroom) {
+        roomDisplayText = `${building?.name} - ${parentRoomId} - ${room.roomId}${capacity ? ` - ${capacity}` : ""}`;
+      } else {
+        roomDisplayText = `${building?.name} - ${room.roomId}${capacity ? ` - ${capacity}` : ""}`;
+      }
+
+      return roomDisplayText.toLowerCase().includes(searchInput.toLowerCase());
+    });
+  };
+
   // Handle room selection
   const handleRoomSelection = (roomId: string) => {
     setSelectedRoomId(roomId);
@@ -363,25 +362,156 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
     setShowConflictRoomSchedule({});
     setConflictAvailableSlots({});
     setConflictRoomConflictStatus({});
-    // Clear search input and hide dropdown
-    setRoomSearchInput("");
-    setShowRoomDropdown(false);
+    setConflictRoomConflictType({});
+
+    // Set the selected room display text in the search input
     if (roomId) {
+      const selectedRoom = allRooms.find((room) => room.roomId === roomId);
+      if (selectedRoom) {
+        const building = allBuildingsData.find((b) => b.id === selectedRoom.buildingId);
+        const floor = building?.floors.find((f) => f.id === selectedRoom.floorId);
+        const roomDisplayText = `${building?.name} ${floor?.name ? `- ${floor?.name}` : ""} - ${selectedRoom.roomName} ${
+          selectedRoom?.roomType ? `(${selectedRoom.roomType})` : ""
+        }`;
+        setRoomSearchInput(roomDisplayText);
+        // Clear any search errors when valid room is selected
+        setRoomSearchError("");
+      }
+      // Fetch room info for the selected room only
       fetchRoomInfo(roomId);
     } else {
+      setRoomSearchInput("");
       setSelectedRoomInfo(null);
+      setRoomSearchError("");
     }
+    setShowRoomDropdown(false);
   };
 
   // Handle search input change
   const handleRoomSearchChange = (value: string) => {
     setRoomSearchInput(value);
     setShowRoomDropdown(true); // Always show dropdown when typing
+
+    // Clear any previous errors
+    setRoomSearchError("");
+
     // If input is cleared, clear selection
     if (value === "") {
       setSelectedRoomId("");
       setSelectedRoomInfo(null);
+    } else {
+      // Check if the entered value matches any room
+      const matchingRooms = allRooms.filter((room) => {
+        const building = allBuildingsData.find((b) => b.id === room.buildingId);
+        const floor = building?.floors.find((f) => f.id === room.floorId);
+        const roomDisplayText = `${building?.name} ${floor?.name ? `- ${floor?.name}` : ""} - ${room.roomName} ${
+          room?.roomType ? `(${room.roomType})` : ""
+        }`.toLowerCase();
+        return roomDisplayText.includes(value.toLowerCase());
+      });
+
+      // If no matching rooms found and user has typed something, show warning
+      if (matchingRooms.length === 0 && value.trim().length > 0) {
+        setRoomSearchError("No rooms found matching your search. Please select from the dropdown.");
+      }
     }
+  };
+
+  // Handle conflict room search input change
+  const handleConflictRoomSearchChange = (conflictId: string, value: string) => {
+    setConflictRoomSearchInputs((prev) => ({ ...prev, [conflictId]: value }));
+    setShowConflictRoomDropdowns((prev) => ({ ...prev, [conflictId]: true }));
+
+    // Clear any previous errors
+    setConflictRoomSearchErrors((prev) => ({ ...prev, [conflictId]: "" }));
+
+    // If input is cleared, clear selection
+    if (value === "") {
+      setConflictRoomSelections((prev) => {
+        const newSelections = { ...prev };
+        delete newSelections[conflictId];
+        return newSelections;
+      });
+    } else {
+      // Check if the entered value matches any room
+      const matchingRooms = getFilteredConflictRooms(conflictId);
+
+      // If no matching rooms found and user has typed something, show warning
+      if (matchingRooms.length === 0 && value.trim().length > 0) {
+        setConflictRoomSearchErrors((prev) => ({ ...prev, [conflictId]: "No rooms found matching your search. Please select from the dropdown." }));
+      }
+    }
+  };
+
+  // Handle conflict room selection
+  const handleConflictRoomSelection = (conflictId: string, roomId: string) => {
+    setConflictRoomSelections((prev) => ({ ...prev, [conflictId]: roomId }));
+
+    // Set the selected room display text in the search input
+    if (roomId) {
+      // Get all available rooms to find the selected room
+      const regularRooms = allRooms.filter((room) => !room.hasSubroom);
+      const allSubrooms: Room[] = [];
+      Object.values(subroomsForConflictResolution).forEach((subrooms) => {
+        allSubrooms.push(...subrooms);
+      });
+      const allAvailableRooms = [...regularRooms, ...allSubrooms];
+
+      const selectedRoom = allAvailableRooms.find((room) => room.roomId === roomId);
+      if (selectedRoom) {
+        const building = allBuildingsData.find((b) => b.id === selectedRoom.buildingId);
+        const isSubroom = allSubrooms.includes(selectedRoom);
+
+        // Find parent room for subrooms
+        let parentRoomId = "";
+        if (isSubroom) {
+          for (const [parentId, subrooms] of Object.entries(subroomsForConflictResolution)) {
+            if (subrooms.some((subroom) => subroom.roomId === selectedRoom.roomId)) {
+              parentRoomId = parentId;
+              break;
+            }
+          }
+        }
+
+        // Format the display text based on room type
+        let roomDisplayText = "";
+        const capacity = selectedRoom.roomCapactiy && selectedRoom.roomCapactiy > 0 ? selectedRoom.roomCapactiy : null;
+
+        if (isSubroom) {
+          roomDisplayText = `${building?.name} - ${parentRoomId} - ${selectedRoom.roomId}${capacity ? ` - ${capacity}` : ""}`;
+        } else {
+          roomDisplayText = `${building?.name} - ${selectedRoom.roomId}${capacity ? ` - ${capacity}` : ""}`;
+        }
+
+        setConflictRoomSearchInputs((prev) => ({ ...prev, [conflictId]: roomDisplayText }));
+        // Clear any search errors when valid room is selected
+        setConflictRoomSearchErrors((prev) => ({ ...prev, [conflictId]: "" }));
+      }
+
+      // Fetch room info for the selected room
+      fetchConflictRoomInfo(conflictId, roomId);
+      // Clear conflict status when room changes
+      setConflictRoomConflictStatus((prev) => ({ ...prev, [conflictId]: false }));
+      setConflictRoomConflictType((prev) => ({ ...prev, [conflictId]: "" }));
+
+      // Immediately check for conflicts if we have all required data
+      const date = conflictDates[conflictId];
+      const startTime = conflictStartTimes[conflictId];
+      const endTime = conflictEndTimes[conflictId];
+      if (date && startTime && endTime) {
+        checkConflictRoomConflicts(conflictId, roomId, date, startTime, endTime);
+      }
+    } else {
+      setConflictRoomSearchInputs((prev) => ({ ...prev, [conflictId]: "" }));
+      setConflictRoomInfos((prev) => {
+        const newInfos = { ...prev };
+        delete newInfos[conflictId];
+        return newInfos;
+      });
+      setConflictRoomSearchErrors((prev) => ({ ...prev, [conflictId]: "" }));
+    }
+
+    setShowConflictRoomDropdowns((prev) => ({ ...prev, [conflictId]: false }));
   };
 
   // Check for conflicts when maintenance details change
@@ -394,6 +524,15 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
       setMaintenanceConflicts([]);
     }
   }, [maintenanceDate, startTime, endTime, selectedRoomInfo]);
+
+  // Check for conflicts immediately when room info is loaded (for initial room selection)
+  useEffect(() => {
+    if (selectedRoomInfo && !maintenanceDate && !startTime && !endTime) {
+      // Show room info but don't check conflicts until maintenance details are provided
+      setConflicts([]);
+      setMaintenanceConflicts([]);
+    }
+  }, [selectedRoomInfo]);
 
   // Trigger conflict checks when conflict room info is loaded
   useEffect(() => {
@@ -726,10 +865,31 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
           delete newStatus[occupantId];
           return newStatus;
         });
+        setConflictRoomConflictType((prev) => {
+          const newType = { ...prev };
+          delete newType[occupantId];
+          return newType;
+        });
         setShowConflictRoomSchedule((prev) => {
           const newSchedule = { ...prev };
           delete newSchedule[occupantId];
           return newSchedule;
+        });
+        // Clear search states
+        setConflictRoomSearchInputs((prev) => {
+          const newInputs = { ...prev };
+          delete newInputs[occupantId];
+          return newInputs;
+        });
+        setShowConflictRoomDropdowns((prev) => {
+          const newDropdowns = { ...prev };
+          delete newDropdowns[occupantId];
+          return newDropdowns;
+        });
+        setConflictRoomSearchErrors((prev) => {
+          const newErrors = { ...prev };
+          delete newErrors[occupantId];
+          return newErrors;
         });
       }
 
@@ -743,6 +903,7 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
       console.log("Missing data for conflict check:", { conflictId, roomId, date, newStartTime, newEndTime, hasRoomInfo: !!roomInfo });
       // Set conflict status to false when data is missing
       setConflictRoomConflictStatus((prev) => ({ ...prev, [conflictId]: false }));
+      setConflictRoomConflictType((prev) => ({ ...prev, [conflictId]: "" }));
       return false;
     }
 
@@ -759,7 +920,50 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
         if (newSlotStart.isBefore(maintenanceEnd) && newSlotEnd.isAfter(maintenanceStart)) {
           console.log("MAINTENANCE CONFLICT DETECTED!");
           setConflictRoomConflictStatus((prev) => ({ ...prev, [conflictId]: true }));
+          setConflictRoomConflictType((prev) => ({ ...prev, [conflictId]: "maintenance" }));
           return true; // Conflict with maintenance time
+        }
+      }
+
+      // NEW: Check if trying to resolve to a subroom of the same parent room during maintenance timeframe
+      if (maintenanceDate && startTime && endTime) {
+        const maintenanceStart = moment(`${maintenanceDate} ${startTime}`, "YYYY-MM-DD HH:mm");
+        const maintenanceEnd = moment(`${maintenanceDate} ${endTime}`, "YYYY-MM-DD HH:mm");
+
+        // Check if the new slot overlaps with maintenance time
+        const timeOverlaps = newSlotStart.isBefore(maintenanceEnd) && newSlotEnd.isAfter(maintenanceStart);
+
+        if (timeOverlaps && date === maintenanceDate) {
+          // Find the new room to check if it's a subroom
+          const newRoom = findRoomById(roomId);
+          const selectedRoom = findRoomById(selectedRoomId);
+
+          // Check if new room is a subroom of the same parent room as the maintenance room
+          if (newRoom && selectedRoom && newRoom.parentId && selectedRoom.parentId) {
+            // Both are subrooms of the same parent
+            if (newRoom.parentId === selectedRoom.parentId) {
+              console.log("SUBROOM CONFLICT DETECTED: Cannot resolve to subroom of same parent room during maintenance timeframe");
+              setConflictRoomConflictStatus((prev) => ({ ...prev, [conflictId]: true }));
+              setConflictRoomConflictType((prev) => ({ ...prev, [conflictId]: "subroom" }));
+              return true;
+            }
+          } else if (newRoom && selectedRoom && newRoom.parentId && !selectedRoom.parentId) {
+            // New room is subroom, selected room is parent
+            if (newRoom.parentId === selectedRoomId) {
+              console.log("SUBROOM CONFLICT DETECTED: Cannot resolve to subroom of same parent room during maintenance timeframe");
+              setConflictRoomConflictStatus((prev) => ({ ...prev, [conflictId]: true }));
+              setConflictRoomConflictType((prev) => ({ ...prev, [conflictId]: "subroom" }));
+              return true;
+            }
+          } else if (newRoom && selectedRoom && !newRoom.parentId && selectedRoom.parentId) {
+            // New room is parent, selected room is subroom
+            if (roomId === selectedRoom.parentId) {
+              console.log("SUBROOM CONFLICT DETECTED: Cannot resolve to parent room when maintenance is on its subroom during same timeframe");
+              setConflictRoomConflictStatus((prev) => ({ ...prev, [conflictId]: true }));
+              setConflictRoomConflictType((prev) => ({ ...prev, [conflictId]: "subroom" }));
+              return true;
+            }
+          }
         }
       }
 
@@ -781,12 +985,14 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
 
       // Update the conflict status immediately
       setConflictRoomConflictStatus((prev) => ({ ...prev, [conflictId]: hasConflicts }));
+      setConflictRoomConflictType((prev) => ({ ...prev, [conflictId]: hasConflicts ? "occupant" : "" }));
 
       return hasConflicts;
     } catch (error) {
       console.error("Error checking conflict room conflicts:", error);
       // Set conflict status to false on error
       setConflictRoomConflictStatus((prev) => ({ ...prev, [conflictId]: false }));
+      setConflictRoomConflictType((prev) => ({ ...prev, [conflictId]: "" }));
       return false;
     }
   };
@@ -893,10 +1099,31 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
         delete newStatus[occupantId];
         return newStatus;
       });
+      setConflictRoomConflictType((prev) => {
+        const newType = { ...prev };
+        delete newType[occupantId];
+        return newType;
+      });
       setShowConflictRoomSchedule((prev) => {
         const newSchedule = { ...prev };
         delete newSchedule[occupantId];
         return newSchedule;
+      });
+      // Clear search states
+      setConflictRoomSearchInputs((prev) => {
+        const newInputs = { ...prev };
+        delete newInputs[occupantId];
+        return newInputs;
+      });
+      setShowConflictRoomDropdowns((prev) => {
+        const newDropdowns = { ...prev };
+        delete newDropdowns[occupantId];
+        return newDropdowns;
+      });
+      setConflictRoomSearchErrors((prev) => {
+        const newErrors = { ...prev };
+        delete newErrors[occupantId];
+        return newErrors;
       });
 
       alert("Occupant moved successfully");
@@ -960,10 +1187,31 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
         delete newStatus[occupantId];
         return newStatus;
       });
+      setConflictRoomConflictType((prev) => {
+        const newType = { ...prev };
+        delete newType[occupantId];
+        return newType;
+      });
       setShowConflictRoomSchedule((prev) => {
         const newSchedule = { ...prev };
         delete newSchedule[occupantId];
         return newSchedule;
+      });
+      // Clear search states
+      setConflictRoomSearchInputs((prev) => {
+        const newInputs = { ...prev };
+        delete newInputs[occupantId];
+        return newInputs;
+      });
+      setShowConflictRoomDropdowns((prev) => {
+        const newDropdowns = { ...prev };
+        delete newDropdowns[occupantId];
+        return newDropdowns;
+      });
+      setConflictRoomSearchErrors((prev) => {
+        const newErrors = { ...prev };
+        delete newErrors[occupantId];
+        return newErrors;
       });
 
       alert("Occupant slot cancelled successfully");
@@ -1152,6 +1400,7 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
     !hasMaintenanceValidationErrors &&
     !hasConflictValidationErrors &&
     !hasNonEditableConflicts &&
+    !roomSearchError &&
     (conflicts.length === 0 || allSelectedConflictsResolved) &&
     allMaintenanceConflictsResolved;
 
@@ -1177,14 +1426,16 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
                   onChange={(e) => handleRoomSearchChange(e.target.value)}
                   onFocus={() => setShowRoomDropdown(true)}
                   placeholder={isLoadingRooms ? "Loading rooms..." : "Search and select a room..."}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-orange-500 focus:border-orange-500 ${
+                    roomSearchError ? "border-red-300 bg-red-50" : "border-gray-300"
+                  }`}
                   required
                   disabled={isLoadingRooms}
                 />
 
                 {/* Dropdown with filtered rooms */}
                 {showRoomDropdown && (
-                  <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                  <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
                     {(() => {
                       const roomsToShow = roomSearchInput.length > 0 ? filteredRooms : allRooms;
                       return roomsToShow.length > 0 ? (
@@ -1215,15 +1466,10 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
               </div>
 
               {/* Click outside to close dropdown */}
-              {showRoomDropdown && <div className="fixed inset-0 z-5" onClick={() => setShowRoomDropdown(false)} />}
+              {showRoomDropdown && <div className="fixed inset-0 z-40" onClick={() => setShowRoomDropdown(false)} />}
 
               {isLoadingRoomInfo && <div className="text-sm text-gray-500 mt-1">Loading room information...</div>}
-              {selectedRoomInfo && (
-                <div className="text-sm text-gray-600 mt-1">
-                  Selected: {selectedRoomInfo.roomName || selectedRoomInfo.id}
-                  {selectedRoomInfo.capacity !== 0 && ` (Capacity: ${selectedRoomInfo.capacity})`}
-                </div>
-              )}
+              {roomSearchError && <div className="text-sm text-red-600 mt-1">{roomSearchError}</div>}
             </div>
 
             <div>
@@ -1413,98 +1659,99 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
                               {isLoadingConflictResolutionRooms && <span className="ml-2 text-xs text-blue-600">(Loading room options...)</span>}
                             </label>
                             <div className="grid grid-cols-2 gap-2">
-                              <select
-                                value={conflictRoomSelections[conflict.occupant.Id] || ""}
-                                onChange={(e) => {
-                                  const roomId = e.target.value;
-                                  setConflictRoomSelections((prev) => ({ ...prev, [conflict.occupant.Id]: roomId }));
-                                  if (roomId) {
-                                    fetchConflictRoomInfo(conflict.occupant.Id, roomId);
-                                    // Clear conflict status when room changes
-                                    setConflictRoomConflictStatus((prev) => ({ ...prev, [conflict.occupant.Id]: false }));
-                                    // Immediately check for conflicts if we have all required data
-                                    const date = conflictDates[conflict.occupant.Id];
-                                    const startTime = conflictStartTimes[conflict.occupant.Id];
-                                    const endTime = conflictEndTimes[conflict.occupant.Id];
-                                    if (date && startTime && endTime) {
-                                      checkConflictRoomConflicts(conflict.occupant.Id, roomId, date, startTime, endTime);
-                                    }
-                                  } else {
-                                    setConflictRoomInfos((prev) => {
-                                      const newInfos = { ...prev };
-                                      delete newInfos[conflict.occupant.Id];
-                                      return newInfos;
-                                    });
-                                    setConflictAvailableSlots((prev) => {
-                                      const newSlots = { ...prev };
-                                      delete newSlots[conflict.occupant.Id];
-                                      return newSlots;
-                                    });
-                                    setConflictRoomConflictStatus((prev) => {
-                                      const newStatus = { ...prev };
-                                      delete newStatus[conflict.occupant.Id];
-                                      return newStatus;
-                                    });
-                                  }
-                                }}
-                                className={`px-3 py-2 border rounded-md text-sm ${
-                                  conflictRoomSelections[conflict.occupant.Id] ? "border-green-300 bg-green-50" : "border-gray-300"
-                                }`}
-                                disabled={isLoadingRooms}
-                              >
-                                <option value="">{isLoadingRooms || isLoadingConflictResolutionRooms ? "Loading rooms..." : "Select Room"}</option>
-                                {(() => {
-                                  // Get rooms with hasSubtype === false
-                                  const roomsWithoutSubtype = allRooms.filter((room) => {
-                                    const roomInfo = roomInfos[room.roomId];
-                                    return roomInfo ? !roomInfo.hasSubtype : false;
-                                  });
+                              <div className="relative">
+                                <input
+                                  type="text"
+                                  value={conflictRoomSearchInputs[conflict.occupant.Id] || ""}
+                                  onChange={(e) => handleConflictRoomSearchChange(conflict.occupant.Id, e.target.value)}
+                                  onFocus={() => setShowConflictRoomDropdowns((prev) => ({ ...prev, [conflict.occupant.Id]: true }))}
+                                  placeholder={isLoadingRooms || isLoadingConflictResolutionRooms ? "Loading rooms..." : "Select a room..."}
+                                  className={`px-3 min-w-35 max-w-44 py-2 border rounded-md text-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500 ${
+                                    conflictRoomSearchErrors[conflict.occupant.Id]
+                                      ? "border-red-300 bg-red-50"
+                                      : conflictRoomSelections[conflict.occupant.Id]
+                                      ? "border-green-300 bg-green-50"
+                                      : "border-gray-300"
+                                  }`}
+                                  disabled={isLoadingRooms || isLoadingConflictResolutionRooms}
+                                />
 
-                                  // Get all subrooms from rooms with hasSubtype === true
-                                  const allSubrooms: Room[] = [];
-                                  Object.values(subroomsForConflictResolution).forEach((subrooms) => {
-                                    allSubrooms.push(...subrooms);
-                                  });
+                                {/* Dropdown with filtered rooms */}
+                                {showConflictRoomDropdowns[conflict.occupant.Id] && (
+                                  <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                                    {(() => {
+                                      const roomsToShow =
+                                        conflictRoomSearchInputs[conflict.occupant.Id]?.length > 0
+                                          ? getFilteredConflictRooms(conflict.occupant.Id)
+                                          : (() => {
+                                              const regularRooms = allRooms.filter((room) => !room.hasSubroom);
+                                              const allSubrooms: Room[] = [];
+                                              Object.values(subroomsForConflictResolution).forEach((subrooms) => {
+                                                allSubrooms.push(...subrooms);
+                                              });
+                                              return [...regularRooms, ...allSubrooms];
+                                            })();
 
-                                  // Combine both lists
-                                  const allAvailableRooms = [...roomsWithoutSubtype, ...allSubrooms];
+                                      return roomsToShow.length > 0 ? (
+                                        roomsToShow.map((room) => {
+                                          const building = allBuildingsData.find((b) => b.id === room.buildingId);
+                                          const isSubroom = Object.values(subroomsForConflictResolution).some((subrooms) =>
+                                            subrooms.some((subroom) => subroom.roomId === room.roomId)
+                                          );
 
-                                  return allAvailableRooms.map((room) => {
-                                    const building = allBuildingsData.find((b) => b.id === room.buildingId);
-                                    const isSubroom = allSubrooms.includes(room);
+                                          // Find parent room for subrooms
+                                          let parentRoomId = "";
+                                          if (isSubroom) {
+                                            for (const [parentId, subrooms] of Object.entries(subroomsForConflictResolution)) {
+                                              if (subrooms.some((subroom) => subroom.roomId === room.roomId)) {
+                                                parentRoomId = parentId;
+                                                break;
+                                              }
+                                            }
+                                          }
 
-                                    // Find parent room for subrooms
-                                    let parentRoomId = "";
-                                    if (isSubroom) {
-                                      // Find which parent room this subroom belongs to
-                                      for (const [parentId, subrooms] of Object.entries(subroomsForConflictResolution)) {
-                                        if (subrooms.some((subroom) => subroom.roomId === room.roomId)) {
-                                          parentRoomId = parentId;
-                                          break;
-                                        }
-                                      }
-                                    }
+                                          // Format the display text based on room type
+                                          let roomDisplayText = "";
+                                          const capacity = room.roomCapactiy && room.roomCapactiy > 0 ? room.roomCapactiy : null;
 
-                                    // Format the option text based on room type
-                                    let optionText = "";
-                                    const capacity = room.roomCapactiy && room.roomCapactiy > 0 ? room.roomCapactiy : null;
+                                          if (isSubroom) {
+                                            roomDisplayText = `${building?.name} - ${parentRoomId} - ${room.roomId}${capacity ? ` - ${capacity}` : ""}`;
+                                          } else {
+                                            roomDisplayText = `${building?.name} - ${room.roomId}${capacity ? ` - ${capacity}` : ""}`;
+                                          }
 
-                                    if (isSubroom) {
-                                      // For subrooms: AB2 - ParentRoomId - SubroomId - capacity (if capacity > 0)
-                                      optionText = `${building?.name} - ${parentRoomId} - ${room.roomId}${capacity ? ` - ${capacity}` : ""}`;
-                                    } else {
-                                      // For regular rooms: AB2 - parentRoomId - capacity (if capacity > 0)
-                                      optionText = `${building?.name} - ${room.roomId}${capacity ? ` - ${capacity}` : ""}`;
-                                    }
+                                          return (
+                                            <div
+                                              key={`${room.roomId}-${room.buildingId}`}
+                                              onClick={() => handleConflictRoomSelection(conflict.occupant.Id, room.roomId)}
+                                              className="px-3 py-2 hover:bg-orange-50 cursor-pointer border-b border-gray-100 last:border-b-0"
+                                            >
+                                              <div className="text-sm text-gray-800">{roomDisplayText}</div>
+                                              {capacity && <div className="text-xs text-gray-500">Capacity: {capacity}</div>}
+                                            </div>
+                                          );
+                                        })
+                                      ) : (
+                                        <div className="px-3 py-2 text-sm text-gray-500 italic">
+                                          No rooms found matching "{conflictRoomSearchInputs[conflict.occupant.Id] || ""}"
+                                        </div>
+                                      );
+                                    })()}
+                                  </div>
+                                )}
 
-                                    return (
-                                      <option key={`${room.roomId}-${room.buildingId}`} value={room.roomId}>
-                                        {optionText}
-                                      </option>
-                                    );
-                                  });
-                                })()}
-                              </select>
+                                {/* Click outside to close dropdown */}
+                                {showConflictRoomDropdowns[conflict.occupant.Id] && (
+                                  <div
+                                    className="fixed inset-0 z-40"
+                                    onClick={() => setShowConflictRoomDropdowns((prev) => ({ ...prev, [conflict.occupant.Id]: false }))}
+                                  />
+                                )}
+
+                                {conflictRoomSearchErrors[conflict.occupant.Id] && (
+                                  <div className="text-sm text-red-600 mt-1">{conflictRoomSearchErrors[conflict.occupant.Id]}</div>
+                                )}
+                              </div>
                               <input
                                 type="date"
                                 value={conflictDates[conflict.occupant.Id] || ""}
@@ -1517,6 +1764,7 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
                                   }
                                   // Clear conflict status when date changes
                                   setConflictRoomConflictStatus((prev) => ({ ...prev, [conflict.occupant.Id]: false }));
+                                  setConflictRoomConflictType((prev) => ({ ...prev, [conflict.occupant.Id]: "" }));
                                   // Validate time slot when date changes
                                   const startTime = conflictStartTimes[conflict.occupant.Id];
                                   const endTime = conflictEndTimes[conflict.occupant.Id];
@@ -1550,6 +1798,7 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
                                     setConflictStartTimes((prev) => ({ ...prev, [conflict.occupant.Id]: startTime }));
                                     // Clear conflict status when time changes
                                     setConflictRoomConflictStatus((prev) => ({ ...prev, [conflict.occupant.Id]: false }));
+                                    setConflictRoomConflictType((prev) => ({ ...prev, [conflict.occupant.Id]: "" }));
                                     // Validate time slot when start time changes
                                     const date = conflictDates[conflict.occupant.Id];
                                     const endTime = conflictEndTimes[conflict.occupant.Id];
@@ -1598,6 +1847,7 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
                                     setConflictEndTimes((prev) => ({ ...prev, [conflict.occupant.Id]: endTime }));
                                     // Clear conflict status when time changes
                                     setConflictRoomConflictStatus((prev) => ({ ...prev, [conflict.occupant.Id]: false }));
+                                    setConflictRoomConflictType((prev) => ({ ...prev, [conflict.occupant.Id]: "" }));
                                     // Validate time slot when end time changes
                                     const date = conflictDates[conflict.occupant.Id];
                                     const startTime = conflictStartTimes[conflict.occupant.Id];
@@ -1664,8 +1914,10 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
                                   }`}
                                 >
                                   {conflictRoomConflictStatus[conflict.occupant.Id]
-                                    ? conflictRoomSelections[conflict.occupant.Id] === selectedRoomId && conflictDates[conflict.occupant.Id] === maintenanceDate
+                                    ? conflictRoomConflictType[conflict.occupant.Id] === "maintenance"
                                       ? "⚠️ This time slot conflicts with scheduled maintenance"
+                                      : conflictRoomConflictType[conflict.occupant.Id] === "subroom"
+                                      ? "⚠️ Cannot resolve because parent room during maintenance timeframe"
                                       : "⚠️ This time slot conflicts with existing occupants"
                                     : "✅ Time slot is available"}
                                 </div>
@@ -1831,6 +2083,8 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
           >
             {isSubmitting
               ? "Scheduling..."
+              : roomSearchError
+              ? "Cannot Schedule - Invalid Room Selection"
               : hasMaintenanceValidationErrors
               ? "Cannot Schedule - Fix Time Validation"
               : hasConflictValidationErrors
