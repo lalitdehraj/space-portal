@@ -368,9 +368,7 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
       const endTime = conflictEndTimes[conflictId];
 
       if (roomInfo && roomId && date && startTime && endTime) {
-        checkConflictRoomConflicts(conflictId, roomId, date, startTime, endTime).then((hasConflicts) => {
-          setConflictRoomConflictStatus((prev) => ({ ...prev, [conflictId]: hasConflicts }));
-        });
+        checkConflictRoomConflicts(conflictId, roomId, date, startTime, endTime);
       }
     });
   }, [conflictRoomInfos]);
@@ -407,9 +405,7 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
         const startTime = conflictStartTimes[conflictId];
         const endTime = conflictEndTimes[conflictId];
         if (date && startTime && endTime) {
-          checkConflictRoomConflicts(conflictId, roomId, date, startTime, endTime).then((hasConflicts) => {
-            setConflictRoomConflictStatus((prev) => ({ ...prev, [conflictId]: hasConflicts }));
-          });
+          checkConflictRoomConflicts(conflictId, roomId, date, startTime, endTime);
         }
       }
     } catch (error) {
@@ -478,6 +474,13 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
     const [start, end] = timeString.split(" → ");
     setConflictStartTimes((prev) => ({ ...prev, [conflictId]: start }));
     setConflictEndTimes((prev) => ({ ...prev, [conflictId]: end }));
+
+    // Trigger conflict check after setting the times
+    const roomId = conflictRoomSelections[conflictId];
+    const date = conflictDates[conflictId];
+    if (roomId && date && start && end) {
+      checkConflictRoomConflicts(conflictId, roomId, date, start, end);
+    }
   };
 
   const checkConflicts = async () => {
@@ -701,6 +704,8 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
     const roomInfo = conflictRoomInfos[conflictId];
     if (!roomInfo || !date || !newStartTime || !newEndTime) {
       console.log("Missing data for conflict check:", { conflictId, roomId, date, newStartTime, newEndTime, hasRoomInfo: !!roomInfo });
+      // Set conflict status to false when data is missing
+      setConflictRoomConflictStatus((prev) => ({ ...prev, [conflictId]: false }));
       return false;
     }
 
@@ -716,6 +721,7 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
         // Check if the new slot overlaps with the maintenance time
         if (newSlotStart.isBefore(maintenanceEnd) && newSlotEnd.isAfter(maintenanceStart)) {
           console.log("MAINTENANCE CONFLICT DETECTED!");
+          setConflictRoomConflictStatus((prev) => ({ ...prev, [conflictId]: true }));
           return true; // Conflict with maintenance time
         }
       }
@@ -733,10 +739,17 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
         return newSlotStart.isBefore(occupantEnd) && newSlotEnd.isAfter(occupantStart);
       });
 
-      console.log("Occupant conflicts found:", conflictingOccupants.length);
-      return conflictingOccupants.length > 0;
+      const hasConflicts = conflictingOccupants.length > 0;
+      console.log("Occupant conflicts found:", conflictingOccupants.length, "Has conflicts:", hasConflicts);
+
+      // Update the conflict status immediately
+      setConflictRoomConflictStatus((prev) => ({ ...prev, [conflictId]: hasConflicts }));
+
+      return hasConflicts;
     } catch (error) {
       console.error("Error checking conflict room conflicts:", error);
+      // Set conflict status to false on error
+      setConflictRoomConflictStatus((prev) => ({ ...prev, [conflictId]: false }));
       return false;
     }
   };
@@ -1283,9 +1296,7 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
                                     const startTime = conflictStartTimes[conflict.occupant.Id];
                                     const endTime = conflictEndTimes[conflict.occupant.Id];
                                     if (date && startTime && endTime) {
-                                      checkConflictRoomConflicts(conflict.occupant.Id, roomId, date, startTime, endTime).then((hasConflicts) => {
-                                        setConflictRoomConflictStatus((prev) => ({ ...prev, [conflict.occupant.Id]: hasConflicts }));
-                                      });
+                                      checkConflictRoomConflicts(conflict.occupant.Id, roomId, date, startTime, endTime);
                                     }
                                   } else {
                                     setConflictRoomInfos((prev) => {
@@ -1384,9 +1395,7 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
                                   // Immediately check for conflicts if we have all required data
                                   const roomId = conflictRoomSelections[conflict.occupant.Id];
                                   if (roomId && startTime && endTime) {
-                                    checkConflictRoomConflicts(conflict.occupant.Id, roomId, date, startTime, endTime).then((hasConflicts) => {
-                                      setConflictRoomConflictStatus((prev) => ({ ...prev, [conflict.occupant.Id]: hasConflicts }));
-                                    });
+                                    checkConflictRoomConflicts(conflict.occupant.Id, roomId, date, startTime, endTime);
                                   }
                                 }}
                                 className={`px-3 py-2 border rounded-md text-sm ${
@@ -1419,9 +1428,7 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
                                     // Check for conflicts when time changes
                                     const roomId = conflictRoomSelections[conflict.occupant.Id];
                                     if (roomId && date && startTime && endTime) {
-                                      checkConflictRoomConflicts(conflict.occupant.Id, roomId, date, startTime, endTime).then((hasConflicts) => {
-                                        setConflictRoomConflictStatus((prev) => ({ ...prev, [conflict.occupant.Id]: hasConflicts }));
-                                      });
+                                      checkConflictRoomConflicts(conflict.occupant.Id, roomId, date, startTime, endTime);
                                     }
                                   }}
                                   min={conflictDates[conflict.occupant.Id] === moment().format("YYYY-MM-DD") ? moment().format("HH:mm") : undefined}
@@ -1469,9 +1476,7 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
                                     // Check for conflicts when time changes
                                     const roomId = conflictRoomSelections[conflict.occupant.Id];
                                     if (roomId && date && startTime && endTime) {
-                                      checkConflictRoomConflicts(conflict.occupant.Id, roomId, date, startTime, endTime).then((hasConflicts) => {
-                                        setConflictRoomConflictStatus((prev) => ({ ...prev, [conflict.occupant.Id]: hasConflicts }));
-                                      });
+                                      checkConflictRoomConflicts(conflict.occupant.Id, roomId, date, startTime, endTime);
                                     }
                                   }}
                                   min={
