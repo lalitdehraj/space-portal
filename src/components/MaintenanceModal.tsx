@@ -53,6 +53,9 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
   const [isLoadingRoomInfo, setIsLoadingRoomInfo] = useState(false);
   const [allRooms, setAllRooms] = useState<Room[]>([]);
   const [isLoadingRooms, setIsLoadingRooms] = useState(false);
+  const [roomInfos, setRoomInfos] = useState<Record<string, RoomInfo>>({});
+  const [subroomsForConflictResolution, setSubroomsForConflictResolution] = useState<Record<string, Room[]>>({});
+  const [isLoadingConflictResolutionRooms, setIsLoadingConflictResolutionRooms] = useState(false);
   const [conflictRoomInfos, setConflictRoomInfos] = useState<{ [key: string]: RoomInfo }>({});
   const [isLoadingConflictRoomInfo, setIsLoadingConflictRoomInfo] = useState<{ [key: string]: boolean }>({});
   const [showConflictRoomSchedule, setShowConflictRoomSchedule] = useState<{ [key: string]: boolean }>({});
@@ -61,12 +64,53 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
   const [timeValidationErrors, setTimeValidationErrors] = useState<{ [key: string]: string }>({});
   const [existingMaintenanceRecords, setExistingMaintenanceRecords] = useState<Maintenance[]>([]);
 
+  // Helper function to find a room (either parent room or subroom) by roomId
+  const findRoomById = (roomId: string): Room | undefined => {
+    // First check in allRooms (parent rooms)
+    const parentRoom = allRooms.find((r) => r.roomId === roomId);
+    if (parentRoom) return parentRoom;
+
+    // Then check in subrooms
+    for (const subrooms of Object.values(subroomsForConflictResolution)) {
+      const subroom = subrooms.find((r) => r.roomId === roomId);
+      if (subroom) return subroom;
+    }
+
+    return undefined;
+  };
+
+  // Helper function to format time for display (ensures HH:MM format)
+  const formatTimeForDisplay = (time: string): string => {
+    if (!time) return "";
+    const trimmedTime = time.trim();
+    const parts = trimmedTime.split(":");
+    if (parts.length === 2) {
+      const hours = parts[0].padStart(2, "0");
+      const minutes = parts[1].padStart(2, "0");
+      return `${hours}:${minutes}`;
+    }
+    return trimmedTime;
+  };
+
+  // Helper function to normalize time for HTML time inputs (handles leading spaces)
+  const normalizeTimeForInput = (time: string): string => {
+    if (!time) return "";
+    const trimmedTime = time.trim();
+    const parts = trimmedTime.split(":");
+    if (parts.length === 2) {
+      const hours = parts[0].padStart(2, "0");
+      const minutes = parts[1].padStart(2, "0");
+      return `${hours}:${minutes}`;
+    }
+    return trimmedTime;
+  };
+
   // Validation functions for past time slots
   const validateTimeSlot = (date: string, startTime: string, endTime: string, fieldKey: string) => {
     const now = moment();
     const selectedDate = moment(date);
-    const selectedStartTime = moment(`${date} ${startTime}`);
-    const selectedEndTime = moment(`${date} ${endTime}`);
+    const selectedStartTime = moment(`${date} ${startTime}`, "YYYY-MM-DD HH:mm");
+    const selectedEndTime = moment(`${date} ${endTime}`, "YYYY-MM-DD HH:mm");
 
     // Check if date is in the past
     if (selectedDate.isBefore(now, "day")) {
@@ -136,6 +180,103 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
     }
   }, [allBuildingsData]);
 
+  // Fetch room info for all rooms to get hasSubtype property
+  const fetchAllRoomInfos = async () => {
+    if (!allRooms.length || !academicYear || !academicSession || !startDate || !endDate) return;
+
+    try {
+      const infos: Record<string, RoomInfo> = {};
+      for (const room of allRooms) {
+        try {
+          // For regular rooms: roomID = room.roomId, subroomID = ""
+          // For subrooms: roomID = room.parentId, subroomID = room.roomId
+          const requestbody = {
+            roomID: room.parentId || room.roomId, // Use parentId if it exists (subroom), otherwise use roomId (regular room)
+            subroomID: room.parentId ? room.roomId : "", // If parentId exists, this is a subroom, so use roomId as subroomID
+            academicYr: academicYear,
+            acadSess: academicSession,
+            startDate: startDate,
+            endDate: endDate,
+          };
+
+          const res = await callApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, requestbody);
+          if (res.success && res.data) {
+            infos[room.roomId] = res.data;
+          }
+        } catch (error) {
+          console.error(`Error fetching room info for ${room.roomId}:`, error);
+        }
+      }
+      setRoomInfos(infos);
+    } catch (error) {
+      console.error("Error fetching all room infos:", error);
+    }
+  };
+
+  // Fetch room infos when rooms are loaded and required data is available
+  useEffect(() => {
+    if (allRooms.length > 0 && academicYear && academicSession && startDate && endDate) {
+      fetchAllRoomInfos();
+    }
+  }, [allRooms, academicYear, academicSession, startDate, endDate]);
+
+  // Fetch subrooms for rooms that have hasSubtype === true
+  const fetchSubroomsForConflictResolution = async () => {
+    if (!academicYear || !academicSession) return;
+
+    setIsLoadingConflictResolutionRooms(true);
+    try {
+      const subroomsMap: Record<string, Room[]> = {};
+
+      // Find rooms that have hasSubtype === true
+      const roomsWithSubtype = allRooms.filter((room) => {
+        const roomInfo = roomInfos[room.roomId];
+        return roomInfo && roomInfo.hasSubtype === true;
+      });
+
+      // Fetch subrooms for each room with hasSubtype === true
+      for (const room of roomsWithSubtype) {
+        try {
+          const response = await callApi<Room[]>(process.env.NEXT_PUBLIC_GET_SUBROOMS_LIST || URL_NOT_FOUND, {
+            roomID: room.roomId,
+            buildingNo: room.buildingId,
+            acadSess: academicSession,
+            acadYr: academicYear,
+          });
+
+          if (response.success && response.data) {
+            subroomsMap[room.roomId] = response.data;
+          }
+        } catch (error) {
+          console.error(`Error fetching subrooms for room ${room.roomId}:`, error);
+        }
+      }
+
+      setSubroomsForConflictResolution(subroomsMap);
+    } catch (error) {
+      console.error("Error fetching subrooms for conflict resolution:", error);
+    } finally {
+      setIsLoadingConflictResolutionRooms(false);
+    }
+  };
+
+  // Fetch subrooms when room infos are loaded
+  useEffect(() => {
+    if (Object.keys(roomInfos).length > 0 && academicYear && academicSession) {
+      fetchSubroomsForConflictResolution();
+    }
+  }, [roomInfos, academicYear, academicSession]);
+
+  // Fetch conflict resolution room data as soon as conflicts are detected
+  useEffect(() => {
+    if (conflicts.length > 0 && Object.keys(roomInfos).length > 0 && academicYear && academicSession) {
+      // Ensure subrooms are fetched for conflict resolution
+      if (Object.keys(subroomsForConflictResolution).length === 0) {
+        fetchSubroomsForConflictResolution();
+      }
+    }
+  }, [conflicts, roomInfos, academicYear, academicSession, subroomsForConflictResolution]);
+
   // Fetch existing maintenance records
   const fetchExistingMaintenanceRecords = async () => {
     try {
@@ -158,9 +299,12 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
 
     setIsLoadingRoomInfo(true);
     try {
+      // Find the room (either parent room or subroom) to determine if it's a subroom
+      const room = findRoomById(roomId);
+
       const requestbody = {
-        roomID: roomId,
-        subroomID: "",
+        roomID: room?.parentId || roomId, // Use parentId if it exists (subroom), otherwise use roomId (regular room)
+        subroomID: room?.parentId ? roomId : "", // If parentId exists, this is a subroom, so use roomId as subroomID
         academicYr: academicYear,
         acadSess: academicSession,
         startDate: startDate,
@@ -224,9 +368,7 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
       const endTime = conflictEndTimes[conflictId];
 
       if (roomInfo && roomId && date && startTime && endTime) {
-        console.log("useEffect triggering conflict check:", { conflictId, roomId, date, startTime, endTime });
         checkConflictRoomConflicts(conflictId, roomId, date, startTime, endTime).then((hasConflicts) => {
-          console.log("useEffect conflict check result:", hasConflicts);
           setConflictRoomConflictStatus((prev) => ({ ...prev, [conflictId]: hasConflicts }));
         });
       }
@@ -239,15 +381,18 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
 
     setIsLoadingConflictRoomInfo((prev) => ({ ...prev, [conflictId]: true }));
     try {
+      // Find the room (either parent room or subroom) to determine if it's a subroom
+      const room = findRoomById(roomId);
+
       const requestbody = {
-        roomID: roomId,
-        subroomID: "",
+        roomID: room?.parentId || roomId, // Use parentId if it exists (subroom), otherwise use roomId (regular room)
+        subroomID: room?.parentId ? roomId : "", // If parentId exists, this is a subroom, so use roomId as subroomID
         academicYr: academicYear,
         acadSess: academicSession,
         startDate: startDate,
         endDate: endDate,
       };
-
+      console.log("gggg", requestbody);
       const res = await callApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, requestbody);
       if (res.success && res.data) {
         setConflictRoomInfos((prev) => ({ ...prev, [conflictId]: res.data! }));
@@ -262,9 +407,7 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
         const startTime = conflictStartTimes[conflictId];
         const endTime = conflictEndTimes[conflictId];
         if (date && startTime && endTime) {
-          console.log("Triggering conflict check after room info loaded:", { conflictId, roomId, date, startTime, endTime });
           checkConflictRoomConflicts(conflictId, roomId, date, startTime, endTime).then((hasConflicts) => {
-            console.log("Conflict check result:", hasConflicts);
             setConflictRoomConflictStatus((prev) => ({ ...prev, [conflictId]: hasConflicts }));
           });
         }
@@ -405,25 +548,7 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
 
       setConflicts(conflictInfo);
 
-      // Check for maintenance conflicts
-      console.log("Debug - Checking maintenance conflicts:", {
-        selectedRoomId,
-        maintenanceDate,
-        startTime,
-        endTime,
-        existingMaintenanceRecords: existingMaintenanceRecords.length,
-      });
-
       const conflictingMaintenanceRecords = existingMaintenanceRecords.filter((maintenance) => {
-        console.log("Debug - Checking maintenance record:", {
-          maintenanceId: maintenance.id,
-          roomId: maintenance.roomid,
-          selectedRoomId,
-          isActive: maintenance.isMainteneceActive,
-          maintenanceDate: maintenance.maintanceDate,
-          selectedDate: maintenanceDate,
-        });
-
         // Only check maintenance records for the same room
         if (maintenance.roomid !== selectedRoomId) {
           console.log("Debug - Room ID mismatch:", maintenance.roomid, "!=", selectedRoomId);
@@ -469,8 +594,6 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
 
         return overlaps;
       });
-
-      console.log("Debug - Found conflicting maintenance records:", conflictingMaintenanceRecords.length);
 
       const maintenanceConflictInfo: MaintenanceConflictInfo[] = conflictingMaintenanceRecords.map((maintenance) => {
         const existingMaintenanceDate = moment(maintenance.maintanceDate).format("YYYY-MM-DD");
@@ -523,8 +646,8 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
 
           // Auto-fill the conflict-specific details
           setConflictDates((prev) => ({ ...prev, [occupantId]: occupantDate }));
-          setConflictStartTimes((prev) => ({ ...prev, [occupantId]: occupant.startTime }));
-          setConflictEndTimes((prev) => ({ ...prev, [occupantId]: occupant.endTime }));
+          setConflictStartTimes((prev) => ({ ...prev, [occupantId]: normalizeTimeForInput(occupant.startTime) }));
+          setConflictEndTimes((prev) => ({ ...prev, [occupantId]: normalizeTimeForInput(occupant.endTime) }));
         }
       } else {
         // If unchecking, clear the conflict-specific details
@@ -582,36 +705,13 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
     }
 
     try {
-      const newSlotStart = moment(`${date} ${newStartTime}`);
-      const newSlotEnd = moment(`${date} ${newEndTime}`);
-
-      console.log("Starting conflict check:", {
-        conflictId,
-        roomId,
-        date,
-        newStartTime,
-        newEndTime,
-        selectedRoomId,
-        maintenanceDate,
-        startTime,
-        endTime,
-      });
+      const newSlotStart = moment(`${date} ${newStartTime}`, "YYYY-MM-DD HH:mm");
+      const newSlotEnd = moment(`${date} ${newEndTime}`, "YYYY-MM-DD HH:mm");
 
       // Check if the new room is the same as the maintenance room and time overlaps
       if (roomId === selectedRoomId && date === maintenanceDate) {
-        const maintenanceStart = moment(`${maintenanceDate} ${startTime}`);
-        const maintenanceEnd = moment(`${maintenanceDate} ${endTime}`);
-
-        console.log("Checking maintenance conflict:", {
-          roomId,
-          selectedRoomId,
-          date,
-          maintenanceDate,
-          newSlotStart: newSlotStart.format("YYYY-MM-DD HH:mm"),
-          newSlotEnd: newSlotEnd.format("YYYY-MM-DD HH:mm"),
-          maintenanceStart: maintenanceStart.format("YYYY-MM-DD HH:mm"),
-          maintenanceEnd: maintenanceEnd.format("YYYY-MM-DD HH:mm"),
-        });
+        const maintenanceStart = moment(`${maintenanceDate} ${startTime}`, "YYYY-MM-DD HH:mm");
+        const maintenanceEnd = moment(`${maintenanceDate} ${endTime}`, "YYYY-MM-DD HH:mm");
 
         // Check if the new slot overlaps with the maintenance time
         if (newSlotStart.isBefore(maintenanceEnd) && newSlotEnd.isAfter(maintenanceStart)) {
@@ -623,8 +723,8 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
       // Check for conflicts with existing occupants in the new room
       const conflictingOccupants = (roomInfo.occupants || []).filter((occupant: Occupant) => {
         const occupantDate = moment(occupant.scheduledDate);
-        const occupantStart = moment(`${occupantDate.format("YYYY-MM-DD")} ${occupant.startTime}`);
-        const occupantEnd = moment(`${occupantDate.format("YYYY-MM-DD")} ${occupant.endTime}`);
+        const occupantStart = moment(`${occupantDate.format("YYYY-MM-DD")} ${occupant.startTime}`, "YYYY-MM-DD HH:mm");
+        const occupantEnd = moment(`${occupantDate.format("YYYY-MM-DD")} ${occupant.endTime}`, "YYYY-MM-DD HH:mm");
 
         // Check if dates match
         if (!occupantDate.isSame(date, "day")) return false;
@@ -678,15 +778,18 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
       });
 
       // Create new allocation in the new room
+      // Find the new room (either parent room or subroom) to determine if it's a subroom
+      const newRoom = findRoomById(newRoomId);
+
       const newAllocation = {
         allocationDate: newDate,
         startTime: newStartTime,
         endTime: newEndTime,
         purpose: occupant.type || "Class",
         type: occupant.type || "Class",
-        allocatedRoomID: newRoomId,
+        allocatedRoomID: newRoom?.parentId || newRoomId, // Use parentId if it's a subroom, otherwise use the room ID
         buildingId: allBuildingsData.find((b) => b.floors.some((f) => f.id === selectedRoomInfo?.floor))?.id,
-        subRoom: "0",
+        subRoom: newRoom?.parentId ? newRoomId : "0", // If it's a subroom, use the subroom ID, otherwise "0"
         academicSession: academicSession,
         academicYear: academicYear,
         allocatedTo: occupant.occupantName || "",
@@ -856,9 +959,12 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
     setIsSubmitting(true);
     try {
       // Create maintenance data for the new API
+      // Find the selected room (either parent room or subroom) to determine if it's a subroom
+      const selectedRoom = findRoomById(selectedRoomId);
+
       const maintenanceData = {
         buildingId: selectedRoomInfo.building,
-        roomid: selectedRoomInfo.id,
+        roomid: selectedRoom?.parentId || selectedRoomInfo.id, // Use parentId if it's a subroom, otherwise use the room info id
         maintanceDate: maintenanceDate,
         startTime: `${startTime}:00`,
         endTime: `${endTime}:00`,
@@ -957,17 +1063,15 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
                 disabled={isLoadingRooms}
               >
                 <option value="">{isLoadingRooms ? "Loading rooms..." : "Select a room..."}</option>
-                {allRooms
-                  .filter((room) => !room.hasSubroom) // Only show rooms where hasSubroom is false
-                  .map((room) => {
-                    const building = allBuildingsData.find((b) => b.id === room.buildingId);
-                    const floor = building?.floors.find((f) => f.id === room.floorId);
-                    return (
-                      <option key={`${room.roomId}-${room.buildingId}`} value={room.roomId}>
-                        {building?.name} {floor?.name ? `- ${floor?.name}` : ""} - {room.roomName} {room?.roomType ? `(${room.roomType})` : ""}
-                      </option>
-                    );
-                  })}
+                {allRooms.map((room) => {
+                  const building = allBuildingsData.find((b) => b.id === room.buildingId);
+                  const floor = building?.floors.find((f) => f.id === room.floorId);
+                  return (
+                    <option key={`${room.roomId}-${room.buildingId}`} value={room.roomId}>
+                      {building?.name} {floor?.name ? `- ${floor?.name}` : ""} - {room.roomName} {room?.roomType ? `(${room.roomType})` : ""}
+                    </option>
+                  );
+                })}
               </select>
               {isLoadingRoomInfo && <div className="text-sm text-gray-500 mt-1">Loading room information...</div>}
               {selectedRoomInfo && (
@@ -1147,7 +1251,7 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
                           </span>
                         </div>
                         <p className="text-sm text-gray-600 mb-2">
-                          {conflict.occupant.type} • {conflict.occupant.startTime} - {conflict.occupant.endTime}
+                          {conflict.occupant.type} • {formatTimeForDisplay(conflict.occupant.startTime)} - {formatTimeForDisplay(conflict.occupant.endTime)}
                         </p>
                         <p className="text-xs text-gray-500">Editable: {conflict.isEditable ? "Yes" : "No"}</p>
                       </div>
@@ -1160,7 +1264,10 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
                         <div className="space-y-3">
                           {/* Move to another room */}
                           <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Move to Room</label>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Move to Room
+                              {isLoadingConflictResolutionRooms && <span className="ml-2 text-xs text-blue-600">(Loading room options...)</span>}
+                            </label>
                             <div className="grid grid-cols-2 gap-2">
                               <select
                                 value={conflictRoomSelections[conflict.occupant.Id] || ""}
@@ -1203,18 +1310,58 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
                                 }`}
                                 disabled={isLoadingRooms}
                               >
-                                <option value="">{isLoadingRooms ? "Loading rooms..." : "Select Room"}</option>
-                                {allRooms
-                                  .filter((room) => !room.hasSubroom) // Only show rooms where hasSubroom is false
-                                  .map((room) => {
+                                <option value="">{isLoadingRooms || isLoadingConflictResolutionRooms ? "Loading rooms..." : "Select Room"}</option>
+                                {(() => {
+                                  // Get rooms with hasSubtype === false
+                                  const roomsWithoutSubtype = allRooms.filter((room) => {
+                                    const roomInfo = roomInfos[room.roomId];
+                                    return roomInfo ? !roomInfo.hasSubtype : false;
+                                  });
+
+                                  // Get all subrooms from rooms with hasSubtype === true
+                                  const allSubrooms: Room[] = [];
+                                  Object.values(subroomsForConflictResolution).forEach((subrooms) => {
+                                    allSubrooms.push(...subrooms);
+                                  });
+
+                                  // Combine both lists
+                                  const allAvailableRooms = [...roomsWithoutSubtype, ...allSubrooms];
+
+                                  return allAvailableRooms.map((room) => {
                                     const building = allBuildingsData.find((b) => b.id === room.buildingId);
-                                    const floor = building?.floors.find((f) => f.id === room.floorId);
+                                    const isSubroom = allSubrooms.includes(room);
+
+                                    // Find parent room for subrooms
+                                    let parentRoomId = "";
+                                    if (isSubroom) {
+                                      // Find which parent room this subroom belongs to
+                                      for (const [parentId, subrooms] of Object.entries(subroomsForConflictResolution)) {
+                                        if (subrooms.some((subroom) => subroom.roomId === room.roomId)) {
+                                          parentRoomId = parentId;
+                                          break;
+                                        }
+                                      }
+                                    }
+
+                                    // Format the option text based on room type
+                                    let optionText = "";
+                                    const capacity = room.roomCapactiy && room.roomCapactiy > 0 ? room.roomCapactiy : null;
+
+                                    if (isSubroom) {
+                                      // For subrooms: AB2 - ParentRoomId - SubroomId - capacity (if capacity > 0)
+                                      optionText = `${building?.name} - ${parentRoomId} - ${room.roomId}${capacity ? ` - ${capacity}` : ""}`;
+                                    } else {
+                                      // For regular rooms: AB2 - parentRoomId - capacity (if capacity > 0)
+                                      optionText = `${building?.name} - ${room.roomId}${capacity ? ` - ${capacity}` : ""}`;
+                                    }
+
                                     return (
                                       <option key={`${room.roomId}-${room.buildingId}`} value={room.roomId}>
-                                        {building?.name} {floor?.name ? `- ${floor?.name}` : ""} - {room.roomName} {room?.roomType ? `(${room.roomType})` : ""}
+                                        {optionText}
                                       </option>
                                     );
-                                  })}
+                                  });
+                                })()}
                               </select>
                               <input
                                 type="date"
@@ -1438,7 +1585,7 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
                                           ?.filter((occupant) => moment(occupant.scheduledDate).format("YYYY-MM-DD") === conflictDates[conflict.occupant.Id])
                                           ?.map((occupant, index) => (
                                             <div key={index} className="text-xs text-red-600 bg-red-50 px-2 py-1 rounded border border-red-300">
-                                              {occupant.occupantName} - {occupant.startTime} → {occupant.endTime}
+                                              {occupant.occupantName} {formatTimeForDisplay(occupant.startTime)} → {formatTimeForDisplay(occupant.endTime)}
                                             </div>
                                           ))}
                                       </div>
