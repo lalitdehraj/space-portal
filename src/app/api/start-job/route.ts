@@ -391,7 +391,7 @@ async function createBigXLS(filePath: string, jsonObject: any) {
     const dataManupulation = async (object: any) => {
       const reqBody = {
         roomID: object.roomID,
-        subroomID: 0,
+        subroomID: "",
         academicYr: object.academicYr,
         acadSess: object.acadSess,
         startDate: object.startDate,
@@ -401,32 +401,8 @@ async function createBigXLS(filePath: string, jsonObject: any) {
       const roomInfoResponse = await callApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, reqBody);
       if (roomInfoResponse.success) {
         if (!roomInfoResponse.data?.roomType.toLowerCase().includes("faculty")) {
-          if (roomInfoResponse.data?.hasSubtype) {
-            // 🔹 CASE 1: Room has subrooms
-            const subroomsResponse = await callApi<Room[]>(process.env.NEXT_PUBLIC_GET_SUBROOMS_LIST || URL_NOT_FOUND, {
-              roomID: object.roomID,
-              buildingNo: roomInfoResponse.data.building,
-              acadSess: object.acadSess,
-              acadYr: object.academicYr,
-            });
-
-            const subrooms = subroomsResponse?.data || [];
-            for (const sub of subrooms) {
-              const subRoomReqBody = {
-                ...reqBody,
-                subroomID: sub.roomId,
-              };
-
-              const subRoomInfoResponse = await callApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, subRoomReqBody);
-
-              if (subRoomInfoResponse.success) {
-                await handleRoom(subRoomInfoResponse.data);
-              }
-            }
-          } else {
-            // 🔹 CASE 2: Normal room
-            await handleRoom(roomInfoResponse.data);
-          }
+          // Process parent room only - occupants already contain subroom data
+          await handleRoom(roomInfoResponse.data);
         }
       }
     };
@@ -437,7 +413,7 @@ async function createBigXLS(filePath: string, jsonObject: any) {
       // Add faculty seating logic for room reports if it's a faculty room
       const reqBody = {
         roomID: jsonObject.roomID,
-        subroomID: 0,
+        subroomID: "",
         academicYr: jsonObject.academicYr,
         acadSess: jsonObject.acadSess,
         startDate: jsonObject.startDate,
@@ -447,59 +423,17 @@ async function createBigXLS(filePath: string, jsonObject: any) {
       const roomInfoResponse = await callApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, reqBody);
 
       if (roomInfoResponse.success && roomInfoResponse.data?.roomType.toLowerCase().includes("faculty")) {
-        // Handle subrooms for faculty seating
-        if (roomInfoResponse.data?.hasSubtype) {
-          // 🔹 CASE 1: Room has subrooms
-          const subroomsResponse = await callApi<Room[]>(process.env.NEXT_PUBLIC_GET_SUBROOMS_LIST || URL_NOT_FOUND, {
-            roomID: jsonObject.roomID,
-            buildingNo: roomInfoResponse.data.building,
-            acadSess: jsonObject.acadSess,
-            acadYr: jsonObject.academicYr,
-          });
+        // Process faculty room - occupants already contain subroom data
+        const roomOccupants = roomInfoResponse.data?.occupants || [];
+        const employeeIds = roomOccupants.map((o) => o.occupantId).filter((id) => id);
 
-          const subrooms = subroomsResponse?.data || [];
-          const subroomInfoResponses = [];
+        const filteredEmployees =
+          employees?.filter((e) => {
+            return employeeIds.includes(e.employeeCode);
+          }) || [];
 
-          for (const sub of subrooms) {
-            const subRoomReqBody = {
-              ...reqBody,
-              subroomID: sub.roomId,
-            };
-
-            const subRoomInfoResponse = await callApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, subRoomReqBody);
-
-            if (subRoomInfoResponse.success) {
-              subroomInfoResponses.push(subRoomInfoResponse.data);
-            }
-          }
-
-          // Process faculty seating for all subrooms
-          for (const subroomData of subroomInfoResponses) {
-            const roomOccupants = subroomData?.occupants || [];
-            const employeeIds = roomOccupants.map((o) => o.occupantId).filter((id) => id);
-
-            const filteredEmployees =
-              employees?.filter((e) => {
-                return employeeIds.includes(e.employeeCode);
-              }) || [];
-
-            for (const emp of filteredEmployees) {
-              await handleFacultySeating(emp, [subroomData]);
-            }
-          }
-        } else {
-          // 🔹 CASE 2: Normal faculty room
-          const roomOccupants = roomInfoResponse.data?.occupants || [];
-          const employeeIds = roomOccupants.map((o) => o.occupantId).filter((id) => id);
-
-          const filteredEmployees =
-            employees?.filter((e) => {
-              return employeeIds.includes(e.employeeCode);
-            }) || [];
-
-          for (const emp of filteredEmployees) {
-            await handleFacultySeating(emp, [roomInfoResponse.data]);
-          }
+        for (const emp of filteredEmployees) {
+          await handleFacultySeating(emp, [roomInfoResponse.data]);
         }
       }
 
@@ -546,82 +480,25 @@ async function createBigXLS(filePath: string, jsonObject: any) {
         .flat()
         .filter((r) => r.roomType.toLowerCase().includes("faculty"));
 
-      // First, fetch all subrooms for all buildings at once to optimize API calls
-      const uniqueBuildings = [...new Set(allRooms.map((room) => room.buildingId))];
-      const allBuildingSubroomsMap: Record<string, Room[]> = {};
-
-      for (const buildingId of uniqueBuildings) {
-        try {
-          const { data: subrooms } = await callApi<Room[]>(process.env.NEXT_PUBLIC_GET_SUBROOMS_LIST || URL_NOT_FOUND, {
-            roomID: "", // Use blank roomID to get all subrooms for the building
-            buildingNo: buildingId,
-            acadSess: jsonObject.acadSess,
-            acadYr: jsonObject.academicYr,
-          });
-
-          if (subrooms) {
-            // Group subrooms by their parent room ID
-            subrooms.forEach((subroom) => {
-              if (subroom.parentId) {
-                if (!allBuildingSubroomsMap[subroom.parentId]) {
-                  allBuildingSubroomsMap[subroom.parentId] = [];
-                }
-                allBuildingSubroomsMap[subroom.parentId].push(subroom);
-              }
-            });
-          }
-        } catch (error) {
-          console.error(`Error fetching subrooms for building ${buildingId}:`, error);
-        }
-      }
-
-      // Prepare promises for rooms and subrooms
+      // Process all faculty rooms - occupants already contain subroom data
       const roomInfoPromises = allRooms.map(async (room) => {
-        if (room.hasSubroom) {
-          // Use cached subrooms instead of making individual API calls
-          const subrooms = allBuildingSubroomsMap[room.roomId] || [];
+        const reqBody = {
+          roomID: room.roomId,
+          subroomID: "",
+          academicYr: jsonObject.academicYr,
+          acadSess: jsonObject.acadSess,
+          startDate: jsonObject.startDate,
+          endDate: jsonObject.endDate,
+        };
 
-          if (!subrooms || subrooms.length === 0) return [];
-
-          // Fetch info for each subroom
-          const subRoomInfoPromises = subrooms.map((sub) => {
-            const reqBody = {
-              roomID: room.roomId, // parent
-              subroomID: sub.roomId, // subroom
-              academicYr: jsonObject.academicYr,
-              acadSess: jsonObject.acadSess,
-              startDate: jsonObject.startDate,
-              endDate: jsonObject.endDate,
-            };
-
-            return callApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, reqBody).then((res) => ({
-              ...res.data,
-              isRoom: false,
-            }));
-          });
-
-          return Promise.all(subRoomInfoPromises);
-        } else {
-          // Normal room
-          const reqBody = {
-            roomID: room.roomId,
-            subroomID: 0,
-            academicYr: jsonObject.academicYr,
-            acadSess: jsonObject.acadSess,
-            startDate: jsonObject.startDate,
-            endDate: jsonObject.endDate,
-          };
-
-          return callApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, reqBody).then((res) => ({
-            ...res.data,
-            isRoom: true,
-          }));
-        }
+        return callApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, reqBody).then((res) => ({
+          ...res.data,
+          isRoom: true,
+        }));
       });
 
       // Run everything in parallel and flatten
       const roomInfoResponses = (await Promise.all(roomInfoPromises)).flat().filter((r) => (r.occupants?.length || 0) > 0);
-
 
       for (const emp of employees || []) {
         await handleFacultySeating(emp, roomInfoResponses);
@@ -668,53 +545,21 @@ async function createBigXLS(filePath: string, jsonObject: any) {
         )
       ).flat();
 
-      // Prepare promises for rooms and subrooms
+      // Process all rooms - occupants already contain subroom data
       const roomInfoPromises = allRooms.map(async (room) => {
-        if (room.hasSubroom) {
-          // Fetch subrooms
-          const { data: subrooms } = await callApi<Room[]>(process.env.NEXT_PUBLIC_GET_SUBROOMS_LIST || URL_NOT_FOUND, {
-            roomID: room.roomId,
-            buildingNo: room.buildingId,
-            acadSess: jsonObject.acadSess,
-            acadYr: jsonObject.academicYr,
-          });
+        const reqBody = {
+          roomID: room.roomId,
+          subroomID: "",
+          academicYr: jsonObject.academicYr,
+          acadSess: jsonObject.acadSess,
+          startDate: jsonObject.startDate,
+          endDate: jsonObject.endDate,
+        };
 
-          if (!subrooms || subrooms.length === 0) return [];
-
-          // Fetch info for each subroom
-          const subRoomInfoPromises = subrooms.map((sub) => {
-            const reqBody = {
-              roomID: room.roomId, // parent
-              subroomID: sub.roomId, // subroom
-              academicYr: jsonObject.academicYr,
-              acadSess: jsonObject.acadSess,
-              startDate: jsonObject.startDate,
-              endDate: jsonObject.endDate,
-            };
-
-            return callApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, reqBody).then((res) => ({
-              ...res.data,
-              isRoom: false,
-            }));
-          });
-
-          return Promise.all(subRoomInfoPromises);
-        } else {
-          // Normal room
-          const reqBody = {
-            roomID: room.roomId,
-            subroomID: 0,
-            academicYr: jsonObject.academicYr,
-            acadSess: jsonObject.acadSess,
-            startDate: jsonObject.startDate,
-            endDate: jsonObject.endDate,
-          };
-
-          return callApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, reqBody).then((res) => ({
-            ...res.data,
-            isRoom: true,
-          }));
-        }
+        return callApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, reqBody).then((res) => ({
+          ...res.data,
+          isRoom: true,
+        }));
       });
 
       // Run everything in parallel and flatten
@@ -770,53 +615,21 @@ async function createBigXLS(filePath: string, jsonObject: any) {
         )
       ).flat();
 
-      // Prepare promises for rooms and subrooms
+      // Process all rooms - occupants already contain subroom data
       const roomInfoPromises = allRooms.map(async (room) => {
-        if (room.hasSubroom) {
-          // Fetch subrooms
-          const { data: subrooms } = await callApi<Room[]>(process.env.NEXT_PUBLIC_GET_SUBROOMS_LIST || URL_NOT_FOUND, {
-            roomID: room.roomId,
-            buildingNo: room.buildingId,
-            acadSess: jsonObject.acadSess,
-            acadYr: jsonObject.academicYr,
-          });
+        const reqBody = {
+          roomID: room.roomId,
+          subroomID: "",
+          academicYr: jsonObject.academicYr,
+          acadSess: jsonObject.acadSess,
+          startDate: jsonObject.startDate,
+          endDate: jsonObject.endDate,
+        };
 
-          if (!subrooms || subrooms.length === 0) return [];
-
-          // Fetch info for each subroom
-          const subRoomInfoPromises = subrooms.map((sub) => {
-            const reqBody = {
-              roomID: room.roomId, // parent
-              subroomID: sub.roomId, // subroom
-              academicYr: jsonObject.academicYr,
-              acadSess: jsonObject.acadSess,
-              startDate: jsonObject.startDate,
-              endDate: jsonObject.endDate,
-            };
-
-            return callApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, reqBody).then((res) => ({
-              ...res.data,
-              isRoom: false,
-            }));
-          });
-
-          return Promise.all(subRoomInfoPromises);
-        } else {
-          // Normal room
-          const reqBody = {
-            roomID: room.roomId,
-            subroomID: 0,
-            academicYr: jsonObject.academicYr,
-            acadSess: jsonObject.acadSess,
-            startDate: jsonObject.startDate,
-            endDate: jsonObject.endDate,
-          };
-
-          return callApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, reqBody).then((res) => ({
-            ...res.data,
-            isRoom: true,
-          }));
-        }
+        return callApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, reqBody).then((res) => ({
+          ...res.data,
+          isRoom: true,
+        }));
       });
 
       // Run everything in parallel and flatten
