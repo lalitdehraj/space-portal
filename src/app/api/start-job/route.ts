@@ -4,7 +4,7 @@ import path from "path";
 import ExcelJS from "exceljs";
 import { callApi } from "@/utils/apiIntercepter";
 import { Building, Program, Occupant, Room, RoomInfo, Allocation, Department, Faculty, Employee } from "@/types";
-import { URL_NOT_FOUND, INSERT_ALLOCATION_UTILIZATION_REPORT_API } from "@/constants";
+import { URL_NOT_FOUND } from "@/constants";
 import { getRoomOccupancyByWeekday, getVacantSlotsByWeekday } from "./helperFunction";
 import moment from "moment";
 
@@ -260,17 +260,17 @@ async function createBigXLS(filePath: string, jsonObject: any) {
           roomNo: String(roomData.parentId ? `${roomData?.parentId} - ${roomData?.id}` : `${roomData?.id}`),
           roomType: roomData?.roomType ?? "",
           buildingId: roomData?.building ?? "",
-          roomCapacity: String(roomData?.capacity ?? ""),
+          roomCapacity: Number(roomData?.capacity ?? ""),
           programCode: "",
           programName: "",
-          occupancyMon: String((((week.Monday ?? 0) * 100) / 540).toFixed(2)),
-          occupancyTue: String((((week.Tuesday ?? 0) * 100) / 540).toFixed(2)),
-          occupancyWed: String((((week.Wednesday ?? 0) * 100) / 540).toFixed(2)),
-          occupancyThu: String((((week.Thursday ?? 0) * 100) / 540).toFixed(2)),
-          occupancyFri: String((((week.Friday ?? 0) * 100) / 540).toFixed(2)),
-          occupancySat: String((((week.Saturday ?? 0) * 100) / 540).toFixed(2)),
-          occupancySun: String((((week.Sunday ?? 0) * 100) / 540).toFixed(2)),
-          occupancyWeekly: String((((week.Weekly ?? 0) * 100) / (540 * 7)).toFixed(2)),
+          occupancyMon: Number((((week.Monday ?? 0) * 100) / 540).toFixed(2)),
+          occupancyTue: Number((((week.Tuesday ?? 0) * 100) / 540).toFixed(2)),
+          occupancyWed: Number((((week.Wednesday ?? 0) * 100) / 540).toFixed(2)),
+          occupancyThu: Number((((week.Thursday ?? 0) * 100) / 540).toFixed(2)),
+          occupancyFri: Number((((week.Friday ?? 0) * 100) / 540).toFixed(2)),
+          occupancySat: Number((((week.Saturday ?? 0) * 100) / 540).toFixed(2)),
+          occupancySun: Number((((week.Sunday ?? 0) * 100) / 540).toFixed(2)),
+          occupancyWeekly: Number((((week.Weekly ?? 0) * 100) / (540 * 7)).toFixed(2)),
           vacantMon: String(vacant.Monday.toString()),
           vacantTue: String(vacant.Tuesday.toString()),
           vacantWed: String(vacant.Wednesday.toString()),
@@ -288,17 +288,17 @@ async function createBigXLS(filePath: string, jsonObject: any) {
             roomNo: String(roomData.parentId ? `${roomData?.parentId} - ${roomData?.id}` : `${roomData?.id}`),
             roomType: roomData?.roomType ?? "",
             buildingId: roomData?.building ?? "",
-            roomCapacity: String(roomData?.capacity ?? ""),
+            roomCapacity: Number(roomData?.capacity ?? ""),
             programCode: code,
             programName: program ? program.description : "",
-            occupancyMon: String((((week.Monday ?? 0) * 100) / 540).toFixed(2)),
-            occupancyTue: String((((week.Tuesday ?? 0) * 100) / 540).toFixed(2)),
-            occupancyWed: String((((week.Wednesday ?? 0) * 100) / 540).toFixed(2)),
-            occupancyThu: String((((week.Thursday ?? 0) * 100) / 540).toFixed(2)),
-            occupancyFri: String((((week.Friday ?? 0) * 100) / 540).toFixed(2)),
-            occupancySat: String((((week.Saturday ?? 0) * 100) / 540).toFixed(2)),
-            occupancySun: String((((week.Sunday ?? 0) * 100) / 540).toFixed(2)),
-            occupancyWeekly: String((((week.Weekly ?? 0) * 100) / (540 * 7)).toFixed(2)),
+            occupancyMon: Number((((week.Monday ?? 0) * 100) / 540).toFixed(2)),
+            occupancyTue: Number((((week.Tuesday ?? 0) * 100) / 540).toFixed(2)),
+            occupancyWed: Number((((week.Wednesday ?? 0) * 100) / 540).toFixed(2)),
+            occupancyThu: Number((((week.Thursday ?? 0) * 100) / 540).toFixed(2)),
+            occupancyFri: Number((((week.Friday ?? 0) * 100) / 540).toFixed(2)),
+            occupancySat: Number((((week.Saturday ?? 0) * 100) / 540).toFixed(2)),
+            occupancySun: Number((((week.Sunday ?? 0) * 100) / 540).toFixed(2)),
+            occupancyWeekly: Number((((week.Weekly ?? 0) * 100) / (540 * 7)).toFixed(2)),
             vacantMon: String(vacant.Monday.toString()),
             vacantTue: String(vacant.Tuesday.toString()),
             vacantWed: String(vacant.Wednesday.toString()),
@@ -676,7 +676,7 @@ async function insertFileInfo(filePath: string, jsonObject: any) {
 
     console.log("Inserting file info:", insertData);
 
-    const response = await callApi(INSERT_ALLOCATION_UTILIZATION_REPORT_API, insertData);
+    const response = await callApi(process.env.NEXT_PUBLIC_INSERT_ALLOCATION_UTILIZATION_REPORT_API || URL_NOT_FOUND, insertData);
 
     if (response.success) {
       console.log("File information inserted successfully");

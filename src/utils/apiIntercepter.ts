@@ -53,7 +53,6 @@ export const callApi = async <T>(
     });
     //@ts-ignore
     return { success: true, data: JSON.parse(response.data.value) };
-    // return { success: true, data: response.data };
   } catch (err) {
     const error = err as AxiosError;
     const errorMessage =

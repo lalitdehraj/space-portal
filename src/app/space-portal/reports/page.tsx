@@ -2,29 +2,13 @@
 import React, { useEffect, useState } from "react";
 import Pagination from "@/components/PageNumberIndicator";
 import { callApi } from "@/utils/apiIntercepter";
-import { URL_NOT_FOUND, GET_UTILIZATION_REPORT_API } from "@/constants";
+import { URL_NOT_FOUND } from "@/constants";
 import { useSelector } from "react-redux";
 import { Building, Report, AcademicSession, AcademicYear, Room, Department, Faculty } from "@/types";
-import { formatDate, formatDateOnly, formatFileSize } from "@/utils";
+import { formatDateOnly, formatFileSize } from "@/utils";
 import { AcademicYearResponse, AcademicSessionResponse } from "@/components/Header";
 import { useBuildingsData } from "@/hooks/useBuildingsData";
 import moment from "moment";
-
-/**
- * Key fixes & additions:
- * - Safe guards on parsing size strings
- * - Fixed sorting toggle logic (handleSort)
- * - Added missing state and fetch for departments & faculties
- * - Send payload keys expected by backend: acadYear & acadSession
- * - Defensive coding around optional fields to avoid runtime errors
- */
-
-type ReportsResponse = {
-  pageSize: number;
-  currentPage: number;
-  totalPages: number;
-  reports?: Report[];
-};
 
 const tableHeadersList: { [key: string]: keyof Report } = {
   "Serial No.": "id",
@@ -175,7 +159,7 @@ export default function UtilizationReport() {
     const fetchReports = async () => {
       setIsLoadingReports(true);
       try {
-        const response = await callApi<Report[]>(GET_UTILIZATION_REPORT_API);
+        const response = await callApi<Report[]>(process.env.NEXT_PUBLIC_GET_UTILIZATION_REPORT_API || URL_NOT_FOUND);
 
         if (response.success && response.data) {
           setReportsList(response.data);
@@ -477,11 +461,11 @@ function GenerateReportForm({ onClosePressed, startJob, setJobId, setReady, setP
       const endOfWeek = moment().endOf("isoWeek"); // Sunday
       setCustomStartDate(startOfWeek.format("YYYY-MM-DD"));
       setCustomEndDate(endOfWeek.format("YYYY-MM-DD"));
-    } else if (timePeriod === "last30") {
-      const endDate = moment();
-      const startDate = moment().subtract(30, "days");
-      setCustomStartDate(startDate.format("YYYY-MM-DD"));
-      setCustomEndDate(endDate.format("YYYY-MM-DD"));
+    } else if (timePeriod === "thisMonth") {
+      const startOfMonth = moment().startOf("month");
+      const endOfMonth = moment().endOf("month");
+      setCustomStartDate(startOfMonth.format("YYYY-MM-DD"));
+      setCustomEndDate(endOfMonth.format("YYYY-MM-DD"));
     } else if (timePeriod === "active") {
       // let backend resolve the active session range
       setCustomStartDate("");
@@ -579,9 +563,9 @@ function GenerateReportForm({ onClosePressed, startJob, setJobId, setReady, setP
       if (timePeriod === "thisWeek") {
         startDate = moment().startOf("isoWeek").format("YYYY-MM-DD"); // Monday
         endDate = moment().endOf("isoWeek").format("YYYY-MM-DD"); // Sunday
-      } else if (timePeriod === "last30") {
-        startDate = moment().subtract(29, "day").format("YYYY-MM-DD");
-        endDate = moment().format("YYYY-MM-DD");
+      } else if (timePeriod === "thisMonth") {
+        startDate = moment().startOf("month").format("YYYY-MM-DD");
+        endDate = moment().endOf("month").format("YYYY-MM-DD");
       } else if (timePeriod === "active" || timePeriod === "year" || timePeriod === "session") {
         startDate = "";
         endDate = "";
@@ -774,7 +758,7 @@ function GenerateReportForm({ onClosePressed, startJob, setJobId, setReady, setP
                   >
                     <option value="">Select Duration</option>
                     <option value={"thisWeek"}>This Week</option>
-                    <option value={"last30"}>Last 30 Days</option>
+                    <option value={"thisMonth"}>This Month</option>
                     <option value={"active"}>Active Session</option>
                     <option value={"year"}>Academic Year</option>
                     <option value={"session"}>Academic Session</option>
