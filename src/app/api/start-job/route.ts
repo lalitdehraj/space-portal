@@ -21,17 +21,17 @@ export async function POST(req: NextRequest) {
       }
     );
   }
-
-  const fileName = `${jsonObject.fileKey}.xlsx`;
+  let fileName = `${jsonObject.fileKey}`;
+  if (!jsonObject.fileKey.endsWith(".xlsx")) fileName = `${jsonObject.fileKey}.xlsx`;
+  console.log("fileName", fileName);
   const filePath = path.join(process.cwd(), "reports", fileName);
-
-  // if (fs.existsSync(filePath)) {
-  //   return NextResponse.json({
-  //     jobId: fileName,
-  //     alreadyExists: true,
-  //     downloadUrl: `/api/download/${fileName}`,
-  //   });
-  // }
+  if (fs.existsSync(filePath)) {
+    return NextResponse.json({
+      jobId: fileName,
+      alreadyExists: true,
+      downloadUrl: `/api/download/${fileName}`,
+    });
+  }
 
   createBigXLS(filePath, jsonObject).catch(console.error);
 
@@ -698,17 +698,17 @@ type ReportData = {
   buildingId?: string;
   facultyBlockName?: string;
   keys?: string;
-  roomCapacity?: string;
+  roomCapacity?: number;
 
-  occupancyMon?: string;
-  occupancyTue?: string;
-  occupancyWed?: string;
-  occupancyThu?: string;
-  occupancyFri?: string;
-  occupancySat?: string;
-  occupancySun?: string;
-  occupancyWeekly?: string;
-  totalOccupancy?: string;
+  occupancyMon?: number;
+  occupancyTue?: number;
+  occupancyWed?: number;
+  occupancyThu?: number;
+  occupancyFri?: number;
+  occupancySat?: number;
+  occupancySun?: number;
+  occupancyWeekly?: number;
+  totalOccupancy?: number;
 
   vacantMon?: string;
   vacantTue?: string;
