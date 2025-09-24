@@ -374,7 +374,7 @@ export function AdvancedSearch({ onClose }: { onClose: () => void }) {
 
                       return (
                         <div
-                          key={room.roomId}
+                          key={`${room.buildingId}-${room.roomId}-${room.parentId || "main"}`}
                           className="bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden"
                         >
                           <div className="p-4">

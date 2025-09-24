@@ -123,6 +123,8 @@ function WeeklyTimetable({
     const response = await callApi(process.env.NEXT_PUBLIC_UPDATE_SPACE_ALLOCATION_ENTRY || URL_NOT_FOUND, {
       allocationEntNo: id,
       isAllocationActive: false,
+      roomID: selectedOccupant?.roomId,
+      subRoomID: selectedOccupant?.subroomId,
       startTime: selectedOccupant?.startTime ? moment(selectedOccupant.startTime, "HH:mm").format("HH:mm:ss") : "",
       endTime: selectedOccupant?.endTime ? moment(selectedOccupant.endTime, "HH:mm").format("HH:mm:ss") : "",
       remarks: "",

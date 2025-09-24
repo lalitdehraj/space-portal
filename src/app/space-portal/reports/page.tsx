@@ -683,6 +683,7 @@ function GenerateReportForm({ onClosePressed, startJob, setJobId, setReady, setP
                     onChange={(e) => setSelectedBuildingId(e.target.value)}
                   >
                     <option value="">Select building</option>
+                    <option value="allBuildings">All buildings</option>
                     {buildings.map((b) => (
                       <option key={b.id} value={b.id}>
                         {b.name}
