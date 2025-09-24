@@ -30,6 +30,7 @@ export default function RequestApproval({ requestData, onApprovalComplete, onClo
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [selectedBuildingId, setSelectedBuildingId] = useState<string>("");
   const [rooms, setRooms] = useState<Room[]>([]);
+  const [subrooms, setSubrooms] = useState<Room[]>([]);
   const [selectedRoomId, setSelectedRoomId] = useState<string>("");
   const [description, setDescription] = useState<string>("");
   const [keys, setKeys] = useState<string>("");
@@ -50,24 +51,49 @@ export default function RequestApproval({ requestData, onApprovalComplete, onClo
     fetchBuildings();
   }, [academicSession, academicYear]);
 
-  // Fetch rooms for selected building
+  // Fetch rooms and subrooms for selected building
   useEffect(() => {
     const fetchRoomsForBuilding = async (buildingId: string) => {
       const building = buildings.find((b) => b.id === buildingId);
-      if (!building) return setRooms([]);
+      if (!building) {
+        setRooms([]);
+        setSubrooms([]);
+        return;
+      }
 
-      const reqBody = {
-        buildingNo: buildingId,
-        floorID: "", // Empty to get all rooms from the building
-        curreentTime: moment().format("HH:mm"),
-      };
-      const response = await callApi<Room[]>(process.env.NEXT_PUBLIC_GET_ROOMS_LIST || URL_NOT_FOUND, reqBody);
-      setRooms(response.data || []);
+      try {
+        // Fetch regular rooms
+        const reqBody = {
+          buildingNo: buildingId,
+          floorID: "", // Empty to get all rooms from the building
+          curreentTime: moment().format("HH:mm"),
+        };
+        const response = await callApi<Room[]>(process.env.NEXT_PUBLIC_GET_ROOMS_LIST || URL_NOT_FOUND, reqBody);
+        setRooms(response.data || []);
+
+        // Fetch subrooms for this building
+        const subroomReqBody = {
+          roomID: "", // Use blank roomID to get all subrooms for the building
+          buildingNo: buildingId,
+          acadSess: academicSession,
+          acadYr: academicYear,
+        };
+        const subroomResponse = await callApi<Room[]>(process.env.NEXT_PUBLIC_GET_SUBROOMS_LIST || URL_NOT_FOUND, subroomReqBody);
+        setSubrooms(subroomResponse.data || []);
+      } catch (error) {
+        console.error("Error fetching rooms/subrooms:", error);
+        setRooms([]);
+        setSubrooms([]);
+      }
     };
+
     if (selectedBuildingId) {
       fetchRoomsForBuilding(selectedBuildingId);
       setSelectedRoomId("");
-    } else setRooms([]);
+    } else {
+      setRooms([]);
+      setSubrooms([]);
+    }
   }, [selectedBuildingId, buildings, academicSession, academicYear]);
 
   // Fetch maintenance data
@@ -170,9 +196,13 @@ export default function RequestApproval({ requestData, onApprovalComplete, onClo
 
   const validateConflicts = async (slots: Slot[]) => {
     const fetchExistingSlots = async () => {
+      // Parse selectedRoomId to handle subrooms (format: parentId|roomId)
+      const isSubroom = selectedRoomId.includes("|");
+      const [roomId, subroomId] = isSubroom ? selectedRoomId.split("|") : [selectedRoomId, ""];
+
       const requestbody = {
-        roomID: selectedRoomId,
-        subroomID: 0,
+        roomID: roomId,
+        subroomID: isSubroom ? parseInt(subroomId) : 0,
         academicYr: academicYear,
         acadSess: academicSession,
         startDate: moment().format("YYYY-MM-DD"),
@@ -215,13 +245,18 @@ export default function RequestApproval({ requestData, onApprovalComplete, onClo
 
   const createSpaceAllocations = (slots: Slot[]): SpaceAllocation[] => {
     if (!requestData) return [];
+
+    // Parse selectedRoomId to handle subrooms (format: parentId|roomId)
+    const isSubroom = selectedRoomId.includes("|");
+    const [roomId, subroomId] = isSubroom ? selectedRoomId.split("|") : [selectedRoomId, ""];
+
     return slots.map((slot) => ({
       allocationDate: slot.date,
       startTime: `${slot.start}`,
       endTime: `${slot.end}`,
       keyAssigned: keys,
-      subRoom: "0",
-      allocatedRoomID: selectedRoomId,
+      subRoom: isSubroom ? subroomId : "0",
+      allocatedRoomID: roomId,
       buildingId: selectedBuildingId,
       academicSession: academicSession,
       academicYear: academicYear,
@@ -238,7 +273,7 @@ export default function RequestApproval({ requestData, onApprovalComplete, onClo
 
   const handleApprove = async () => {
     if (!selectedRoomId || !keys.trim()) {
-      alert("Please select Room and assign Keys before approval.");
+      alert("Please select Room/Subroom and assign Keys before approval.");
       return;
     }
 
@@ -419,14 +454,16 @@ export default function RequestApproval({ requestData, onApprovalComplete, onClo
                 </select>
               </div>
               <div className="w-full mt-4 md:mt-0">
-                <label className="block text-sm text-gray-700 mb-1">Room</label>
+                <label className="block text-sm text-gray-700 mb-1">Room/Subroom</label>
                 <select
                   className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
                   value={selectedRoomId}
                   onChange={(e) => setSelectedRoomId(e.target.value)}
                   disabled={!selectedBuildingId}
                 >
-                  <option value="">Select room</option>
+                  <option value="">Select room or subroom</option>
+
+                  {/* Regular rooms (non-subrooms) */}
                   {rooms
                     .filter((r) => !r.hasSubroom) // Only show rooms where hasSubroom is false
                     .map((r) => {
@@ -436,11 +473,29 @@ export default function RequestApproval({ requestData, onApprovalComplete, onClo
                       const capacity = r.roomCapactiy || 0;
 
                       return (
-                        <option key={r.roomId} value={r.roomId}>
+                        <option key={`room-${r.roomId}`} value={r.roomId}>
                           {roomName} ({roomId} • {roomType} • {capacity})
                         </option>
                       );
                     })}
+
+                  {/* Subrooms */}
+                  {subrooms?.map((subroom) => {
+                    const subroomName = subroom.roomName || "Unknown Subroom";
+                    const subroomId = subroom?.roomId || "N/A";
+                    const subroomType = subroom?.roomType ? subroom?.roomType : "N/A";
+                    const capacity = subroom?.roomCapactiy || 0;
+
+                    // Find parent room name for better identification
+                    const parentRoom = rooms.find((r) => r.roomId === subroom.parentId);
+                    const parentName = parentRoom?.roomName || "Unknown Parent";
+
+                    return (
+                      <option key={`subroom-${subroom.roomId}`} value={`${subroom.parentId}|${subroom.roomId}`}>
+                        {subroomName} ({subroomType} • {capacity}) - Parent: {parentName}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
             </div>
