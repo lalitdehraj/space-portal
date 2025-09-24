@@ -42,14 +42,12 @@ export function AdvancedSearch({ onClose }: { onClose: () => void }) {
 
         const rooms: Room[] = [];
         for (const b of buildingsRes.data || []) {
-          for (const f of b.floors) {
-            const res = await callApi<Room[]>(process.env.NEXT_PUBLIC_GET_ROOMS_LIST || URL_NOT_FOUND, {
-              buildingNo: b.id,
-              floorID: f.id,
-              curreentTime: moment().format("HH:mm"),
-            });
-            if (res.success && res.data) rooms.push(...res.data);
-          }
+          const res = await callApi<Room[]>(process.env.NEXT_PUBLIC_GET_ROOMS_LIST || URL_NOT_FOUND, {
+            buildingNo: b.id,
+            floorID: "",
+            curreentTime: moment().format("HH:mm"),
+          });
+          if (res.success && res.data) rooms.push(...res.data);
         }
         setAllRooms(rooms);
         setFilteredRooms(rooms); // Show all rooms initially
@@ -192,142 +190,270 @@ export function AdvancedSearch({ onClose }: { onClose: () => void }) {
   const nowTime = moment().format("HH:mm"); // current time
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center bg-black/40 z-50 text-gray-600">
-      <div className="bg-white w-[95%] md:w-[85%] h-[90%] rounded-lg shadow-lg flex flex-col overflow-hidden">
+    <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
+      <div className="bg-white w-[95%] md:w-[90%] h-[90%] rounded-lg shadow-xl flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="flex justify-between items-center p-4 border-b bg-gray-50">
-          <h2 className="text-lg font-semibold text-gray-700 ">Advanced Search</h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700 text-xl">
-            ✕
+        <div className="flex justify-between items-center p-6 border-b border-gray-200 bg-white">
+          <div className="flex items-center space-x-3">
+            <div className="w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center">
+              <img src="/images/bx-filter-alt.svg" alt="Filter" className="h-4 w-4 text-white" />
+            </div>
+            <h2 className="text-xl font-semibold text-gray-800">Advanced Search</h2>
+          </div>
+          <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
           </button>
         </div>
 
         <div className="flex flex-1 overflow-hidden">
-          {/* Filters */}
-          <div className="w-full md:w-80 border-r p-4 bg-gray-50 flex flex-col space-y-4 overflow-y-auto">
-            <h3 className="font-semibold text-gray-700 text-sm">Filters</h3>
+          {/* Filters Sidebar */}
+          <div className="w-full md:w-80 border-r border-gray-200 bg-gray-50 flex flex-col">
+            <div className="p-6 flex flex-col space-y-6 overflow-y-auto">
+              <div>
+                <h3 className="text-sm font-semibold text-gray-700 mb-4 uppercase tracking-wide">Search Filters</h3>
 
-            <div className="flex flex-col space-y-2">
-              <label className="text-xs font-medium">Capacity</label>
-              <input
-                type="number"
-                value={capacity}
-                onChange={(e) => setCapacity(e.target.value)}
-                className="w-full border rounded px-2 py-1 text-sm focus:ring-1 focus:ring-orange-400"
-              />
-            </div>
-
-            <div className="flex flex-col space-y-2">
-              <label className="text-xs font-medium">Status</label>
-              <select
-                value={status}
-                onChange={(e) => setStatus(e.target.value)}
-                className="w-full border rounded px-2 py-1 text-sm focus:ring-1 focus:ring-orange-400"
-              >
-                <option value="">All</option>
-                <option value="maintenance">Maintenance</option>
-                <option value="allocated">Allocated</option>
-                <option value="unallocated">Unallocated</option>
-              </select>
-            </div>
-
-            <div className="flex flex-col space-y-2">
-              <label className="text-xs font-medium">Room Type</label>
-              <select
-                value={roomType}
-                onChange={(e) => setRoomType(e.target.value)}
-                className="w-full border rounded px-2 py-1 text-sm focus:ring-1 focus:ring-orange-400"
-              >
-                <option value="">All</option>
-                {[...new Set(allRooms.map((r) => r.roomType))].map((type) => (
-                  <option key={type} value={type}>
-                    {type}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="flex items-center space-x-2">
-              <input type="checkbox" checked={availabilityOn} onChange={() => setAvailabilityOn(!availabilityOn)} />
-              <span className="text-sm font-medium text-orange-600">Available</span>
-            </div>
-            {availabilityOn && (
-              <div className="flex flex-col space-y-2">
-                <input
-                  type="date"
-                  value={startDate}
-                  min={today} // prevent past dates
-                  onChange={(e) => setStartDate(e.target.value)}
-                  className="w-full border rounded px-2 py-1 text-sm"
-                />
-                <input
-                  type="date"
-                  value={endDate}
-                  min={startDate || today} // end date cannot be before start date
-                  onChange={(e) => setEndDate(e.target.value)}
-                  className="w-full border rounded px-2 py-1 text-sm"
-                />
-                <div className="flex space-x-2">
+                {/* Capacity Filter */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700">Minimum Capacity</label>
                   <input
-                    type="time"
-                    value={startTime}
-                    min={startDate === today ? nowTime : "00:00"} // prevent past time if today
-                    onChange={(e) => setStartTime(e.target.value)}
-                    className="w-1/2 border rounded px-2 py-1 text-sm"
-                  />
-                  <input
-                    type="time"
-                    value={endTime}
-                    min={startTime} // endTime cannot be before startTime
-                    onChange={(e) => setEndTime(e.target.value)}
-                    className="w-1/2 border rounded px-2 py-1 text-sm"
+                    type="number"
+                    value={capacity}
+                    onChange={(e) => setCapacity(e.target.value)}
+                    placeholder="Enter capacity"
+                    className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                   />
                 </div>
-              </div>
-            )}
 
-            <button onClick={handleSearch} className="mt-auto bg-orange-500 text-white py-2 rounded hover:bg-orange-600 text-sm font-medium">
-              Search
-            </button>
+                {/* Status Filter */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700">Room Status</label>
+                  <select
+                    value={status}
+                    onChange={(e) => setStatus(e.target.value)}
+                    className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  >
+                    <option value="">All Status</option>
+                    <option value="allocated">Allocated</option>
+                    <option value="unallocated">Unallocated</option>
+                    <option value="maintenance">Maintenance</option>
+                  </select>
+                </div>
+
+                {/* Room Type Filter */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700">Room Type</label>
+                  <select
+                    value={roomType}
+                    onChange={(e) => setRoomType(e.target.value)}
+                    className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  >
+                    <option value="">All Types</option>
+                    {[...new Set(allRooms.map((r) => r.roomType))].map((type) => (
+                      <option key={type} value={type}>
+                        {type}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Availability Filter */}
+                <div className="space-y-3">
+                  <div className="flex items-center space-x-3">
+                    <input
+                      type="checkbox"
+                      id="availability"
+                      checked={availabilityOn}
+                      onChange={() => setAvailabilityOn(!availabilityOn)}
+                      className="w-4 h-4 text-orange-600 bg-gray-100 border-gray-300 rounded focus:ring-orange-500 focus:ring-2"
+                    />
+                    <label htmlFor="availability" className="text-sm font-medium text-gray-700">
+                      Check Availability
+                    </label>
+                  </div>
+
+                  {availabilityOn && (
+                    <div className="space-y-3 pl-7">
+                      <div className="space-y-2">
+                        <label className="text-xs font-medium text-gray-600 uppercase tracking-wide">Date Range</label>
+                        <div className="space-y-2">
+                          <input
+                            type="date"
+                            value={startDate}
+                            min={today}
+                            onChange={(e) => setStartDate(e.target.value)}
+                            className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                          />
+                          <input
+                            type="date"
+                            value={endDate}
+                            min={startDate || today}
+                            onChange={(e) => setEndDate(e.target.value)}
+                            className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-xs font-medium text-gray-600 uppercase tracking-wide">Time Range</label>
+                        <div className="flex space-x-2">
+                          <input
+                            type="time"
+                            value={startTime}
+                            min={startDate === today ? nowTime : "00:00"}
+                            onChange={(e) => setStartTime(e.target.value)}
+                            className="flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                          />
+                          <input
+                            type="time"
+                            value={endTime}
+                            min={startTime}
+                            onChange={(e) => setEndTime(e.target.value)}
+                            className="flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Search Button */}
+            <div className="p-6 border-t border-gray-200 bg-white">
+              <button
+                onClick={handleSearch}
+                className="w-full bg-orange-500 text-white py-3 rounded-lg hover:bg-orange-600 text-sm font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2"
+              >
+                Search Rooms
+              </button>
+            </div>
           </div>
 
-          {/* Results */}
-          <div className="flex-1 p-4 overflow-y-auto">
-            {loading || loadingSubrooms ? (
-              <p>Loading rooms...</p>
-            ) : filteredRooms.length === 0 ? (
-              <p className="text-sm text-gray-500">No rooms match the filters.</p>
-            ) : (
-              <ul className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-                {filteredRooms.map((room) => (
-                  <li
-                    key={room.roomId}
-                    className="p-4 border border-orange-600 rounded-lg shadow-sm hover:shadow-md transition bg-white flex flex-col justify-between"
-                  >
-                    <div>
-                      <h4 className="font-semibold text-gray-700 mb-1">{room.roomName}</h4>
-                      <p className="text-xs text-gray-500 mb-1">Capacity: {room.roomCapactiy}</p>
-                      <p className="text-xs mb-1">
-                        Status:{" "}
-                        <span
-                          className={`px-2 py-0.5 rounded text-white text-[10px] ${
-                            room.status === "allocated" ? "bg-green-500" : room.status === "maintenance" ? "bg-red-500" : "bg-gray-400"
-                          }`}
-                        >
-                          {room.status}
-                        </span>
-                      </p>
-                      <p className="text-xs text-gray-500 mb-1">Type: {room.roomType}</p>
+          {/* Results Section */}
+          <div className="flex-1 bg-white">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-lg font-semibold text-gray-800">Search Results</h3>
+                {filteredRooms.length > 0 && (
+                  <span className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
+                    {filteredRooms.length} room{filteredRooms.length !== 1 ? "s" : ""} found
+                  </span>
+                )}
+              </div>
+
+              <div className="overflow-y-auto" style={{ maxHeight: "calc(100vh - 280px)" }}>
+                {loading || loadingSubrooms ? (
+                  <div className="flex items-center justify-center py-12">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-6 h-6 border-2 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
+                      <span className="text-gray-600">Loading rooms...</span>
                     </div>
-                    {availabilityOn && (
-                      <p className={`text-xs font-semibold mt-2 ${isRoomAvailable(room.roomId) ? "text-green-600" : "text-red-600"}`}>
-                        {isRoomAvailable(room.roomId) ? "Available" : "Not Available"}
-                      </p>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
+                  </div>
+                ) : filteredRooms.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-gray-500">
+                    <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                      <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
+                        />
+                      </svg>
+                    </div>
+                    <p className="text-lg font-medium">No rooms found</p>
+                    <p className="text-sm">Try adjusting your search criteria</p>
+                  </div>
+                ) : (
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                    {filteredRooms.map((room) => {
+                      const occupancyStatus = room.occupied / room.roomCapactiy;
+                      const statusColor = occupancyStatus <= 0.1 ? "green" : occupancyStatus > 0.8 ? "red" : "yellow";
+
+                      return (
+                        <div
+                          key={room.roomId}
+                          className="bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden"
+                        >
+                          <div className="p-4">
+                            <div className="flex items-start justify-between mb-3">
+                              <div className="flex-1">
+                                <h4 className="font-semibold text-gray-800 text-sm mb-1 truncate">{room.roomName}</h4>
+                                <p className="text-xs text-gray-500 mb-1">Building ID: {room.buildingId}</p>
+                              </div>
+                              <div
+                                className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                                  room.status === "allocated"
+                                    ? "bg-green-100 text-green-800"
+                                    : room.status === "maintenance"
+                                    ? "bg-red-100 text-red-800"
+                                    : "bg-gray-100 text-gray-800"
+                                }`}
+                              >
+                                {room.status}
+                              </div>
+                            </div>
+
+                            <div className="space-y-2">
+                              <div className="flex justify-between text-xs">
+                                <span className="text-gray-500">Capacity:</span>
+                                <span className="font-medium text-gray-700">{room.roomCapactiy}</span>
+                              </div>
+                              <div className="flex justify-between text-xs">
+                                <span className="text-gray-500">Type:</span>
+                                <span className="font-medium text-gray-700">{room.roomType}</span>
+                              </div>
+                              <div className="flex justify-between text-xs">
+                                <span className="text-gray-500">Occupied:</span>
+                                <span className="font-medium text-gray-700">{room.occupied}</span>
+                              </div>
+                            </div>
+
+                            {/* Occupancy Progress Bar */}
+                            <div className="mt-3">
+                              <div className="flex justify-between text-xs mb-1">
+                                <span className="text-gray-500">Occupancy</span>
+                                <span
+                                  className={`font-medium ${
+                                    statusColor === "green" ? "text-green-600" : statusColor === "red" ? "text-red-600" : "text-yellow-600"
+                                  }`}
+                                >
+                                  {Math.round(occupancyStatus * 100)}%
+                                </span>
+                              </div>
+                              <div className="w-full bg-gray-200 rounded-full h-2">
+                                <div
+                                  className={`h-2 rounded-full ${
+                                    statusColor === "green" ? "bg-green-500" : statusColor === "red" ? "bg-red-500" : "bg-yellow-500"
+                                  }`}
+                                  style={{ width: `${Math.min(occupancyStatus * 100, 100)}%` }}
+                                ></div>
+                              </div>
+                            </div>
+
+                            {/* Availability Status */}
+                            {availabilityOn && (
+                              <div className="mt-3 pt-3 border-t border-gray-100">
+                                <div
+                                  className={`flex items-center space-x-2 text-xs font-medium ${
+                                    isRoomAvailable(room.roomId) ? "text-green-600" : "text-red-600"
+                                  }`}
+                                >
+                                  <div className={`w-2 h-2 rounded-full ${isRoomAvailable(room.roomId) ? "bg-green-500" : "bg-red-500"}`}></div>
+                                  <span>{isRoomAvailable(room.roomId) ? "Available" : "Not Available"}</span>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       </div>
