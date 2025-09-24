@@ -41,7 +41,6 @@ export default function Buildings() {
       if (response.success) {
         let building = response.data?.find((building) => building.id === buildingId);
         setSelectedBuilding(building);
-        console.log(building);
         if ((building?.floors?.length || 0) > 0) {
           const floor = building?.floors.filter((f) => f.id === selectedFloorId);
           setSelectedFloor(floor && (floor?.length || 0) > 0 ? floor?.[0] : building?.floors[0]);

@@ -121,7 +121,6 @@ async function createBigXLS(filePath: string, jsonObject: any) {
       process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND,
       reqBody
     );
-    console.log("print", roomInfoResponse);
 
     if (roomInfoResponse.success) {
       if (

@@ -163,19 +163,10 @@ export default function UtilizationReport() {
   }
 
   useEffect(() => {
-    console.log("Processing reportsList:", reportsList);
-    console.log("ReportsList length:", reportsList?.length);
     const filtered = filterData(reportsList || [], searchQuery);
-    console.log("Filtered data:", filtered);
     const sorted = sortData(filtered, (activeHeader as keyof Report) || ("id" as keyof Report), sortState);
-    console.log("Sorted data:", sorted);
     setFilteredList(sorted || []);
   }, [reportsList, activeHeader, sortState, searchQuery]);
-
-  // Debug render state
-  useEffect(() => {
-    console.log("Render state - isLoadingReports:", isLoadingReports, "filteredList:", filteredList, "filteredList.length:", filteredList?.length);
-  }, [isLoadingReports, filteredList]);
 
   const [generateReportVisible, setGenerateReportVisible] = useState(false);
   const [totalPages, setTotalPages] = useState(0);
@@ -185,7 +176,6 @@ export default function UtilizationReport() {
       setIsLoadingReports(true);
       try {
         const response = await callApi<Report[]>(GET_UTILIZATION_REPORT_API);
-        console.log("API Response:", response);
 
         if (response.success && response.data) {
           setReportsList(response.data);

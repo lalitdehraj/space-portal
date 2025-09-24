@@ -91,7 +91,6 @@ export function AdvancedSearch({ onClose }: { onClose: () => void }) {
     fetchRoomInfos();
   }, [availabilityOn, allRooms, startDate, endDate]);
 
-  console.log(roomInfos);
   // Availability check
   const isRoomAvailable = (roomId: string) => {
     const info = roomInfos[roomId];

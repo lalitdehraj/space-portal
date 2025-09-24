@@ -242,7 +242,6 @@ export default function AddAssignmentForm({
     if (!purpose) errors.push("Purpose must be entered.");
     if (!remarks) errors.push("Remarks must be entered.");
     if (!allocationType) errors.push("Type must be selected.");
-    console.log(keys);
     if (errors.length > 0) {
       setValidationErrors(errors);
       return;
@@ -341,12 +340,10 @@ export default function AddAssignmentForm({
             .join("\n")}\n\nDo you want to proceed anyway?`
         );
         if (confirmProceed) {
-          console.log(slotGroups, allocationSlotsList);
           onSuccessfulSlotsCreation(createSpaceAllocations(slotGroups.resolved));
           setIsConflictsViewVisible(false);
         }
       } else {
-        console.log(slotGroups, allocationSlotsList);
         onSuccessfulSlotsCreation(createSpaceAllocations(slotGroups.resolved));
       }
       setSuccessMessage("Slots allocated successfully!");

@@ -29,13 +29,11 @@ export default function Dashboard() {
     const fetchDashboardData = async () => {
       // Avoid API call if required data is insufficient
       if (!startDate || !endDate || !acadmeicSession) {
-        console.log("Skipping dashboard API call - insufficient data:", { startDate, endDate, acadmeicSession });
         return;
       }
 
       // Validate date range using utility function
       if (!isValidDateRange(startDate, endDate)) {
-        console.log("Skipping dashboard API call - invalid date range:", { startDate, endDate });
         return;
       }
 

@@ -10,7 +10,6 @@ import moment from "moment";
 
 export async function POST(req: NextRequest) {
   const jsonObject = await req.json();
-  console.log(jsonObject);
 
   if (!jsonObject.fileKey) {
     return NextResponse.json(
@@ -623,7 +622,6 @@ async function createBigXLS(filePath: string, jsonObject: any) {
       // Run everything in parallel and flatten
       const roomInfoResponses = (await Promise.all(roomInfoPromises)).flat().filter((r) => (r.occupants?.length || 0) > 0);
 
-      // console.log(roomInfoResponses);
 
       for (const emp of employees || []) {
         await handleFacultySeating(emp, roomInfoResponses);

@@ -30,7 +30,6 @@ export default function AuthGuard({ children }: AuthGuardProps) {
           // Filter roles for the current user only
           const currentUserRoles = response.data?.filter((u) => u.userEmail.toLowerCase() === session?.user?.email?.toLowerCase()) || [];
           const roles = extractUserRoles(currentUserRoles);
-          console.log("Current user roles:", roles, "for user:", session?.user?.email);
           setUserRoles(roles);
         }
       } catch (error) {
@@ -54,7 +53,6 @@ export default function AuthGuard({ children }: AuthGuardProps) {
 
     // Check if user has access to the current route
     const hasAccess = checkRouteAccess(pathname, userRoles);
-    console.log("Access check:", { pathname, userRoles, hasAccess });
     setIsAuthorized(hasAccess);
 
     if (!hasAccess) {

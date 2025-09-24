@@ -566,7 +566,6 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
         startDate: startDate,
         endDate: endDate,
       };
-      console.log("gggg", requestbody);
       const res = await callApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, requestbody);
       if (res.success && res.data) {
         setConflictRoomInfos((prev) => ({ ...prev, [conflictId]: res.data! }));
@@ -757,13 +756,11 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
       const conflictingMaintenanceRecords = existingMaintenanceRecords.filter((maintenance) => {
         // Only check maintenance records for the same room
         if (maintenance.roomid !== selectedRoomId) {
-          console.log("Debug - Room ID mismatch:", maintenance.roomid, "!=", selectedRoomId);
           return false;
         }
 
         // Only check active maintenance records
         if (!maintenance.isMainteneceActive) {
-          console.log("Debug - Maintenance not active:", maintenance.id);
           return false;
         }
 
@@ -771,7 +768,6 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
 
         // Only check maintenance on the same date
         if (existingMaintenanceDate !== maintenanceDate) {
-          console.log("Debug - Date mismatch:", existingMaintenanceDate, "!=", maintenanceDate);
           return false;
         }
 
@@ -790,13 +786,6 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
 
         const overlaps = newMaintenanceStart.isBefore(existingMaintenanceEnd) && newMaintenanceEnd.isAfter(existingMaintenanceStart);
 
-        console.log("Debug - Time overlap check:", {
-          newStart: newMaintenanceStart.format(),
-          newEnd: newMaintenanceEnd.format(),
-          existingStart: existingMaintenanceStart.format(),
-          existingEnd: existingMaintenanceEnd.format(),
-          overlaps,
-        });
 
         return overlaps;
       });
@@ -927,7 +916,6 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
   const checkConflictRoomConflicts = async (conflictId: string, roomId: string, date: string, newStartTime: string, newEndTime: string) => {
     const roomInfo = conflictRoomInfos[conflictId];
     if (!roomInfo || !date || !newStartTime || !newEndTime) {
-      console.log("Missing data for conflict check:", { conflictId, roomId, date, newStartTime, newEndTime, hasRoomInfo: !!roomInfo });
       // Set conflict status to false when data is missing
       setConflictRoomConflictStatus((prev) => ({ ...prev, [conflictId]: false }));
       setConflictRoomConflictType((prev) => ({ ...prev, [conflictId]: "" }));
@@ -945,7 +933,6 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
 
         // Check if the new slot overlaps with the maintenance time
         if (newSlotStart.isBefore(maintenanceEnd) && newSlotEnd.isAfter(maintenanceStart)) {
-          console.log("MAINTENANCE CONFLICT DETECTED!");
           setConflictRoomConflictStatus((prev) => ({ ...prev, [conflictId]: true }));
           setConflictRoomConflictType((prev) => ({ ...prev, [conflictId]: "maintenance" }));
           return true; // Conflict with maintenance time
@@ -969,7 +956,6 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
           if (newRoom && selectedRoom && newRoom.parentId && selectedRoom.parentId) {
             // Both are subrooms of the same parent
             if (newRoom.parentId === selectedRoom.parentId) {
-              console.log("SUBROOM CONFLICT DETECTED: Cannot resolve to subroom of same parent room during maintenance timeframe");
               setConflictRoomConflictStatus((prev) => ({ ...prev, [conflictId]: true }));
               setConflictRoomConflictType((prev) => ({ ...prev, [conflictId]: "subroom" }));
               return true;
@@ -977,7 +963,6 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
           } else if (newRoom && selectedRoom && newRoom.parentId && !selectedRoom.parentId) {
             // New room is subroom, selected room is parent
             if (newRoom.parentId === selectedRoomId) {
-              console.log("SUBROOM CONFLICT DETECTED: Cannot resolve to subroom of same parent room during maintenance timeframe");
               setConflictRoomConflictStatus((prev) => ({ ...prev, [conflictId]: true }));
               setConflictRoomConflictType((prev) => ({ ...prev, [conflictId]: "subroom" }));
               return true;
@@ -985,7 +970,6 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
           } else if (newRoom && selectedRoom && !newRoom.parentId && selectedRoom.parentId) {
             // New room is parent, selected room is subroom
             if (roomId === selectedRoom.parentId) {
-              console.log("SUBROOM CONFLICT DETECTED: Cannot resolve to parent room when maintenance is on its subroom during same timeframe");
               setConflictRoomConflictStatus((prev) => ({ ...prev, [conflictId]: true }));
               setConflictRoomConflictType((prev) => ({ ...prev, [conflictId]: "subroom" }));
               return true;

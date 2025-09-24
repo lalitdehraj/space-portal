@@ -85,7 +85,6 @@ function ProfilePage() {
               u.userEmail.toLowerCase().trim() === email.toLowerCase().trim()
           );
           dispatcher(setUser(filteredUsers?.[0] || null))
-          console.log(response);
         }
       } catch (error) {
         console.error("Error fetching user profile:", error);
