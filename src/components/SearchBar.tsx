@@ -20,6 +20,9 @@ export function AdvancedSearch({ onClose }: { onClose: () => void }) {
   const [subroomData, setSubroomData] = useState<Record<string, Room[]>>({});
   const [hoveredRoomId, setHoveredRoomId] = useState<string | null>(null);
   const [subroomCache, setSubroomCache] = useState<Record<string, Room[]>>({});
+  const [clickedRoom, setClickedRoom] = useState<Room | null>(null);
+  const [clickedRoomSubrooms, setClickedRoomSubrooms] = useState<Room[]>([]);
+  const [loadingSubrooms, setLoadingSubrooms] = useState(false);
 
   // Filters
   const [capacity, setCapacity] = useState("");
@@ -198,6 +201,36 @@ export function AdvancedSearch({ onClose }: { onClose: () => void }) {
       console.error(`Error fetching subrooms for room ${roomId}:`, error);
     }
     return [];
+  };
+
+  /**
+   * Handle room click to show subrooms
+   */
+  const handleRoomClick = async (room: Room) => {
+    if (!room.hasSubroom) {
+      return; // Don't show subrooms for rooms that don't have them
+    }
+
+    setClickedRoom(room);
+    setLoadingSubrooms(true);
+
+    try {
+      const subrooms = await fetchSubrooms(room.roomId, room.buildingId);
+      setClickedRoomSubrooms(subrooms);
+    } catch (error) {
+      console.error(`Error fetching subrooms for clicked room ${room.roomId}:`, error);
+      setClickedRoomSubrooms([]);
+    } finally {
+      setLoadingSubrooms(false);
+    }
+  };
+
+  /**
+   * Close subroom modal
+   */
+  const closeSubroomModal = () => {
+    setClickedRoom(null);
+    setClickedRoomSubrooms([]);
   };
 
   /**
@@ -498,17 +531,16 @@ export function AdvancedSearch({ onClose }: { onClose: () => void }) {
                 ) : (
                   <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                     {filteredRooms.map((room) => {
-                      const occupancyStatus = room.occupied / room.roomCapactiy;
-                      const statusColor = occupancyStatus <= 0.1 ? "green" : occupancyStatus > 0.8 ? "red" : "yellow";
                       const isHovered = hoveredRoomId === room.roomId;
                       const availableSubrooms = subroomData[room.roomId] || [];
 
                       return (
                         <div
                           key={`${room.buildingId}-${room.roomId}-${room.parentId || "main"}`}
-                          className="bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden relative"
+                          className="bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden relative cursor-pointer"
                           onMouseEnter={() => (room.hasSubroom ? setHoveredRoomId(room.roomId) : null)}
                           onMouseLeave={() => (room.hasSubroom ? setHoveredRoomId(null) : null)}
+                          onClick={() => handleRoomClick(room)}
                         >
                           <div className="p-4">
                             <div className="flex items-start justify-between mb-3">
@@ -558,6 +590,110 @@ export function AdvancedSearch({ onClose }: { onClose: () => void }) {
             </div>
           </div>
         </div>
+
+        {/* Subroom Modal */}
+        {clickedRoom && (
+          <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-[60]">
+            <div className="bg-white w-[90%] md:w-[70%] lg:w-[60%] max-w-4xl h-[80%] rounded-lg shadow-xl flex flex-col overflow-hidden">
+              {/* Modal Header */}
+              <div className="flex justify-between items-center p-6 border-b border-gray-200 bg-white">
+                <div className="flex items-center space-x-3">
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-blue-100">
+                    <svg className="h-4 w-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
+                      />
+                    </svg>
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-semibold text-gray-800">Subrooms</h2>
+                    <p className="text-sm text-gray-500">
+                      Room: {clickedRoom.roomName} (Building: {clickedRoom.buildingId})
+                    </p>
+                  </div>
+                </div>
+                <button onClick={closeSubroomModal} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Modal Content */}
+              <div className="flex-1 overflow-hidden">
+                <div className="p-6 h-full overflow-y-auto">
+                  {loadingSubrooms ? (
+                    <div className="flex items-center justify-center py-12">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                        <span className="text-gray-600">Loading subrooms...</span>
+                      </div>
+                    </div>
+                  ) : clickedRoomSubrooms.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-12 text-gray-500">
+                      <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
+                          />
+                        </svg>
+                      </div>
+                      <p className="text-lg font-medium">No subrooms found</p>
+                      <p className="text-sm">This room doesn't have any subrooms</p>
+                    </div>
+                  ) : (
+                    <div>
+                      <div className="mb-4">
+                        <h3 className="text-lg font-semibold text-gray-800 mb-2">Available Subrooms</h3>
+                        <p className="text-sm text-gray-500">
+                          Found {clickedRoomSubrooms.length} subroom{clickedRoomSubrooms.length !== 1 ? "s" : ""}
+                        </p>
+                      </div>
+                      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                        {clickedRoomSubrooms.map((subroom) => (
+                          <div
+                            key={subroom.roomId}
+                            className="bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200 p-4"
+                          >
+                            <div className="flex items-start justify-between mb-3">
+                              <div className="flex-1">
+                                <h4 className="font-semibold text-gray-800 text-sm mb-1 truncate">{subroom.roomName}</h4>
+                                <p className="text-xs text-gray-500 mb-1">Subroom ID: {subroom.roomId}</p>
+                              </div>
+                            </div>
+
+                            <div className="space-y-2">
+                              <div className="flex justify-between text-xs">
+                                <span className="text-gray-500">Capacity:</span>
+                                <span className="font-medium text-gray-700">{subroom.roomCapactiy}</span>
+                              </div>
+                              <div className="flex justify-between text-xs">
+                                <span className="text-gray-500">Type:</span>
+                                <span className="font-medium text-gray-700">{subroom.roomType}</span>
+                              </div>
+                              {subroom.parentId && (
+                                <div className="flex justify-between text-xs">
+                                  <span className="text-gray-500">Parent Room:</span>
+                                  <span className="font-medium text-gray-700">{subroom.parentId}</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
