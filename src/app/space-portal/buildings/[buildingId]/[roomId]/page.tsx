@@ -48,7 +48,7 @@ function RoomPage() {
     if (!roomId || !acadmeicYear || !acadmeicSession || !academicSessionStartDate || !academicSessionEndDate) return;
     const requestbody = {
       roomID: roomId,
-      subroomID: subRoomId ?? 0,
+      subroomID: subRoomId ?? "",
       academicYr: acadmeicYear,
       acadSess: acadmeicSession,
       startDate: academicSessionStartDate,

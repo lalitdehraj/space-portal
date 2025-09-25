@@ -5,8 +5,11 @@ import { Building, Room, Maintenance, RoomInfo, Occupant } from "@/types";
 import { callApi } from "@/utils/apiIntercepter";
 import { URL_NOT_FOUND } from "@/constants";
 import { useSelector } from "react-redux";
+import { encrypt } from "@/utils/encryption";
+import { useRouter } from "next/navigation";
 
 export function AdvancedSearch({ onClose }: { onClose: () => void }) {
+  const router = useRouter();
   const academicYear = useSelector((state: any) => state.dataState.selectedAcademicYear);
   const acadSession = useSelector((state: any) => state.dataState.selectedAcademicSession);
 
@@ -18,7 +21,6 @@ export function AdvancedSearch({ onClose }: { onClose: () => void }) {
   const [loading, setLoading] = useState(false);
   const [filteredRooms, setFilteredRooms] = useState<Room[]>([]);
   const [subroomData, setSubroomData] = useState<Record<string, Room[]>>({});
-  const [hoveredRoomId, setHoveredRoomId] = useState<string | null>(null);
   const [subroomCache, setSubroomCache] = useState<Record<string, Room[]>>({});
   const [clickedRoom, setClickedRoom] = useState<Room | null>(null);
   const [clickedRoomSubrooms, setClickedRoomSubrooms] = useState<Room[]>([]);
@@ -208,6 +210,8 @@ export function AdvancedSearch({ onClose }: { onClose: () => void }) {
    */
   const handleRoomClick = async (room: Room) => {
     if (!room.hasSubroom) {
+      router.push(`/space-portal/buildings/${encrypt(room.buildingId)}/${encrypt(room.roomId)}`);
+      onClose();
       return; // Don't show subrooms for rooms that don't have them
     }
 
@@ -375,6 +379,10 @@ export function AdvancedSearch({ onClose }: { onClose: () => void }) {
       setLoading(false);
     }
   };
+  const handleSubroomClick = (subroom: Room) => {
+    router.push(`/space-portal/buildings/${encrypt(subroom.buildingId)}/${encrypt(`${subroom.parentId}|${subroom.roomId}`)}`);
+    onClose();
+  };
 
   const today = moment().format("YYYY-MM-DD");
   const nowTime = moment().format("HH:mm");
@@ -531,15 +539,12 @@ export function AdvancedSearch({ onClose }: { onClose: () => void }) {
                 ) : (
                   <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                     {filteredRooms.map((room) => {
-                      const isHovered = hoveredRoomId === room.roomId;
                       const availableSubrooms = subroomData[room.roomId] || [];
 
                       return (
                         <div
                           key={`${room.buildingId}-${room.roomId}-${room.parentId || "main"}`}
                           className="bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden relative cursor-pointer"
-                          onMouseEnter={() => (room.hasSubroom ? setHoveredRoomId(room.roomId) : null)}
-                          onMouseLeave={() => (room.hasSubroom ? setHoveredRoomId(null) : null)}
                           onClick={() => handleRoomClick(room)}
                         >
                           <div className="p-4">
@@ -566,21 +571,6 @@ export function AdvancedSearch({ onClose }: { onClose: () => void }) {
                               </div>
                             </div>
                           </div>
-
-                          {/* Subroom Hover Tooltip */}
-                          {room.hasSubroom && isHovered && availableSubrooms.length > 0 && (
-                            <div className="absolute top-full left-0 right-0 bg-white border border-gray-200 rounded-lg shadow-lg z-10 mt-1 p-3">
-                              <h5 className="font-semibold text-sm text-gray-800 mb-2">Available Subrooms:</h5>
-                              <div className="space-y-1">
-                                {availableSubrooms.map((subroom) => (
-                                  <div key={subroom.roomId} className="flex justify-between text-xs">
-                                    <span className="text-gray-700">{subroom.roomName}</span>
-                                    <span className="text-gray-500">Cap: {subroom.roomCapactiy}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
                         </div>
                       );
                     })}
@@ -658,6 +648,7 @@ export function AdvancedSearch({ onClose }: { onClose: () => void }) {
                       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                         {clickedRoomSubrooms.map((subroom) => (
                           <div
+                            onClick={() => handleSubroomClick(subroom)}
                             key={subroom.roomId}
                             className="bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200 p-4"
                           >
