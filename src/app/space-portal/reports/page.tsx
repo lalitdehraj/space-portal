@@ -760,9 +760,9 @@ function GenerateReportForm({ onClosePressed, startJob, setJobId, setReady, setP
                     <option value={"thisWeek"}>This Week</option>
                     <option value={"thisMonth"}>This Month</option>
                     <option value={"active"}>Active Session</option>
-                    <option value={"year"}>Academic Year</option>
+                    {/* <option value={"year"}>Academic Year</option> */}
                     <option value={"session"}>Academic Session</option>
-                    <option value={"custom"}>Custom Duration</option>
+                    {/* <option value={"custom"}>Custom Duration</option> */}
                   </select>
                 </div>
                 {timePeriod === "year" && (

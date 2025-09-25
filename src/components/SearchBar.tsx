@@ -72,7 +72,7 @@ export function AdvancedSearch({ onClose }: { onClose: () => void }) {
         for (const room of allRooms) {
           const res = await callApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, {
             roomID: room.parentId ?? room.roomId,
-            subroomID: room.parentId ? room.roomId : 0,
+            subroomID: room.parentId ? room.roomId : "",
             academicYr: academicYear,
             acadSess: acadSession,
             startDate,
@@ -194,7 +194,7 @@ export function AdvancedSearch({ onClose }: { onClose: () => void }) {
         {/* Header */}
         <div className="flex justify-between items-center p-6 border-b border-gray-200 bg-white">
           <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center">
+            <div className="w-8 h-8  rounded-lg flex items-center justify-center">
               <img src="/images/bx-filter-alt.svg" alt="Filter" className="h-4 w-4 text-white" />
             </div>
             <h2 className="text-xl font-semibold text-gray-800">Advanced Search</h2>
