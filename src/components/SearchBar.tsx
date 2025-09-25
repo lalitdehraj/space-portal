@@ -1,7 +1,7 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import moment from "moment";
-import { Building, Room, RoomInfo } from "@/types";
+import { Building, Room, Maintenance, RoomInfo, Occupant } from "@/types";
 import { callApi } from "@/utils/apiIntercepter";
 import { URL_NOT_FOUND } from "@/constants";
 import { useSelector } from "react-redux";
@@ -9,24 +9,36 @@ import { useSelector } from "react-redux";
 export function AdvancedSearch({ onClose }: { onClose: () => void }) {
   const academicYear = useSelector((state: any) => state.dataState.selectedAcademicYear);
   const acadSession = useSelector((state: any) => state.dataState.selectedAcademicSession);
+
+  // State management
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [allRooms, setAllRooms] = useState<Room[]>([]);
+  const [maintenanceRecords, setMaintenanceRecords] = useState<Maintenance[]>([]);
   const [roomInfos, setRoomInfos] = useState<Record<string, RoomInfo>>({});
   const [loading, setLoading] = useState(false);
+  const [filteredRooms, setFilteredRooms] = useState<Room[]>([]);
+  const [subroomData, setSubroomData] = useState<Record<string, Room[]>>({});
+  const [hoveredRoomId, setHoveredRoomId] = useState<string | null>(null);
+  const [subroomCache, setSubroomCache] = useState<Record<string, Room[]>>({});
 
   // Filters
   const [capacity, setCapacity] = useState("");
   const [status, setStatus] = useState<string>("");
   const [roomType, setRoomType] = useState<string>("");
-  const [availabilityOn, setAvailabilityOn] = useState(false);
-  const [startDate, setStartDate] = useState(moment().format("YYYY-MM-DD"));
-  const [endDate, setEndDate] = useState(moment().format("YYYY-MM-DD"));
-  const [startTime, setStartTime] = useState("09:00");
-  const [endTime, setEndTime] = useState("17:00");
+  const [searchDate, setSearchDate] = useState(moment().format("YYYY-MM-DD"));
+  const [startTime, setStartTime] = useState(moment().format("HH:mm"));
+  const [endTime, setEndTime] = useState(moment().format("HH:mm"));
 
-  const [filteredRooms, setFilteredRooms] = useState<Room[]>([]);
-  const [subroomsForAdvancedSearch, setSubroomsForAdvancedSearch] = useState<Room[]>([]);
-  const [loadingSubrooms, setLoadingSubrooms] = useState(false);
+  // Fetch maintenance records
+  const fetchMaintenanceRecords = async () => {
+    try {
+      const response = await callApi<Maintenance[]>(process.env.NEXT_PUBLIC_GET_MAINTENANCE_DATA || URL_NOT_FOUND);
+      setMaintenanceRecords(response.success ? response.data || [] : []);
+    } catch (error) {
+      console.error("Error fetching maintenance records:", error);
+      setMaintenanceRecords([]);
+    }
+  };
 
   // Load buildings + rooms
   useEffect(() => {
@@ -37,6 +49,7 @@ export function AdvancedSearch({ onClose }: { onClose: () => void }) {
           acadSession: `${acadSession}`,
           acadYear: `${academicYear}`,
         });
+
         if (!buildingsRes.success) return;
         setBuildings(buildingsRes.data || []);
 
@@ -50,7 +63,7 @@ export function AdvancedSearch({ onClose }: { onClose: () => void }) {
           if (res.success && res.data) rooms.push(...res.data);
         }
         setAllRooms(rooms);
-        setFilteredRooms(rooms); // Show all rooms initially
+        setFilteredRooms(rooms);
       } catch (err) {
         console.error("Error fetching buildings/rooms:", err);
       } finally {
@@ -59,134 +72,279 @@ export function AdvancedSearch({ onClose }: { onClose: () => void }) {
     };
 
     fetchBuildingsAndRooms();
+    fetchMaintenanceRecords();
   }, [acadSession, academicYear]);
 
-  // Fetch room info for availability
-  useEffect(() => {
-    const fetchRoomInfos = async () => {
-      if (!availabilityOn) return;
-      if (Object.keys(roomInfos).length > 0) return;
+  /**
+   * Memoized maintenance room IDs for current search parameters
+   */
+  const maintenanceRoomIds = useMemo(() => {
+    if (!maintenanceRecords || !searchDate || !startTime || !endTime) return new Set<string>();
 
-      try {
-        const infos: Record<string, RoomInfo> = {};
-        for (const room of allRooms) {
-          const res = await callApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, {
-            roomID: room.parentId ?? room.roomId,
-            subroomID: room.parentId ? room.roomId : "",
-            academicYr: academicYear,
-            acadSess: acadSession,
-            startDate,
-            endDate,
-          });
-          if (res.success && res.data) {
-            infos[room.roomId] = res.data;
+    const filterStart = moment(`${searchDate} ${startTime}`);
+    const filterEnd = moment(`${searchDate} ${endTime}`);
+
+    return new Set(
+      maintenanceRecords
+        .filter((rec) => {
+          if (!rec.isMainteneceActive) return false;
+
+          // Parse maintenance date (ISO format: 2025-09-23T00:00:00Z)
+          const maintenanceDate = moment(rec.maintanceDate).format("YYYY-MM-DD");
+
+          // Parse maintenance times correctly from ISO format
+          // The time format is "0001-01-02T09:00:00Z" - extract time part manually
+          const maintenanceStartTime = rec.startTime.split("T")[1]?.split("Z")[0]?.substring(0, 5) || "00:00";
+          const maintenanceEndTime = rec.endTime.split("T")[1]?.split("Z")[0]?.substring(0, 5) || "00:00";
+
+          const recStart = moment(`${maintenanceDate} ${maintenanceStartTime}`);
+          const recEnd = moment(`${maintenanceDate} ${maintenanceEndTime}`);
+
+          return recEnd.isAfter(filterStart) && recStart.isBefore(filterEnd);
+        })
+        .map((rec) => `${rec.buildingId}|${rec.roomid}`)
+    );
+  }, [maintenanceRecords, searchDate, startTime, endTime]);
+
+  /**
+   * Consolidated room filtering function - handles both maintenance and regular filtering
+   */
+  const roomUnderMaintenece = ({ status, capacity, roomType }: { status?: string; capacity?: string; roomType?: string }) => {
+    let filtered = allRooms;
+
+    // Handle maintenance status using memoized maintenance room IDs
+    if (status && status.toLowerCase() === "maintenance") {
+      filtered = filtered.filter((room) => maintenanceRoomIds.has(`${room.buildingId}|${room.roomId}`));
+    }
+    // Apply additional filters
+    if (capacity) {
+      filtered = filtered.filter((room) => room.roomCapactiy >= parseInt(capacity));
+    }
+
+    if (roomType) {
+      filtered = filtered.filter((room) => room.roomType?.toLowerCase() === roomType.toLowerCase());
+    }
+
+    return filtered;
+  };
+
+  /**
+   * Fetch RoomInfo data for rooms with caching
+   */
+  const fetchRoomInfos = async (rooms: Room[], searchDate: string): Promise<Record<string, RoomInfo>> => {
+    const roomInfoMap: Record<string, RoomInfo> = {};
+
+    try {
+      const roomInfoPromises = rooms.map(async (room) => {
+        const requestBody = {
+          roomID: room.roomId,
+          subroomID: "",
+          academicYr: academicYear,
+          acadSess: acadSession,
+          startDate: searchDate,
+          endDate: searchDate,
+        };
+
+        try {
+          const response = await callApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, requestBody);
+          if (response.success && response.data) {
+            return { roomId: room.roomId, roomInfo: response.data };
+          }
+        } catch (error) {
+          console.error(`Error fetching room info for room ${room.roomId}:`, error);
+        }
+        return null;
+      });
+
+      const results = await Promise.all(roomInfoPromises);
+      results.forEach((result) => {
+        if (result) {
+          roomInfoMap[result.roomId] = result.roomInfo;
+        }
+      });
+    } catch (error) {
+      console.error("Error fetching room infos:", error);
+    }
+
+    return roomInfoMap;
+  };
+
+  /**
+   * Fetch subrooms with caching
+   */
+  const fetchSubrooms = async (roomId: string, buildingId: string): Promise<Room[]> => {
+    const cacheKey = `${roomId}-${buildingId}`;
+    if (subroomCache[cacheKey]) {
+      return subroomCache[cacheKey];
+    }
+
+    try {
+      const requestBody = {
+        roomID: roomId,
+        buildingNo: buildingId,
+        acadSess: acadSession,
+        acadYr: academicYear,
+      };
+
+      const response = await callApi<Room[]>(process.env.NEXT_PUBLIC_GET_SUBROOMS_LIST || URL_NOT_FOUND, requestBody);
+      if (response.success && response.data) {
+        setSubroomCache((prev) => ({
+          ...prev,
+          [cacheKey]: response.data!,
+        }));
+        return response.data;
+      }
+    } catch (error) {
+      console.error(`Error fetching subrooms for room ${roomId}:`, error);
+    }
+    return [];
+  };
+
+  /**
+   * Consolidated function to check if a room/subroom is occupied during time frame
+   */
+  const isOccupiedDuringTimeFrame = (
+    occupants: Occupant[] | undefined,
+    searchDate: string,
+    startTime: string,
+    endTime: string,
+    subroomId?: string
+  ): boolean => {
+    if (!occupants) return false;
+
+    const filterStart = moment(`${searchDate} ${startTime}`);
+    const filterEnd = moment(`${searchDate} ${endTime}`);
+
+    return occupants.some((occupant) => {
+      // If checking for specific subroom, filter by subroomId
+      if (subroomId && occupant.subroomId !== subroomId) {
+        return false;
+      }
+
+      const occupantDate = moment(occupant.scheduledDate).format("YYYY-MM-DD");
+      if (occupantDate !== searchDate) {
+        return false;
+      }
+
+      const occupantStart = moment(`${occupantDate} ${occupant.startTime}`);
+      const occupantEnd = moment(`${occupantDate} ${occupant.endTime}`);
+
+      return occupantEnd.isAfter(filterStart) && occupantStart.isBefore(filterEnd);
+    });
+  };
+
+  /**
+   * Consolidated function to handle room availability checking
+   */
+  const getAvailableRooms = async (rooms: Room[], searchDate: string, startTime: string, endTime: string) => {
+    const nonMaintenanceRooms = rooms.filter((room) => !maintenanceRoomIds.has(`${room.buildingId}|${room.roomId}`));
+
+    // Fetch room infos for occupancy checking
+    const roomInfosData = await fetchRoomInfos(nonMaintenanceRooms, searchDate);
+    setRoomInfos(roomInfosData);
+
+    const availableRooms: Room[] = [];
+    const subroomData: Record<string, Room[]> = {};
+
+    for (const room of nonMaintenanceRooms) {
+      if (room.hasSubroom) {
+        // Handle subroom logic
+        const subrooms = await fetchSubrooms(room.roomId, room.buildingId);
+
+        if (subrooms.length > 0) {
+          const roomInfo = roomInfosData[room.roomId];
+          const availableSubrooms = subrooms.filter(
+            (subroom) => !isOccupiedDuringTimeFrame(roomInfo?.occupants, searchDate, startTime, endTime, subroom.roomId)
+          );
+
+          if (availableSubrooms.length > 0) {
+            availableRooms.push(room);
+            subroomData[room.roomId] = availableSubrooms;
           }
         }
-        setRoomInfos(infos);
-      } catch (err) {
-        console.error("Error fetching room info:", err);
+      } else {
+        // Handle regular rooms
+        const roomInfo = roomInfosData[room.roomId];
+        if (!isOccupiedDuringTimeFrame(roomInfo?.occupants, searchDate, startTime, endTime)) {
+          availableRooms.push(room);
+        }
       }
-    };
+    }
 
-    fetchRoomInfos();
-  }, [availabilityOn, allRooms, startDate, endDate]);
-
-  // Availability check
-  const isRoomAvailable = (roomId: string) => {
-    const info = roomInfos[roomId];
-    if (!info || !info.occupants) return true;
-
-    return !info.occupants.some((occ) => {
-      const sameDay = moment(occ.scheduledDate).isBetween(startDate, endDate, "day", "[]");
-      if (!sameDay) return false;
-
-      const occStart = moment(occ.startTime, "HH:mm");
-      const occEnd = moment(occ.endTime, "HH:mm");
-      const checkStart = moment(startTime, "HH:mm");
-      const checkEnd = moment(endTime, "HH:mm");
-
-      return checkStart.isBefore(occEnd) && checkEnd.isAfter(occStart);
-    });
+    return { availableRooms, subroomData };
   };
 
-  // Filter function
+  // Main search function
   const handleSearch = async () => {
-    if (availabilityOn) {
-      const now = moment();
-      const start = moment(`${startDate} ${startTime}`);
-      const end = moment(`${endDate} ${endTime}`);
+    const now = moment();
+    const start = moment(`${searchDate} ${startTime}`);
+    const end = moment(`${searchDate} ${endTime}`);
 
-      if (start.isBefore(now)) {
-        alert("Start date/time cannot be in the past.");
-        return;
-      }
-      if (end.isBefore(start)) {
-        alert("End date/time cannot be before start date/time.");
-        return;
-      }
+    if (start.isBefore(now)) {
+      alert("Start date/time cannot be in the past.");
+      return;
+    }
+    if (end.isBefore(start)) {
+      alert("End time cannot be before start time.");
+      return;
     }
 
-    // Filter rooms based on criteria
-    const matchingRooms = allRooms.filter((room) => {
-      if (capacity && room.roomCapactiy < parseInt(capacity)) return false;
-      if (status && room.status?.toLowerCase() !== status?.toLowerCase()) return false;
-      if (roomType && room.roomType?.toLowerCase() !== roomType?.toLowerCase()) return false;
-      if (availabilityOn && !isRoomAvailable(room.roomId)) return false;
-      return true;
-    });
+    setLoading(true);
 
-    // Separate parent rooms from regular rooms
-    const parentRooms = matchingRooms.filter((room) => room.hasSubroom);
-    const regularRooms = matchingRooms.filter((room) => !room.hasSubroom);
-
-    // Set regular rooms first
-    setFilteredRooms(regularRooms);
-
-    // Fetch subrooms for parent rooms
-    if (parentRooms.length > 0) {
-      setLoadingSubrooms(true);
-
-      // Add 250ms delay before making API calls
-      await new Promise((resolve) => setTimeout(resolve, 250));
-
-      try {
-        // Get unique buildings from parent rooms
-        const uniqueBuildings = [...new Set(parentRooms.map((room) => room.buildingId))];
-
-        // Fetch all subrooms for each building at once using blank roomID
-        const buildingSubroomPromises = uniqueBuildings.map(async (buildingId) => {
-          const response = await callApi<Room[]>(process.env.NEXT_PUBLIC_GET_SUBROOMS_LIST || URL_NOT_FOUND, {
-            roomID: "", // Use blank roomID to get all subrooms for the building
-            buildingNo: buildingId,
-            acadSess: acadSession,
-            acadYr: academicYear,
-          });
-          return response.success ? response.data || [] : [];
+    try {
+      if (status && status.toLowerCase() === "maintenance") {
+        // Instant maintenance search - no API calls needed
+        const maintenanceRooms = roomUnderMaintenece({
+          status,
+          capacity,
+          roomType,
         });
+        setFilteredRooms(maintenanceRooms);
+        setSubroomData({});
+        setLoading(false);
+        return;
+      } else if (status && status.toLowerCase() === "available") {
+        // Available rooms search - requires API calls
+        const { availableRooms, subroomData: subroomDataResult } = await getAvailableRooms(allRooms, searchDate, startTime, endTime);
 
-        const buildingSubroomArrays = await Promise.all(buildingSubroomPromises);
-        const allBuildingSubrooms = buildingSubroomArrays.flat();
+        // Apply additional filters
+        let finalFilteredRooms = availableRooms;
 
-        // Filter subrooms that belong to the parent rooms we're searching for
-        const relevantSubrooms = allBuildingSubrooms.filter((subroom) => parentRooms.some((parentRoom) => parentRoom.roomId === subroom.parentId));
+        if (capacity) {
+          finalFilteredRooms = finalFilteredRooms.filter((room) => room.roomCapactiy >= parseInt(capacity));
+        }
 
-        setSubroomsForAdvancedSearch(relevantSubrooms);
+        if (roomType) {
+          finalFilteredRooms = finalFilteredRooms.filter((room) => room.roomType?.toLowerCase() === roomType.toLowerCase());
+        }
 
-        // Update filtered rooms to include subrooms
-        setFilteredRooms([...regularRooms, ...relevantSubrooms]);
-      } catch (error) {
-        console.error("Error fetching subrooms for advanced search:", error);
-        setSubroomsForAdvancedSearch([]);
-      } finally {
-        setLoadingSubrooms(false);
+        setFilteredRooms(finalFilteredRooms);
+        setSubroomData(subroomDataResult);
+      } else {
+        // Apply the rest of the filters (except status) to allRooms
+        let filtered = allRooms;
+
+        if (capacity) {
+          filtered = filtered.filter((room) => room.roomCapactiy >= parseInt(capacity));
+        }
+
+        if (roomType) {
+          filtered = filtered.filter((room) => room.roomType?.toLowerCase() === roomType.toLowerCase());
+        }
+
+        setFilteredRooms(filtered);
+        setSubroomData({});
       }
-    } else {
-      setSubroomsForAdvancedSearch([]);
+    } catch (error) {
+      console.error("Error in handleSearch:", error);
+      setFilteredRooms([]);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const today = moment().format("YYYY-MM-DD"); // today
-  const nowTime = moment().format("HH:mm"); // current time
+  const today = moment().format("YYYY-MM-DD");
+  const nowTime = moment().format("HH:mm");
 
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
@@ -194,7 +352,7 @@ export function AdvancedSearch({ onClose }: { onClose: () => void }) {
         {/* Header */}
         <div className="flex justify-between items-center p-6 border-b border-gray-200 bg-white">
           <div className="flex items-center space-x-3">
-            <div className="w-8 h-8  rounded-lg flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center">
               <img src="/images/bx-filter-alt.svg" alt="Filter" className="h-4 w-4 text-white" />
             </div>
             <h2 className="text-xl font-semibold text-gray-800">Advanced Search</h2>
@@ -233,10 +391,9 @@ export function AdvancedSearch({ onClose }: { onClose: () => void }) {
                     onChange={(e) => setStatus(e.target.value)}
                     className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                   >
-                    <option value="">All Status</option>
-                    <option value="allocated">Allocated</option>
-                    <option value="unallocated">Unallocated</option>
-                    <option value="maintenance">Maintenance</option>
+                    <option value="">All Rooms</option>
+                    <option value="maintenance">Under maintenance</option>
+                    <option value="available">Available</option>
                   </select>
                 </div>
 
@@ -249,7 +406,7 @@ export function AdvancedSearch({ onClose }: { onClose: () => void }) {
                     className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                   >
                     <option value="">All Types</option>
-                    {[...new Set(allRooms.map((r) => r.roomType))].map((type) => (
+                    {[...new Set(allRooms.filter((r) => r.roomType !== "").map((r) => r.roomType))].map((type) => (
                       <option key={type} value={type}>
                         {type}
                       </option>
@@ -257,64 +414,37 @@ export function AdvancedSearch({ onClose }: { onClose: () => void }) {
                   </select>
                 </div>
 
-                {/* Availability Filter */}
-                <div className="space-y-3">
-                  <div className="flex items-center space-x-3">
+                {/* Date Filter */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700">Search Date</label>
+                  <input
+                    type="date"
+                    value={searchDate}
+                    min={today}
+                    onChange={(e) => setSearchDate(e.target.value)}
+                    className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  />
+                </div>
+
+                {/* Time Range Filter */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700">Time Range</label>
+                  <div className="flex space-x-2">
                     <input
-                      type="checkbox"
-                      id="availability"
-                      checked={availabilityOn}
-                      onChange={() => setAvailabilityOn(!availabilityOn)}
-                      className="w-4 h-4 text-orange-600 bg-gray-100 border-gray-300 rounded focus:ring-orange-500 focus:ring-2"
+                      type="time"
+                      value={startTime}
+                      min={searchDate === today ? nowTime : "00:00"}
+                      onChange={(e) => setStartTime(e.target.value)}
+                      className="flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                     />
-                    <label htmlFor="availability" className="text-sm font-medium text-gray-700">
-                      Check Availability
-                    </label>
+                    <input
+                      type="time"
+                      value={endTime}
+                      min={startTime}
+                      onChange={(e) => setEndTime(e.target.value)}
+                      className="flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                    />
                   </div>
-
-                  {availabilityOn && (
-                    <div className="space-y-3 pl-7">
-                      <div className="space-y-2">
-                        <label className="text-xs font-medium text-gray-600 uppercase tracking-wide">Date Range</label>
-                        <div className="space-y-2">
-                          <input
-                            type="date"
-                            value={startDate}
-                            min={today}
-                            onChange={(e) => setStartDate(e.target.value)}
-                            className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                          />
-                          <input
-                            type="date"
-                            value={endDate}
-                            min={startDate || today}
-                            onChange={(e) => setEndDate(e.target.value)}
-                            className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <label className="text-xs font-medium text-gray-600 uppercase tracking-wide">Time Range</label>
-                        <div className="flex space-x-2">
-                          <input
-                            type="time"
-                            value={startTime}
-                            min={startDate === today ? nowTime : "00:00"}
-                            onChange={(e) => setStartTime(e.target.value)}
-                            className="flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                          />
-                          <input
-                            type="time"
-                            value={endTime}
-                            min={startTime}
-                            onChange={(e) => setEndTime(e.target.value)}
-                            className="flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  )}
                 </div>
               </div>
             </div>
@@ -343,11 +473,11 @@ export function AdvancedSearch({ onClose }: { onClose: () => void }) {
               </div>
 
               <div className="overflow-y-auto" style={{ maxHeight: "calc(100vh - 280px)" }}>
-                {loading || loadingSubrooms ? (
+                {loading ? (
                   <div className="flex items-center justify-center py-12">
                     <div className="flex items-center space-x-3">
                       <div className="w-6 h-6 border-2 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
-                      <span className="text-gray-600">Loading rooms...</span>
+                      <span className="text-gray-600">Checking room availability...</span>
                     </div>
                   </div>
                 ) : filteredRooms.length === 0 ? (
@@ -370,28 +500,26 @@ export function AdvancedSearch({ onClose }: { onClose: () => void }) {
                     {filteredRooms.map((room) => {
                       const occupancyStatus = room.occupied / room.roomCapactiy;
                       const statusColor = occupancyStatus <= 0.1 ? "green" : occupancyStatus > 0.8 ? "red" : "yellow";
+                      const isHovered = hoveredRoomId === room.roomId;
+                      const availableSubrooms = subroomData[room.roomId] || [];
 
                       return (
                         <div
                           key={`${room.buildingId}-${room.roomId}-${room.parentId || "main"}`}
-                          className="bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden"
+                          className="bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden relative"
+                          onMouseEnter={() => (room.hasSubroom ? setHoveredRoomId(room.roomId) : null)}
+                          onMouseLeave={() => (room.hasSubroom ? setHoveredRoomId(null) : null)}
                         >
                           <div className="p-4">
                             <div className="flex items-start justify-between mb-3">
                               <div className="flex-1">
                                 <h4 className="font-semibold text-gray-800 text-sm mb-1 truncate">{room.roomName}</h4>
                                 <p className="text-xs text-gray-500 mb-1">Building ID: {room.buildingId}</p>
-                              </div>
-                              <div
-                                className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                                  room.status === "allocated"
-                                    ? "bg-green-100 text-green-800"
-                                    : room.status === "maintenance"
-                                    ? "bg-red-100 text-red-800"
-                                    : "bg-gray-100 text-gray-800"
-                                }`}
-                              >
-                                {room.status}
+                                {room.hasSubroom && availableSubrooms.length > 0 && (
+                                  <p className="text-xs text-blue-600 mb-1">
+                                    {availableSubrooms.length} subroom{availableSubrooms.length !== 1 ? "s" : ""} available
+                                  </p>
+                                )}
                               </div>
                             </div>
 
@@ -404,48 +532,23 @@ export function AdvancedSearch({ onClose }: { onClose: () => void }) {
                                 <span className="text-gray-500">Type:</span>
                                 <span className="font-medium text-gray-700">{room.roomType}</span>
                               </div>
-                              <div className="flex justify-between text-xs">
-                                <span className="text-gray-500">Occupied:</span>
-                                <span className="font-medium text-gray-700">{room.occupied}</span>
-                              </div>
                             </div>
-
-                            {/* Occupancy Progress Bar */}
-                            <div className="mt-3">
-                              <div className="flex justify-between text-xs mb-1">
-                                <span className="text-gray-500">Occupancy</span>
-                                <span
-                                  className={`font-medium ${
-                                    statusColor === "green" ? "text-green-600" : statusColor === "red" ? "text-red-600" : "text-yellow-600"
-                                  }`}
-                                >
-                                  {Math.round(occupancyStatus * 100)}%
-                                </span>
-                              </div>
-                              <div className="w-full bg-gray-200 rounded-full h-2">
-                                <div
-                                  className={`h-2 rounded-full ${
-                                    statusColor === "green" ? "bg-green-500" : statusColor === "red" ? "bg-red-500" : "bg-yellow-500"
-                                  }`}
-                                  style={{ width: `${Math.min(occupancyStatus * 100, 100)}%` }}
-                                ></div>
-                              </div>
-                            </div>
-
-                            {/* Availability Status */}
-                            {availabilityOn && (
-                              <div className="mt-3 pt-3 border-t border-gray-100">
-                                <div
-                                  className={`flex items-center space-x-2 text-xs font-medium ${
-                                    isRoomAvailable(room.roomId) ? "text-green-600" : "text-red-600"
-                                  }`}
-                                >
-                                  <div className={`w-2 h-2 rounded-full ${isRoomAvailable(room.roomId) ? "bg-green-500" : "bg-red-500"}`}></div>
-                                  <span>{isRoomAvailable(room.roomId) ? "Available" : "Not Available"}</span>
-                                </div>
-                              </div>
-                            )}
                           </div>
+
+                          {/* Subroom Hover Tooltip */}
+                          {room.hasSubroom && isHovered && availableSubrooms.length > 0 && (
+                            <div className="absolute top-full left-0 right-0 bg-white border border-gray-200 rounded-lg shadow-lg z-10 mt-1 p-3">
+                              <h5 className="font-semibold text-sm text-gray-800 mb-2">Available Subrooms:</h5>
+                              <div className="space-y-1">
+                                {availableSubrooms.map((subroom) => (
+                                  <div key={subroom.roomId} className="flex justify-between text-xs">
+                                    <span className="text-gray-700">{subroom.roomName}</span>
+                                    <span className="text-gray-500">Cap: {subroom.roomCapactiy}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       );
                     })}
