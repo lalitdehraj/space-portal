@@ -1,21 +1,13 @@
 "use client";
 import { useSession } from "next-auth/react";
 import React, { useEffect, useState } from "react";
-import {
-  Mail,
-  Phone,
-  Building2,
-  CalendarCheck,
-  Clock,
-  CheckCircle2,
-  AlertTriangle,
-  ArrowRightCircle,
-} from "lucide-react";
+import { Mail, Phone, Building2, CalendarCheck, Clock, CheckCircle2, AlertTriangle, ArrowRightCircle } from "lucide-react";
 import { callApi } from "@/utils/apiIntercepter";
 import { UserProfile } from "@/types";
 import { URL_NOT_FOUND } from "@/constants";
 import { useDispatch, useSelector } from "react-redux";
 import { setUser } from "@/app/feature/dataSlice";
+import { useRouter } from "next/navigation";
 
 // Dummy data to simulate API responses for the faculty member's profile
 const dummyFacultyData = {
@@ -65,6 +57,7 @@ const dummyFacultyData = {
 };
 
 function ProfilePage() {
+  const router = useRouter();
   const { data } = useSession();
   const dispatcher = useDispatch();
   const userEmail = data?.user?.email;
@@ -76,15 +69,10 @@ function ProfilePage() {
       if (!email) return;
       setIsLoadingUser(true);
       try {
-        const response = await callApi<UserProfile[]>(
-          process.env.NEXT_PUBLIC_GET_USER || URL_NOT_FOUND
-        );
+        const response = await callApi<UserProfile[]>(process.env.NEXT_PUBLIC_GET_USER || URL_NOT_FOUND);
         if (response.success) {
-          const filteredUsers = response.data?.filter(
-            (u) =>
-              u.userEmail.toLowerCase().trim() === email.toLowerCase().trim()
-          );
-          dispatcher(setUser(filteredUsers?.[0] || null))
+          const filteredUsers = response.data?.filter((u) => u.userEmail.toLowerCase().trim() === email.toLowerCase().trim());
+          dispatcher(setUser(filteredUsers?.[0] || null));
         }
       } catch (error) {
         console.error("Error fetching user profile:", error);
@@ -114,25 +102,17 @@ function ProfilePage() {
       <div className="flex flex-col md:flex-row items-center md:items-start space-y-6 md:space-y-0 md:space-x-8 pb-8 border-b border-gray-200 mb-8">
         <div className="relative w-40 h-40 rounded-full overflow-hidden border-4 border-white shadow-md">
           <img
-            src={
-              user?.userImage
-                ? `data:image/png;base64,${user?.userImage}`
-                : `https://placehold.co/150x150/E2E8F0/A0AEC0?text=Munipal`
-            }
+            src={user?.userImage ? `data:image/png;base64,${user?.userImage}` : `https://placehold.co/150x150/E2E8F0/A0AEC0?text=Munipal`}
             alt={`${data?.user?.name}'s profile`}
             className="w-full h-full object-cover"
           />
         </div>
         <div className="flex flex-col items-center md:items-start text-center md:text-left space-y-2">
-          <h1 className="text-3xl font-bold text-gray-800">
-            {data?.user?.name}
-          </h1>
+          <h1 className="text-3xl font-bold text-gray-800">{data?.user?.name}</h1>
           {isLoadingUser ? (
             <div className="h-6 bg-gray-200 rounded w-32 animate-pulse"></div>
           ) : (
-            <p className="text-lg text-orange-600 font-semibold">
-              {user?.userPosition}
-            </p>
+            <p className="text-lg text-orange-600 font-semibold">{user?.userPosition}</p>
           )}
           <div className="flex flex-col space-y-2 pt-4 text-sm text-gray-600">
             <div className="flex items-center space-x-2">
@@ -223,7 +203,10 @@ function ProfilePage() {
 
       {/* Action Button */}
       <div className="flex justify-end mt-8">
-        <button className="flex items-center space-x-2 px-6 py-3 bg-orange-500 text-white font-semibold rounded-lg shadow-md hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-opacity-50 transition-colors duration-200">
+        <button
+          onClick={() => router.push("/space-portal/buildings")}
+          className="flex items-center space-x-2 px-6 py-3 bg-orange-500 text-white font-semibold rounded-lg shadow-md hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-opacity-50 transition-colors duration-200"
+        >
           <span>Manage Spaces</span>
           <ArrowRightCircle size={18} />
         </button>

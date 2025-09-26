@@ -71,16 +71,9 @@ interface SideNavProps {
   onClose: () => void;
 }
 
-const NavItem: FC<NavLink & { onClose: () => void }> = ({
-  href,
-  iconSrc,
-  alt,
-  title,
-  onClose,
-}) => {
+const NavItem: FC<NavLink & { onClose: () => void }> = ({ href, iconSrc, alt, title, onClose }) => {
   const pathname = usePathname();
-  const isActive =
-    pathname.replace("%20", " ") === href || pathname.includes(href);
+  const isActive = pathname.replace("%20", " ") === href || pathname.includes(href);
 
   const dispatcher = useDispatch();
   return (
@@ -88,32 +81,26 @@ const NavItem: FC<NavLink & { onClose: () => void }> = ({
       onClickCapture={() => dispatcher(setHeaderTextId(title))}
       href={href}
       className={`ml-10 flex items-center rounded p-2 text-sm transition-colors duration-200 hover:bg-gray-200 ${
-        isActive
-          ? "border-l-4 border-[#F26722] font-medium text-gray-800"
-          : "border-l-4 border-transparent text-gray-700"
+        isActive ? "border-l-4 border-[#F26722] font-medium text-gray-800" : "border-l-4 border-transparent text-gray-700"
       }`}
       onClick={onClose}
     >
-      {iconSrc && (
-        <img src={iconSrc} alt={alt} className="mr-3 h-[20px] w-[20px]" />
-      )}
+      {iconSrc && <img src={iconSrc} alt={alt} className="mr-3 h-[20px] w-[20px]" />}
       {title}
     </Link>
   );
 };
 
 const SideNav: FC<SideNavProps> = ({ onClose }) => {
-  const dispatcher = useDispatch();
   const router = useRouter();
   const [userRoles, setUserRoles] = useState<string[]>([]);
   useEffect(() => {
     const fetchUserRoles = async () => {
-      const response = await callApi<UserProfile[]>(
-        process.env.NEXT_PUBLIC_GET_USER || URL_NOT_FOUND
-      );
+      const response = await callApi<UserProfile[]>(process.env.NEXT_PUBLIC_GET_USER || URL_NOT_FOUND);
       if (response.success) {
         const roles = response.data?.map((u) => u.userRole) || [];
-        const uniqueRoles = Array.from(new Set(roles));
+        const allRoles = roles.flatMap((role) => (role ? role.split("|") : []));
+        const uniqueRoles = Array.from(new Set(allRoles));
         setUserRoles(uniqueRoles);
       }
     };
@@ -131,11 +118,7 @@ const SideNav: FC<SideNavProps> = ({ onClose }) => {
           className="h-[52px] w-[160px] mt-6 mb-6 object-contain"
         />
         {/* Close button visible only on mobile */}
-        <button
-          onClick={onClose}
-          className="rounded-full p-2 md:hidden"
-          aria-label="Close menu"
-        >
+        <button onClick={onClose} className="rounded-full p-2 md:hidden" aria-label="Close menu">
           <X size={24} className="text-gray-600" />
         </button>
       </div>
@@ -148,9 +131,7 @@ const SideNav: FC<SideNavProps> = ({ onClose }) => {
         </div>
 
         <div className="flex flex-col border-t border-[#F26722] py-4">
-          <div className="px-8 pb-2 text-xs text-gray-500">
-            Space Management
-          </div>
+          <div className="px-8 pb-2 text-xs text-gray-500">Space Management</div>
           <div className="space-y-0.5">
             {spaceManagementLinks.map((link) => (
               <NavItem key={link.href} {...link} onClose={onClose} />

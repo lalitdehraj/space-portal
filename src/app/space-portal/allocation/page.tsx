@@ -147,20 +147,21 @@ function AllocationPage() {
     <div>
       <div className="flex flex-col md:flex-row justify-between mb-4">
         <h2 className="text-base font-semibold text-gray-800 md:ml-2">Room Allocations</h2>
-        {isActiveSession && (
-          <div className="flex items-center space-x-4">
-            <input
-              type="text"
-              placeholder="Search"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="border border-gray-300 rounded-md py-1 px-2 text-sm focus:outline-none text-gray-700 focus:ring-1 focus:ring-orange-500"
-            />
+
+        <div className="flex items-center space-x-4">
+          <input
+            type="text"
+            placeholder="Search"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="border border-gray-300 rounded-md py-1 px-2 text-sm focus:outline-none text-gray-700 focus:ring-1 focus:ring-orange-500"
+          />
+          {isActiveSession && (
             <button className="px-3 py-2 rounded-lg shadow-md transition duration-300 bg-orange-500 text-white hover:bg-orange-600" onClick={() => openForm()}>
               Add Allocation
             </button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Allocations Table */}

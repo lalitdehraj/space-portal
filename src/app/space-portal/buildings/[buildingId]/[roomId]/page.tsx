@@ -21,7 +21,7 @@ function RoomPage() {
   const acadmeicSession = useSelector((state: any) => state.dataState.selectedAcademicSession);
   const academicSessionStartDate = useSelector((state: any) => state.dataState.selectedAcademicSessionStartDate);
   const academicSessionEndDate = useSelector((state: any) => state.dataState.selectedAcademicSessionEndDate);
-
+  const isActiveSession = useSelector((state: any) => state.dataState.isActiveSession);
   const string = decrypt(params.roomId?.toString() || "");
   const buildingId = decrypt(params.buildingId?.toString() || "");
   const roomId = string.split("|")?.[0];
@@ -57,7 +57,7 @@ function RoomPage() {
     try {
       const res = await callApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, requestbody);
       const isAllocationAllowed = res.data?.managedBy?.split("|").some((d) => {
-        return d.toUpperCase() === userRole?.toUpperCase();
+        return userRole?.toUpperCase().split("|").includes(d.toUpperCase());
       });
       setIsManagedByThisUser(isAllocationAllowed || false);
       if (res.success) setRoomInfo(res.data);
@@ -257,7 +257,7 @@ function RoomPage() {
                 <div className="mt-8">
                   <div className="flex flex-row justify-between">
                     <h3 className="text-lg font-semibold mb-4 text-gray-500">Current Assignment</h3>
-                    {roomInfo.managedBy?.split("|").includes(userRole) && (
+                    {isManagedByThisUser && isActiveSession && (
                       <button
                         className="mt-4 flex h-fit items-center rounded-md bg-[#F26722] px-4 py-2 text-xs text-white shadow-md transition-all hover:bg-[#a5705a] md:mt-0"
                         onClick={() => setIsAllocationFormVisible(true)}
