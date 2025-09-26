@@ -78,7 +78,20 @@ function RoomPage() {
     try {
       const response = await callApi<Maintenance[]>(process.env.NEXT_PUBLIC_GET_MAINTENANCE_DATA || URL_NOT_FOUND);
       if (response.success) {
-        setMaintenanceData(response.data || []);
+        const allMaintenanceData = response.data || [];
+
+        // Filter maintenance data to only include records for this room
+        const filteredMaintenanceData = allMaintenanceData.filter((maintenance) => {
+          const isActive = maintenance.isMainteneceActive;
+
+          // Check if maintenance is for this room or its parent room
+          const isRoomMatch = maintenance.roomid === roomId;
+          const isParentMatch = roomInfo?.parentId && maintenance.roomid === roomInfo.parentId;
+
+          return isActive && (isRoomMatch || isParentMatch);
+        });
+
+        setMaintenanceData(filteredMaintenanceData);
       }
     } catch (error) {
       console.error("Error fetching maintenance data:", error);
@@ -87,7 +100,7 @@ function RoomPage() {
 
   useEffect(() => {
     fetchMaintenanceData();
-  }, [buildingId, roomId]);
+  }, [buildingId, roomId, roomInfo?.parentId]);
 
   /** Handle timetable slot click */
   const handleTimeTableClick = (date: string, slot: { start: string; end: string }) => {

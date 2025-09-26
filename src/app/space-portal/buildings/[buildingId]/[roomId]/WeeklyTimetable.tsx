@@ -280,7 +280,7 @@ function WeeklyTimetable({
                         // Check if maintenance is for this room or its parent room
                         const isRoomMatch = maintenance.roomid === roomId;
                         const isParentMatch = roomParentId && maintenance.roomid === roomParentId;
-
+                        console.log(isRoomMatch, isParentMatch);
                         return isDateMatch && isActive && (isRoomMatch || isParentMatch);
                       })
                       .map((maintenance) => {
