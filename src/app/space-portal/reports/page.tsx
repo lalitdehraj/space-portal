@@ -402,6 +402,7 @@ function GenerateReportForm({ onClosePressed, startJob, setJobId, setReady, setP
   const [isGenerateDisabled, setIsGenerateDisabled] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string>("");
+  const user = useSelector((state: any) => state.dataState.user);
   const acadmeicYear = useSelector((state: any) => state.dataState.selectedAcademicYear);
   const acadmeicSession = useSelector((state: any) => state.dataState.selectedAcademicSession);
 
@@ -456,6 +457,20 @@ function GenerateReportForm({ onClosePressed, startJob, setJobId, setReady, setP
   }, [reportType]);
 
   useEffect(() => {
+    const fetchAllSessions = async () => {
+      try {
+        const response = await callApi<AcademicSessionResponse>(process.env.NEXT_PUBLIC_GET_ACADMIC_SESSIONS || URL_NOT_FOUND);
+        if (response.success && response.data?.["Academic Session"]) {
+          setAcademicSessionsList(response.data["Academic Session"]);
+        }
+      } catch (err) {
+        console.error("Error fetching all sessions:", err);
+      }
+    };
+    fetchAllSessions();
+  }, []);
+
+  useEffect(() => {
     if (timePeriod === "thisWeek") {
       const startOfWeek = moment().startOf("isoWeek"); // Monday
       const endOfWeek = moment().endOf("isoWeek"); // Sunday
@@ -468,16 +483,18 @@ function GenerateReportForm({ onClosePressed, startJob, setJobId, setReady, setP
       setCustomEndDate(endOfMonth.format("YYYY-MM-DD"));
     } else if (timePeriod === "active") {
       // let backend resolve the active session range
-      setCustomStartDate("");
-      setCustomEndDate("");
+      const session = academicSessionsList?.find((s) => s.Code === user?.activeSession);
+      setCustomStartDate(session?.["Start Session"] || "");
+      setCustomEndDate(session?.["End Session"] || "");
     } else if (timePeriod === "year") {
       // controlled by academic year dropdown
       setCustomStartDate("");
       setCustomEndDate("");
     } else if (timePeriod === "session") {
       // controlled by academic session dropdown
-      setCustomStartDate("");
-      setCustomEndDate("");
+      const session = academicSessionsList?.find((s) => s.Code === selectedSession);
+      setCustomStartDate(session?.["Start Session"] || "");
+      setCustomEndDate(session?.["End Session"] || "");
     } else if (timePeriod === "custom") {
       // do not reset here → user will pick manually
     } else {
@@ -581,6 +598,10 @@ function GenerateReportForm({ onClosePressed, startJob, setJobId, setReady, setP
       } else if (reportType === "faculty") {
         fileName = `faculty_${selectedFaculty}_${acadmeicYear}_${acadmeicSession}`;
       }
+      let isNeededToGenrate= false
+      if(timePeriod === "active" || timePeriod === "thisWeek" || timePeriod === "thisMonth"){
+        isNeededToGenrate = true;
+      }
 
       const response = await fetch("/api/start-job", {
         method: "POST",
@@ -591,6 +612,7 @@ function GenerateReportForm({ onClosePressed, startJob, setJobId, setReady, setP
           fileKey: fileName,
           roomID: selectedRoomId,
           reportType,
+          isNeededToGenrate,
           buildingId: selectedBuildingId,
           departmentId: selectedDepartment,
           facultyId: selectedFaculty,

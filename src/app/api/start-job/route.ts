@@ -25,12 +25,14 @@ export async function POST(req: NextRequest) {
   if (!jsonObject.fileKey.endsWith(".xlsx")) fileName = `${jsonObject.fileKey}.xlsx`;
   console.log("fileName", fileName);
   const filePath = path.join(process.cwd(), "reports", fileName);
-  if (fs.existsSync(filePath)) {
-    return NextResponse.json({
-      jobId: fileName,
-      alreadyExists: true,
-      downloadUrl: `/api/download/${fileName}`,
-    });
+  if (!jsonObject.isNeededToGenrate || false) {
+    if (fs.existsSync(filePath)) {
+      return NextResponse.json({
+        jobId: fileName,
+        alreadyExists: true,
+        downloadUrl: `/api/download/${fileName}`,
+      });
+    }
   }
 
   createBigXLS(filePath, jsonObject).catch(console.error);
@@ -668,7 +670,7 @@ async function insertFileInfo(filePath: string, jsonObject: any) {
       fileName: fileName,
       reportType: jsonObject.reportType || "room",
       fileSize: fileSize,
-      isActiveSession: true,
+      isActiveSession: jsonObject.isNeededToGenrate,
       startDate: jsonObject.startDate || "",
       endDate: jsonObject.endDate || "",
       filePath: filePath,
