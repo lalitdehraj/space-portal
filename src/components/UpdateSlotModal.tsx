@@ -49,12 +49,6 @@ export default function UpdateSlotModal({ occupant, occupants, onClose, onUpdate
     return slotDate === today && isSlotPartiallyElapsed();
   };
 
-  // Get the current time rounded to the next hour for partial slot editing
-  const getCurrentTimeRounded = () => {
-    const now = moment();
-    return now.add(1, "hour").startOf("hour").format("HH:mm");
-  };
-
   // Get minimum time for validation
   const getMinTime = () => {
     if (isSlotPartiallyElapsed() && moment(occupant.scheduledDate).format("YYYY-MM-DD") === selectedDate) {
