@@ -31,6 +31,20 @@ function AllocationPage() {
   const isActiveSession = useSelector((state: any) => state.dataState.isActiveSession);
 
   const [searchQuery, setSearchQuery] = useState("");
+  const userRole = useSelector((state: any) => state.dataState.userRole);
+  const [isManagedByUser, setIsManagedByUser] = useState(false);
+
+  useEffect(() => {
+    if (!userRole) return;
+    userRole.split("|").forEach((role: string) => {
+      if (role === "ADMIN") {
+        setIsManagedByUser(true);
+      }
+      if (role === "ACADEMICS") {
+        setIsManagedByUser(true);
+      }
+    });
+  }, [userRole]);
 
   // Fetch allocations for selected session/year
   useEffect(() => {
@@ -156,7 +170,7 @@ function AllocationPage() {
             onChange={(e) => setSearchQuery(e.target.value)}
             className="border border-gray-300 rounded-md py-1 px-2 text-sm focus:outline-none text-gray-700 focus:ring-1 focus:ring-orange-500"
           />
-          {isActiveSession && (
+          {isActiveSession && isManagedByUser && (
             <button className="px-3 py-2 rounded-lg shadow-md transition duration-300 bg-orange-500 text-white hover:bg-orange-600" onClick={() => openForm()}>
               Add Allocation
             </button>
@@ -174,7 +188,7 @@ function AllocationPage() {
               <th className="px-4 py-2">Room ID</th>
               <th className="px-4 py-2">Session</th>
               <th className="px-4 py-2">Year</th>
-              {isActiveSession && <th className="px-4 py-2">Edit</th>}
+              {isActiveSession && isManagedByUser && <th className="px-4 py-2">Edit</th>}
             </tr>
           </thead>
           <tbody className="text-[13px]">
@@ -194,7 +208,7 @@ function AllocationPage() {
                   <td className="px-4 py-2">{alloc.roomNo}</td>
                   <td className="px-4 py-2">{alloc.session}</td>
                   <td className="px-4 py-2">{alloc.academicYear}</td>
-                  {isActiveSession && (
+                  {isActiveSession && isManagedByUser && (
                     <td className="px-4 py-2">
                       <button className="px-2 py-1 rounded bg-orange-500 text-white hover:bg-orange-600" onClick={() => openForm(alloc)}>
                         Edit

@@ -34,7 +34,16 @@ const MaintenancePage = () => {
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [maintenanceToCancel, setMaintenanceToCancel] = useState<MaintenanceRecord | null>(null);
   const [isCancelling, setIsCancelling] = useState(false);
+  const [isManagedByUser, setIsManagedByUser] = useState(false);
 
+  useEffect(() => {
+    if (!userRole) return;
+    userRole.split("|").forEach((role: string) => {
+      if (role === "ADMIN") {
+        setIsManagedByUser(true);
+      }
+    });
+  }, [userRole]);
   // Fetch maintenance records
   const fetchMaintenanceRecords = async () => {
     setIsLoading(true);
@@ -151,12 +160,14 @@ const MaintenancePage = () => {
               onChange={(e) => setSearchQuery(e.target.value)}
               className="border border-gray-300 rounded-md py-1 px-2 text-sm focus:outline-none text-gray-700 focus:ring-1 focus:ring-orange-500"
             />
-            <button
-              className="flex h-fit items-center rounded-md bg-[#F26722] px-4 py-2 text-xs text-white shadow-md transition-all hover:bg-[#a5705a]"
-              onClick={() => setIsMaintenanceModalVisible(true)}
-            >
-              🔧 Schedule Maintenance
-            </button>
+            {isManagedByUser && (
+              <button
+                className="flex h-fit items-center rounded-md bg-[#F26722] px-4 py-2 text-xs text-white shadow-md transition-all hover:bg-[#a5705a]"
+                onClick={() => setIsMaintenanceModalVisible(true)}
+              >
+                🔧 Schedule Maintenance
+              </button>
+            )}
           </div>
         </div>
 

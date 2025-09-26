@@ -101,7 +101,7 @@ const SideNav: FC<SideNavProps> = ({ onClose }) => {
         const roles = response.data?.map((u) => u.userRole) || [];
         const allRoles = roles.flatMap((role) => (role ? role.split("|") : []));
         const uniqueRoles = Array.from(new Set(allRoles));
-        setUserRoles(uniqueRoles);
+        setUserRoles(uniqueRoles.filter((role) => role !== "ADMIN"));
       }
     };
     fetchUserRoles();
