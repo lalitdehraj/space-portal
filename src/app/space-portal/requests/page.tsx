@@ -1,12 +1,13 @@
 "use client";
 import React, { useEffect, useState, useRef } from "react";
 import Pagination from "@/components/PageNumberIndicator";
-import { RoomRequestTable, RoomRequest, AcademicSessions, Building, Room } from "@/types";
-import { api, callApi } from "@/utils/apiIntercepter";
+import { RoomRequestTable, RoomRequest } from "@/types";
+import { callApi } from "@/utils/apiIntercepter";
 import { URL_NOT_FOUND } from "@/constants";
 import { useSelector } from "react-redux";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { encrypt } from "@/utils/encryption";
+import { RootState } from "@/app/store";
 
 const tableHeadersList: { [key: string]: keyof RoomRequest } = {
   "Request No.": "requestID",
@@ -104,8 +105,8 @@ function filterData(data: RoomRequest[], filters: { [key: string]: string[] }, s
 export default function RequestApprovalPage() {
   const router = useRouter();
   const [curruntPage, setCurruntPage] = useState(1);
-  const acadmeicYear = useSelector((state: any) => state.dataState.selectedAcademicYear);
-  const acadmeicSession = useSelector((state: any) => state.dataState.selectedAcademicSession);
+  const acadmeicYear = useSelector((state: RootState) => state.dataState.selectedAcademicYear);
+  const acadmeicSession = useSelector((state: RootState) => state.dataState.selectedAcademicSession);
   const [sortState, setSortState] = useState<sortingTypes>("");
   const [activeHeader, setActiveHeader] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -131,7 +132,7 @@ export default function RequestApprovalPage() {
       if (!(acadmeicSession && acadmeicSession && pageSize)) return;
       setIsLoadingRequests(true);
       try {
-        let response = await callApi<RoomRequestTable>(`${process.env.NEXT_PUBLIC_GET_REQUEST_LIST}` || URL_NOT_FOUND, {
+        const response = await callApi<RoomRequestTable>(`${process.env.NEXT_PUBLIC_GET_REQUEST_LIST}` || URL_NOT_FOUND, {
           limit: pageSize,
           offset: curruntPage,
           acadSess: acadmeicSession,

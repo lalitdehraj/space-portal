@@ -1,15 +1,16 @@
 "use client";
 import { URL_NOT_FOUND } from "@/constants";
-import { Room, Allocation, Program, Building } from "@/types";
+import { Room, Allocation, Program } from "@/types";
 import { callApi } from "@/utils/apiIntercepter";
 import { useBuildingsData } from "@/hooks/useBuildingsData";
 import moment from "moment";
 import React, { useState, useEffect, useMemo } from "react";
 import { useSelector } from "react-redux";
+import { RootState } from "@/app/store";
 
 function AllocationPage() {
-  const selectedAcademicYear = useSelector((state: any) => state.dataState.selectedAcademicYear);
-  const selectedAcademicSession = useSelector((state: any) => state.dataState.selectedAcademicSession);
+  const selectedAcademicYear = useSelector((state: RootState) => state.dataState.selectedAcademicYear);
+  const selectedAcademicSession = useSelector((state: RootState) => state.dataState.selectedAcademicSession);
 
   const [allocations, setAllocations] = useState<Allocation[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
@@ -25,13 +26,10 @@ function AllocationPage() {
   const [selectedCourseId, setSelectedCourseId] = useState("");
   const [selectedFloorId, setSelectedFloorId] = useState("");
   const [selectedBuildingId, setSelectedBuildingId] = useState("");
-
-  const acadmeicYear = useSelector((state: any) => state.dataState.selectedAcademicYear);
-  const acadmeicSession = useSelector((state: any) => state.dataState.selectedAcademicSession);
-  const isActiveSession = useSelector((state: any) => state.dataState.isActiveSession);
+  const isActiveSession = useSelector((state: RootState) => state.dataState.isActiveSession);
 
   const [searchQuery, setSearchQuery] = useState("");
-  const userRole = useSelector((state: any) => state.dataState.userRole);
+  const userRole = useSelector((state: RootState) => state.dataState.userRole);
   const [isManagedByUser, setIsManagedByUser] = useState(false);
 
   useEffect(() => {
@@ -85,14 +83,14 @@ function AllocationPage() {
   // Handle add/edit allocation
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    let payload: any = {
+    const payload = {
       buildingId: selectedBuildingId,
       roomId: selectedRoomId,
       programCode: selectedCourseId,
       acadSession: selectedAcademicSession,
       acadYear: selectedAcademicYear,
     };
-    let apiUrl = process.env.NEXT_PUBLIC_INSERT_ROOM_ALLOCATION || URL_NOT_FOUND;
+    const apiUrl = process.env.NEXT_PUBLIC_INSERT_ROOM_ALLOCATION || URL_NOT_FOUND;
 
     const res = await callApi(apiUrl, payload);
 

@@ -213,7 +213,7 @@ export interface SpaceAllocation {
   academicSession: string;
   academicYear: string;
   allocatedTo: string;
-  isAllocationActive?: Boolean;
+  isAllocationActive?: boolean;
   keyAssigned?: string;
   remarks?: string;
   allocatedfrom?: string;

@@ -6,13 +6,14 @@ import Header from "@/components/Header";
 import { Menu } from "lucide-react";
 import { useSelector } from "react-redux";
 import AuthGuard from "@/components/AuthGuard";
+import { RootState } from "../store";
 
 interface ChildProps {
   children: ReactNode;
 }
 
 const DashboardLayout = ({ children }: ChildProps) => {
-  let headertext = useSelector((state: any) => state.dataState.headerText);
+  const headertext = useSelector((state: RootState) => state.dataState.headerText);
   const { isSideNavOpen, toggleSideNav } = useSideNavState();
 
   return (

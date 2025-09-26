@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import { Check } from "lucide-react"; // Importing the check icon
 
 // Define the type for the component props

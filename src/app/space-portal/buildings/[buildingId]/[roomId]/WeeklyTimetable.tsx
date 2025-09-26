@@ -12,7 +12,7 @@ import { URL_NOT_FOUND } from "@/constants";
 
 type WeeklyTimetableProps = {
   startDate: Date;
-  isManagedByThisUser: Boolean;
+  isManagedByThisUser: boolean;
   setStartDate: React.Dispatch<React.SetStateAction<Date>>;
   occupants: Occupant[];
   maintenanceData: Maintenance[];

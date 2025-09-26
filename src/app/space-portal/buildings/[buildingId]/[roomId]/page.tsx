@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Building, Occupant, RoomInfo, SpaceAllocation, Maintenance } from "@/types";
+import { Occupant, RoomInfo, SpaceAllocation, Maintenance } from "@/types";
 import { BuildingSVG } from "@/components/BuildingSvg";
 import { callApi } from "@/utils/apiIntercepter";
 import { URL_NOT_FOUND } from "@/constants";
@@ -11,17 +11,18 @@ import { useBuildingsData } from "@/hooks/useBuildingsData";
 import WeeklyTimetable from "./WeeklyTimetable";
 import AddAssignmentForm from "./AddAssignmentForm";
 import moment from "moment";
+import { RootState } from "@/app/store";
 
 function RoomPage() {
   const params = useParams();
   const router = useRouter();
-  const userRole = useSelector((state: any) => state.dataState.userRole);
+  const userRole = useSelector((state: RootState) => state.dataState.userRole);
   const [isManagedByThisUser, setIsManagedByThisUser] = useState(false);
-  const acadmeicYear = useSelector((state: any) => state.dataState.selectedAcademicYear);
-  const acadmeicSession = useSelector((state: any) => state.dataState.selectedAcademicSession);
-  const academicSessionStartDate = useSelector((state: any) => state.dataState.selectedAcademicSessionStartDate);
-  const academicSessionEndDate = useSelector((state: any) => state.dataState.selectedAcademicSessionEndDate);
-  const isActiveSession = useSelector((state: any) => state.dataState.isActiveSession);
+  const acadmeicYear = useSelector((state: RootState) => state.dataState.selectedAcademicYear);
+  const acadmeicSession = useSelector((state: RootState) => state.dataState.selectedAcademicSession);
+  const academicSessionStartDate = useSelector((state: RootState) => state.dataState.selectedAcademicSessionStartDate);
+  const academicSessionEndDate = useSelector((state: RootState) => state.dataState.selectedAcademicSessionEndDate);
+  const isActiveSession = useSelector((state: RootState) => state.dataState.isActiveSession);
   const string = decrypt(params.roomId?.toString() || "");
   const buildingId = decrypt(params.buildingId?.toString() || "");
   const roomId = string.split("|")?.[0];

@@ -9,6 +9,7 @@ import { formatDateOnly, formatFileSize } from "@/utils";
 import { AcademicYearResponse, AcademicSessionResponse } from "@/components/Header";
 import { useBuildingsData } from "@/hooks/useBuildingsData";
 import moment from "moment";
+import { RootState } from "@/app/store";
 
 const tableHeadersList: { [key: string]: keyof Report } = {
   "Serial No.": "id",
@@ -119,8 +120,8 @@ export default function UtilizationReport() {
   }, [polling, jobId]);
 
   const [curruntPage, setCurruntPage] = useState(1);
-  const acadmeicYear = useSelector((state: any) => state.dataState.academicYear);
-  const acadmeicSession = useSelector((state: any) => state.dataState.academicSession);
+  const acadmeicYear = useSelector((state: RootState) => state.dataState.selectedAcademicYear);
+  const acadmeicSession = useSelector((state: RootState) => state.dataState.selectedAcademicSession);
   const [sortState, setSortState] = useState<sortingTypes>("");
   const [activeHeader, setActiveHeader] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -402,9 +403,9 @@ function GenerateReportForm({ onClosePressed, startJob, setJobId, setReady, setP
   const [isGenerateDisabled, setIsGenerateDisabled] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string>("");
-  const user = useSelector((state: any) => state.dataState.user);
-  const acadmeicYear = useSelector((state: any) => state.dataState.selectedAcademicYear);
-  const acadmeicSession = useSelector((state: any) => state.dataState.selectedAcademicSession);
+  const user = useSelector((state: RootState) => state.dataState.user);
+  const acadmeicYear = useSelector((state: RootState) => state.dataState.selectedAcademicYear);
+  const acadmeicSession = useSelector((state: RootState) => state.dataState.selectedAcademicSession);
 
   const [departments, setDepartments] = useState<Department[]>([]);
   const [faculties, setFaculties] = useState<Faculty[]>([]);

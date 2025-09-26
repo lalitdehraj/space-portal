@@ -1,67 +1,21 @@
 "use client";
 import { useSession } from "next-auth/react";
 import React, { useEffect, useState } from "react";
-import { Mail, Phone, Building2, CalendarCheck, Clock, CheckCircle2, AlertTriangle, ArrowRightCircle } from "lucide-react";
+import { Mail, Phone, Building2, CalendarCheck, ArrowRightCircle } from "lucide-react";
 import { callApi } from "@/utils/apiIntercepter";
 import { UserProfile } from "@/types";
 import { URL_NOT_FOUND } from "@/constants";
 import { useDispatch, useSelector } from "react-redux";
 import { setUser } from "@/app/feature/dataSlice";
 import { useRouter } from "next/navigation";
-
-// Dummy data to simulate API responses for the faculty member's profile
-const dummyFacultyData = {
-  allocatedSpaces: [
-    {
-      id: "A-201",
-      name: "Lab A-201",
-      building: "Mellon Hall",
-      purpose: "Research Lab",
-    },
-    {
-      id: "B-305",
-      name: "Office B-305",
-      building: "Bauer Hall",
-      purpose: "Private Office",
-    },
-    {
-      id: "C-110",
-      name: "Classroom C-110",
-      building: "Main Hall",
-      purpose: "Lecture",
-    },
-  ],
-  pendingRequests: [
-    {
-      id: "req-001",
-      type: "Room Change",
-      space: "Office B-305",
-      date: "2025-10-25",
-      status: "Pending",
-    },
-    {
-      id: "req-002",
-      type: "Equipment Setup",
-      space: "Lab A-201",
-      date: "2025-10-20",
-      status: "Approved",
-    },
-    {
-      id: "req-003",
-      type: "Meeting Room Booking",
-      space: "Conference Room 1",
-      date: "2025-11-01",
-      status: "Rejected",
-    },
-  ],
-};
+import { RootState } from "@/app/store";
 
 function ProfilePage() {
   const router = useRouter();
   const { data } = useSession();
   const dispatcher = useDispatch();
   const userEmail = data?.user?.email;
-  const user = useSelector((state: any) => state.dataState.user);
+  const user = useSelector((state: RootState) => state.dataState.user);
   const [isLoadingUser, setIsLoadingUser] = useState(false);
 
   useEffect(() => {
@@ -83,19 +37,6 @@ function ProfilePage() {
     fetchUser(userEmail || null);
   }, []);
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "Approved":
-        return <CheckCircle2 size={16} className="text-green-500" />;
-      case "Pending":
-        return <Clock size={16} className="text-yellow-500" />;
-      case "Rejected":
-        return <AlertTriangle size={16} className="text-red-500" />;
-      default:
-        return null;
-    }
-  };
-  const { allocatedSpaces, pendingRequests } = dummyFacultyData;
   return (
     <div className="w-full p-8 bg-white rounded-xl shadow-lg border border-gray-200">
       {/* Profile Header Section */}

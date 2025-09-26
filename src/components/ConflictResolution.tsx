@@ -108,7 +108,7 @@ export const ConflictResolution: React.FC<ConflictResolutionProps> = ({ existing
       }))
       .sort((a, b) => a.start - b.start);
 
-    let freeIntervals: { start: number; end: number }[] = [];
+    const freeIntervals: { start: number; end: number }[] = [];
     let currentPosition = workingStart;
 
     if (date === today) {

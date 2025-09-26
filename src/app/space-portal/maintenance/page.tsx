@@ -2,12 +2,13 @@
 
 import React, { useEffect, useState } from "react";
 import { useSelector } from "react-redux";
-import { Building, RoomInfo, Occupant, Maintenance } from "@/types";
+import { Maintenance } from "@/types";
 import { callApi } from "@/utils/apiIntercepter";
 import { URL_NOT_FOUND } from "@/constants";
 import { useBuildingsData } from "@/hooks/useBuildingsData";
 import moment from "moment";
 import MaintenanceModal from "@/components/MaintenanceModal";
+import { RootState } from "@/app/store";
 
 interface MaintenanceRecord extends Maintenance {
   roomName?: string;
@@ -18,11 +19,11 @@ interface MaintenanceRecord extends Maintenance {
 }
 
 const MaintenancePage = () => {
-  const userRole = useSelector((state: any) => state.dataState.userRole);
-  const academicYear = useSelector((state: any) => state.dataState.selectedAcademicYear);
-  const academicSession = useSelector((state: any) => state.dataState.selectedAcademicSession);
-  const academicSessionStartDate = useSelector((state: any) => state.dataState.selectedAcademicSessionStartDate);
-  const academicSessionEndDate = useSelector((state: any) => state.dataState.selectedAcademicSessionEndDate);
+  const userRole = useSelector((state: RootState) => state.dataState.userRole);
+  const academicYear = useSelector((state: RootState) => state.dataState.selectedAcademicYear);
+  const academicSession = useSelector((state: RootState) => state.dataState.selectedAcademicSession);
+  const academicSessionStartDate = useSelector((state: RootState) => state.dataState.selectedAcademicSessionStartDate);
+  const academicSessionEndDate = useSelector((state: RootState) => state.dataState.selectedAcademicSessionEndDate);
 
   const [isMaintenanceModalVisible, setIsMaintenanceModalVisible] = useState(false);
   const [maintenanceRecords, setMaintenanceRecords] = useState<MaintenanceRecord[]>([]);

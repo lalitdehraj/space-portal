@@ -8,6 +8,7 @@ import moment from "moment";
 import { areSlotsEqual, checkSlotConflicts, Slot } from "@/utils/slotsHelper";
 import { ConflictResolution } from "@/components/ConflictResolution";
 import { formatDate } from "@/utils";
+import { RootState } from "@/app/store";
 
 // Helper function to format time by removing seconds
 const formatTime = (timeString: string) => {
@@ -22,10 +23,10 @@ type RequestApprovalProps = {
 };
 
 export default function RequestApproval({ requestData, onApprovalComplete, onClose }: RequestApprovalProps) {
-  const user: UserProfile | null = useSelector((state: any) => state.dataState.user);
-  const academicYear = useSelector((state: any) => state.dataState.selectedAcademicYear);
-  const academicSession = useSelector((state: any) => state.dataState.selectedAcademicSession);
-  const academicSessionEndDate = useSelector((state: any) => state.dataState.selectedAcademicSessionEndDate);
+  const user: UserProfile | null = useSelector((state: RootState) => state.dataState.user);
+  const academicYear = useSelector((state: RootState) => state.dataState.selectedAcademicYear);
+  const academicSession = useSelector((state: RootState) => state.dataState.selectedAcademicSession);
+  const academicSessionEndDate = useSelector((state: RootState) => state.dataState.selectedAcademicSessionEndDate);
 
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [selectedBuildingId, setSelectedBuildingId] = useState<string>("");

@@ -9,6 +9,7 @@ import { decrypt } from "@/utils/encryption";
 import { useRouter } from "next/navigation";
 import { formatDate, getTimeDifference } from "@/utils";
 import RequestApproval from "@/components/RequestApproval";
+import { RootState } from "@/app/store";
 
 // Helper function to format time by removing seconds
 const formatTime = (timeString: string) => {
@@ -49,7 +50,7 @@ const getPriorityClass = (status: string) => {
 
 const getRecurranceString = (recc: string) => {
   let recString = "";
-  let list = recc.split(",");
+  const list = recc.split(",");
   list.map((str, index) => {
     switch (str) {
       case "1":
@@ -85,8 +86,8 @@ export default function RequestInfoPage() {
   const params = useParams();
   const router = useRouter();
   const requestId = decrypt(params.requestId?.toString() || "");
-  const academicYear = useSelector((state: any) => state.dataState.selectedAcademicYear);
-  const academicSession = useSelector((state: any) => state.dataState.selectedAcademicSession);
+  const academicYear = useSelector((state: RootState) => state.dataState.selectedAcademicYear);
+  const academicSession = useSelector((state: RootState) => state.dataState.selectedAcademicSession);
   const [requestData, setRequestData] = useState<RoomRequest | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -98,7 +99,7 @@ export default function RequestInfoPage() {
       setError(null);
       const pageSize = searchParams.get("limit");
       const curruntPage = searchParams.get("offSet");
-      let response = await callApi<RoomRequestTable>(`${process.env.NEXT_PUBLIC_GET_REQUEST_LIST}` || URL_NOT_FOUND, {
+      const response = await callApi<RoomRequestTable>(`${process.env.NEXT_PUBLIC_GET_REQUEST_LIST}` || URL_NOT_FOUND, {
         limit: pageSize,
         offset: curruntPage,
         acadSess: academicSession,

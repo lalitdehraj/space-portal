@@ -3,14 +3,15 @@ import { useSelector } from "react-redux";
 import { callApi } from "@/utils/apiIntercepter";
 import { URL_NOT_FOUND } from "@/constants";
 import { Building } from "@/types";
+import { RootState } from "@/app/store";
 
 export const useBuildingsData = () => {
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const academicSession = useSelector((state: any) => state.dataState.selectedAcademicSession);
-  const academicYear = useSelector((state: any) => state.dataState.selectedAcademicYear);
+  const academicSession = useSelector((state: RootState) => state.dataState.selectedAcademicSession);
+  const academicYear = useSelector((state: RootState) => state.dataState.selectedAcademicYear);
 
   useEffect(() => {
     const fetchBuildings = async () => {

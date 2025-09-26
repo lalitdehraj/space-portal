@@ -6,19 +6,20 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { callApi } from "@/utils/apiIntercepter";
 import { URL_NOT_FOUND } from "@/constants";
 import { useSelector } from "react-redux";
-import { Building, DashboardDataResponse } from "@/types";
+import {  DashboardDataResponse } from "@/types";
 import { useBuildingsData } from "@/hooks/useBuildingsData";
 import { isValidDateRange } from "@/utils";
 import moment from "moment";
+import { RootState } from "@/app/store";
 
 export default function Dashboard() {
   const [data, setData] = useState<DashboardDataResponse | null>(null);
   const [isLoadingDashboard, setIsLoadingDashboard] = useState(false);
-  const acadmeicYear = useSelector((state: any) => state.dataState.selectedAcademicYear);
-  const isActiveSession = useSelector((state: any) => state.dataState.isActiveSession);
-  const sessionStartDate = useSelector((state: any) => state.dataState.selectedAcademicSessionStartDate);
-  const sessionEndDate = useSelector((state: any) => state.dataState.selectedAcademicSessionEndDate);
-  const acadmeicSession = useSelector((state: any) => state.dataState.selectedAcademicSession);
+  const acadmeicYear = useSelector((state: RootState) => state.dataState.selectedAcademicYear);
+  const isActiveSession = useSelector((state: RootState) => state.dataState.isActiveSession);
+  const sessionStartDate = useSelector((state: RootState) => state.dataState.selectedAcademicSessionStartDate);
+  const sessionEndDate = useSelector((state: RootState) => state.dataState.selectedAcademicSessionEndDate);
+  const acadmeicSession = useSelector((state: RootState) => state.dataState.selectedAcademicSession);
   const [days, setDays] = useState("7");
 
   // Use custom hook for buildings data
@@ -45,7 +46,7 @@ export default function Dashboard() {
           startDate: startDate,
           academicSession: acadmeicSession,
         };
-        let response = await callApi<DashboardDataResponse>(
+        const response = await callApi<DashboardDataResponse>(
           process.env.NEXT_PUBLIC_DASHBOARD_URL || URL_NOT_FOUND,
           requestBody,
           { ttl: 2 * 60 * 1000 } // Cache for 2 minutes

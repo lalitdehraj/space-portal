@@ -109,7 +109,7 @@ export const ConflictSlotsList: React.FC<ConflictSlotsListProps> = ({ existingSl
       }))
       .sort((a, b) => a.start - b.start);
 
-    let freeIntervals: { start: number; end: number }[] = [];
+    const freeIntervals: { start: number; end: number }[] = [];
     let currentPosition = workingStart;
 
     if (date === today) {

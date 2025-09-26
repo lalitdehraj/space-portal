@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { callApi } from "@/utils/apiIntercepter";
 import { URL_NOT_FOUND } from "@/constants";
-import { Employee, Occupant, RoomInfo, SpaceAllocation, UserProfile, Maintenance } from "@/types";
+import { Employee, RoomInfo, SpaceAllocation, UserProfile, Maintenance } from "@/types";
 import { useSelector } from "react-redux";
-import { areSlotsEqual, buildSlotsWithWeekdays, checkSlotConflicts, Recurrence, Slot } from "@/utils/slotsHelper";
+import { buildSlotsWithWeekdays, checkSlotConflicts, Recurrence, Slot } from "@/utils/slotsHelper";
 import { Check, X } from "lucide-react";
 import moment from "moment";
 import { ConflictSlotsList } from "./Conflicts";
+import { RootState } from "@/app/store";
 
 type FormProps = {
   roomInfo: RoomInfo;
@@ -42,7 +43,7 @@ function WeekdaySelector({ value, onChange }: { value: string[]; onChange: (v: s
 }
 
 // Helper for time slot list
-const defaultTimeSlots: any = [];
+const defaultTimeSlots = [];
 for (let m = 9 * 60; m < 18 * 60; m += 45) {
   const startHours = Math.floor(m / 60);
   const startMinutes = m % 60;
@@ -66,10 +67,10 @@ export default function AddAssignmentForm({
   initialEndTime,
   maintenanceData = [],
 }: FormProps) {
-  const user: UserProfile | null = useSelector((state: any) => state.dataState.user);
-  const acadmeicYear = useSelector((state: any) => state.dataState.selectedAcademicYear);
-  const acadmeicSession = useSelector((state: any) => state.dataState.selectedAcademicSession);
-  const academicSessionEndDate = useSelector((state: any) => state.dataState.selectedAcademicSessionEndDate);
+  const user: UserProfile | null = useSelector((state: RootState) => state.dataState.user);
+  const acadmeicYear = useSelector((state: RootState) => state.dataState.selectedAcademicYear);
+  const acadmeicSession = useSelector((state: RootState) => state.dataState.selectedAcademicSession);
+  const academicSessionEndDate = useSelector((state: RootState) => state.dataState.selectedAcademicSessionEndDate);
   const [purpose, setPurpose] = useState("");
   const [keys, setKeys] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
@@ -90,7 +91,6 @@ export default function AddAssignmentForm({
   const [allocationSlotsList, setAllocationSlotsList] = useState<Slot[]>([]);
   const [existingBookedSlots, setExistingBookedSlots] = useState<Slot[]>([]);
   const [isValidationVisible, setIsValidationVisible] = useState(false);
-  const [type, setType] = useState(false);
   const [slotGroups, setSlotGroups] = useState<{ resolved: Slot[]; unresolved: Slot[] }>({
     resolved: [],
     unresolved: [],

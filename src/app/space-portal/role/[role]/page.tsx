@@ -5,34 +5,32 @@ import { useParams, useRouter } from "next/navigation";
 import { useSelector, useDispatch } from "react-redux";
 import { Room } from "@/types";
 import RoomCard from "@/components/RoomCard";
-import { Building, Floor } from "@/types";
-import { BuildingSVG } from "@/components/BuildingSvg";
+import { Building } from "@/types";
 import { removeSpaces } from "@/utils";
 import { callApi } from "@/utils/apiIntercepter";
 import { URL_NOT_FOUND } from "@/constants";
 import { encrypt } from "@/utils/encryption";
 import { setSeletedRoomTypeId } from "@/app/feature/dataSlice";
+import { RootState } from "@/app/store";
 export default function Buildings() {
   const router = useRouter();
   const dispatcher = useDispatch();
   const params = useParams();
-  let role = params.role?.toString().replace("%20", " ");
-  let [buildings, setBuildings] = useState<Building[]>();
+  const role = params.role?.toString().replace("%20", " ");
+  const [buildings, setBuildings] = useState<Building[]>();
   const [roomsList, setRoomsList] = useState<Room[]>([]);
   const [selectedRoom, setSelectedRoom] = useState<Room>();
   const [subRooms, setSubRooms] = useState<Room[]>([]);
   const [allBuildingSubrooms, setAllBuildingSubrooms] = useState<Room[]>([]);
   const [isLoadingBuildings, setIsLoadingBuildings] = useState(false);
   const [isLoadingRooms, setIsLoadingRooms] = useState(false);
-  const [isLoadingSubrooms, setIsLoadingSubrooms] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(16);
   const [initialLoad] = useState(8);
   const [searchQuery, setSearchQuery] = useState("");
-  const acadmeicYear = useSelector((state: any) => state.dataState.selectedAcademicYear);
-  const acadmeicSession = useSelector((state: any) => state.dataState.selectedAcademicSession);
-  const selectedRoomId = useSelector((state: any) => state.dataState.selectedRoomId);
-  const selectedRoomType = useSelector((state: any) => state.dataState.selectedRoomType);
+  const acadmeicYear = useSelector((state: RootState) => state.dataState.selectedAcademicYear);
+  const acadmeicSession = useSelector((state: RootState) => state.dataState.selectedAcademicSession);
+  const selectedRoomType = useSelector((state: RootState) => state.dataState.selectedRoomType);
 
   useEffect(() => {
     const fetchBuildings = async () => {
@@ -192,7 +190,7 @@ export default function Buildings() {
     if (!visibleRooms?.length) return;
     const items: JSX.Element[] = [];
     let expandedRowIndex: number | null = null;
-    let cardsPerRow = 4;
+    const cardsPerRow = 4;
     for (let i = 0; i < visibleRooms.length; i++) {
       if (selectedRoom && selectedRoom.roomId === visibleRooms[i].roomId && selectedRoom.buildingId === visibleRooms[i].buildingId) {
         expandedRowIndex = Math.floor(i / cardsPerRow);
@@ -240,19 +238,10 @@ export default function Buildings() {
                   </button>
                 </h4>
                 <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3">
-                  {isLoadingSubrooms
-                    ? // Loading skeleton for subrooms
-                      Array.from({ length: 3 }).map((_, index) => (
-                        <div key={index} className="bg-white rounded-lg shadow-sm p-4 animate-pulse">
-                          <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
-                          <div className="h-3 bg-gray-200 rounded w-1/2 mb-4"></div>
-                          <div className="h-3 bg-gray-200 rounded w-1/3"></div>
-                        </div>
-                      ))
-                    : subRooms &&
-                      subRooms.map((room) => (
-                        <RoomCard key={`${room.buildingId}-${room.roomId}`} onClick={handleRoomClick} room={room} cachedSubrooms={allBuildingSubrooms} />
-                      ))}
+                  {subRooms &&
+                    subRooms.map((room) => (
+                      <RoomCard key={`${room.buildingId}-${room.roomId}`} onClick={handleRoomClick} room={room} cachedSubrooms={allBuildingSubrooms} />
+                    ))}
                 </div>
               </div>
             );

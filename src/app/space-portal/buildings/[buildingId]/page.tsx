@@ -13,23 +13,24 @@ import { callApi } from "@/utils/apiIntercepter";
 import { URL_NOT_FOUND } from "@/constants";
 import { encrypt, decrypt } from "@/utils/encryption";
 import { setSelectedFloorId, setSelectedRoomId, setSeletedRoomTypeId } from "@/app/feature/dataSlice";
+import { RootState } from "@/app/store";
 
 export default function Buildings() {
   const router = useRouter();
   const dispatcher = useDispatch();
   const params = useParams();
-  let buildingId = decrypt(params.buildingId?.toString() || "");
-  let [selectedBuilding, setSelectedBuilding] = useState<Building>();
+  const buildingId = decrypt(params.buildingId?.toString() || "");
+  const [selectedBuilding, setSelectedBuilding] = useState<Building>();
   const [selectedFloor, setSelectedFloor] = useState<Floor>();
   const [roomsList, setRoomsList] = useState<Room[]>([]);
   const [selectedRoom, setSelectedRoom] = useState<Room>();
   const [subRooms, setSubRooms] = useState<Room[]>([]);
   const [allBuildingSubrooms, setAllBuildingSubrooms] = useState<Room[]>([]);
-  const acadmeicYear = useSelector((state: any) => state.dataState.selectedAcademicYear);
-  const acadmeicSession = useSelector((state: any) => state.dataState.selectedAcademicSession);
-  const selectedFloorId = useSelector((state: any) => state.dataState.selectedFloorId);
-  const selectedRoomId = useSelector((state: any) => state.dataState.selectedRoomId);
-  const selectedRoomType = useSelector((state: any) => state.dataState.selectedRoomType);
+  const acadmeicYear = useSelector((state: RootState) => state.dataState.selectedAcademicYear);
+  const acadmeicSession = useSelector((state: RootState) => state.dataState.selectedAcademicSession);
+  const selectedFloorId = useSelector((state: RootState) => state.dataState.selectedFloorId);
+  const selectedRoomId = useSelector((state: RootState) => state.dataState.selectedRoomId);
+  const selectedRoomType = useSelector((state: RootState) => state.dataState.selectedRoomType);
   useEffect(() => {
     const fetchBuildings = async () => {
       const reqBody = {
@@ -39,7 +40,7 @@ export default function Buildings() {
 
       const response = await callApi<Building[]>(process.env.NEXT_PUBLIC_GET_BUILDING_LIST || URL_NOT_FOUND, reqBody);
       if (response.success) {
-        let building = response.data?.find((building) => building.id === buildingId);
+        const building = response.data?.find((building) => building.id === buildingId);
         setSelectedBuilding(building);
         if ((building?.floors?.length || 0) > 0) {
           const floor = building?.floors.filter((f) => f.id === selectedFloorId);
@@ -95,7 +96,7 @@ export default function Buildings() {
     },
   ];
 
-  let allRoomsCategories: string[] = [...new Set(roomsList?.map((room) => room.roomType).filter((roomType) => roomType && roomType.trim() !== ""))];
+  const allRoomsCategories: string[] = [...new Set(roomsList?.map((room) => room.roomType).filter((roomType) => roomType && roomType.trim() !== ""))];
   let roomCategories = ["All Rooms"];
   roomCategories = [...roomCategories, ...allRoomsCategories];
 
@@ -118,8 +119,8 @@ export default function Buildings() {
         acadSess: acadmeicSession,
         acadYr: acadmeicYear,
       };
-      let response = callApi<Room[]>(process.env.NEXT_PUBLIC_GET_SUBROOMS_LIST || URL_NOT_FOUND, requestBody);
-      let res = await response;
+      const response = callApi<Room[]>(process.env.NEXT_PUBLIC_GET_SUBROOMS_LIST || URL_NOT_FOUND, requestBody);
+      const res = await response;
       console.log("All building subrooms:", res);
       setAllBuildingSubrooms(res.data || []);
     };
@@ -159,7 +160,7 @@ export default function Buildings() {
     if (!filteredRooms?.length) return;
     const items: JSX.Element[] = [];
     let expandedRowIndex: number | null = null;
-    let cardsPerRow = 4;
+    const cardsPerRow = 4;
     for (let i = 0; i < (filteredRooms?.length || 1); i++) {
       if (selectedRoom && selectedRoom.roomId === filteredRooms?.[i].roomId && selectedRoom.buildingId === filteredRooms?.[i].buildingId) {
         expandedRowIndex = Math.floor(i / cardsPerRow);

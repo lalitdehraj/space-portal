@@ -8,6 +8,7 @@ import moment from "moment";
 import { checkSlotConflicts, Slot } from "@/utils/slotsHelper";
 import { useSelector } from "react-redux";
 import { X, Eye } from "lucide-react";
+import { RootState } from "@/app/store";
 
 interface MaintenanceModalProps {
   allBuildingsData: Building[];
@@ -30,8 +31,8 @@ interface MaintenanceConflictInfo {
 
 const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, onClose, onSuccess, startDate, endDate }) => {
   // Redux selectors for academic year and session
-  const academicYear = useSelector((state: any) => state.dataState.selectedAcademicYear);
-  const academicSession = useSelector((state: any) => state.dataState.selectedAcademicSession);
+  const academicYear = useSelector((state: RootState) => state.dataState.selectedAcademicYear);
+  const academicSession = useSelector((state: RootState) => state.dataState.selectedAcademicSession);
 
   const [selectedRoomId, setSelectedRoomId] = useState("");
   const [selectedRoomInfo, setSelectedRoomInfo] = useState<RoomInfo | null>(null);

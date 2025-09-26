@@ -140,7 +140,7 @@ export function buildSlotsWithWeekdays(params: {
 
   if (weekdaySet && weekdaySet.size > 0) {
     for (const weekday of weekdaySet) {
-      let cursor = rangeStart.clone();
+      const cursor = rangeStart.clone();
       if (cursor.day() !== weekday) {
         const daysToAdd = (weekday - cursor.day() + 7) % 7;
         cursor.add(daysToAdd, "days");
@@ -160,7 +160,7 @@ export function buildSlotsWithWeekdays(params: {
   }
 
   // fallback: daily slots
-  let cursor = rangeStart.clone();
+  const cursor = rangeStart.clone();
   while (cursor.isSameOrBefore(rangeEnd, "day")) {
     slots.push({
       id:`${cursor.format("YYYY-MM-DD")},${startTime},${endTime}`,
@@ -218,27 +218,3 @@ export function checkSlotConflicts(
 export function areSlotsEqual(a: Slot, b: Slot): boolean {
     return a.date === b.date && a.start === b.start && a.end === b.end;
   }
-
-const s = buildSlotsWithWeekdays({
-  startDate: "2025-09-04",
-  startTime: "09:00",
-  endTime: "10:00",
-  recurrence: "month",
-  repeatOnDays: [1, 3, 5], // Mon, Wed, Fri
-});
-
-const existingSlots: Slot[] = [
-  {id:"2025-09-05,09:15,10:05", date: "2025-09-05", start: "09:15", end: "10:05" },
-];
-
-const newSlots: Slot[] = [
-  { id:"2025-09-05,09:00,09:20",date: "2025-09-05", start: "09:00", end: "09:20" }, // ✅ no conflict
-];
-
-const conflicts = checkSlotConflicts(newSlots, existingSlots);
-
-if (conflicts.length > 0) {
-  // console.log("Conflicting slots found:", conflicts);
-} else {
-  console.log("No conflicts, safe to insert into DB.");
-}

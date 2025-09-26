@@ -7,11 +7,12 @@ import { URL_NOT_FOUND } from "@/constants";
 import { useSelector } from "react-redux";
 import { encrypt } from "@/utils/encryption";
 import { useRouter } from "next/navigation";
+import { RootState } from "@/app/store";
 
 export function AdvancedSearch({ onClose }: { onClose: () => void }) {
   const router = useRouter();
-  const academicYear = useSelector((state: any) => state.dataState.selectedAcademicYear);
-  const acadSession = useSelector((state: any) => state.dataState.selectedAcademicSession);
+  const academicYear = useSelector((state: RootState) => state.dataState.selectedAcademicYear);
+  const acadSession = useSelector((state: RootState) => state.dataState.selectedAcademicSession);
 
   // State management
   const [buildings, setBuildings] = useState<Building[]>([]);

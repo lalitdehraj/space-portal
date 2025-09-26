@@ -21,6 +21,7 @@ import { encrypt } from "@/utils/encryption";
 import { signOut, useSession } from "next-auth/react";
 import { AdvancedSearch } from "./SearchBar";
 import path from "path";
+import { RootState } from "@/app/store";
 
 export type AcademicYearResponse = {
   "Academic Year": AcademicYear[];
@@ -35,8 +36,8 @@ export default function Header() {
   const { data } = useSession();
 
   // redux values
-  const academicYear = useSelector((state: any) => state.dataState.selectedAcademicYear);
-  const acadSession = useSelector((state: any) => state.dataState.selectedAcademicSession);
+  const academicYear = useSelector((state: RootState) => state.dataState.selectedAcademicYear);
+  const acadSession = useSelector((state: RootState) => state.dataState.selectedAcademicSession);
 
   // Local state
   const [academicYearsList, setAcademicYearsList] = useState<AcademicYear[] | undefined>();
@@ -472,7 +473,7 @@ export default function Header() {
 
       <div className="flex items-center space-x-2 md:space-x-4">
         <select
-          value={useSelector((state: any) => state.dataState.selectedAcademicSession)}
+          value={useSelector((state: RootState) => state.dataState.selectedAcademicSession)}
           className={`hidden rounded-md px-2 py-2 text-xs text-gray-700 focus:outline-none ${(sessionsPerYear?.length || 0) > 0 ? "md:block" : ""}`}
           onChange={(event) => {
             dispatcher(setAcademicSessionId(event.target.value));

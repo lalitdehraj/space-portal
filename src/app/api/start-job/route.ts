@@ -362,7 +362,7 @@ async function createBigXLS(filePath: string, jsonObject: any) {
 
       // // Add one row per matched room
       for (let i = 0; i < (roomsInWhichEmp.length === 0 ? 1 : roomsInWhichEmp.length); i++) {
-        let room = roomsInWhichEmp.length === 0 ? null : roomsInWhichEmp[i];
+        const room = roomsInWhichEmp.length === 0 ? null : roomsInWhichEmp[i];
         const row: FacultyRow = {
           employeeId: String(emp.employeeCode ?? ""),
           facultyName: String(emp.employeeName ?? ""),
@@ -719,17 +719,4 @@ type ReportData = {
   vacantFri?: string;
   vacantSat?: string;
   vacantSun?: string;
-};
-
-type FacultyRow = {
-  employeeId: string;
-  facultyName: string;
-  programCode: string;
-  programName: string;
-  academicBlock: string;
-  facultyBlock: string;
-  workStation: string;
-  cabinNo: string;
-  occupancy: string;
-  keyNo: string;
 };

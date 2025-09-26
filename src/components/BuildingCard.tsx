@@ -1,7 +1,6 @@
 import Image from "next/image";
 import { Building } from "@/types";
 import React, { SVGProps } from "react";
-import { useSelector } from "react-redux";
 
 type BuildingCardProps = {
   building: Building;
