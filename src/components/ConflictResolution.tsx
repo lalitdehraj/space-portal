@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import { Clock, Calendar, Eye, ChevronLeft, ChevronRight } from "lucide-react";
-import { checkSlotConflicts, Slot, areSlotsEqual } from "@/utils/slotsHelper";
+import { Slot } from "@/utils/slotsHelper";
 import moment from "moment";
 
 interface ConflictResolutionProps {

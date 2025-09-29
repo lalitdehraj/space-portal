@@ -138,7 +138,7 @@ export default function Buildings() {
     },
   ];
 
-  let allRoomsCategories: string[] = [...new Set(roomsList.map((room) => room.roomType).filter((roomType) => roomType && roomType.trim() !== ""))];
+  const allRoomsCategories: string[] = [...new Set(roomsList.map((room) => room.roomType).filter((roomType) => roomType && roomType.trim() !== ""))];
   let roomCategories = ["All Rooms"];
   roomCategories = [...roomCategories, ...allRoomsCategories];
   useEffect(() => {
@@ -198,60 +198,62 @@ export default function Buildings() {
       }
     }
 
-    visibleRooms?.length > 0
-      ? visibleRooms?.forEach((room, index) => {
-          items.push(
-            <RoomCard
-              room={room}
-              key={`${room.buildingId}-${room.roomId}`}
-              isExpanded={selectedRoom ? selectedRoom.roomId === room.roomId && selectedRoom.buildingId === room.buildingId : false}
-              onClick={(room) => handleRoomClick(room)}
-              cachedSubrooms={allBuildingSubrooms}
-            />
-          );
-          const currentRowIndex = Math.floor(index / cardsPerRow);
-          const isLastCardInRow = (index + 1) % cardsPerRow === 0;
-          const isLastCardOverall = index === visibleRooms.length - 1;
+    if (visibleRooms?.length > 0) {
+      visibleRooms?.forEach((room, index) => {
+        items.push(
+          <RoomCard
+            room={room}
+            key={`${room.buildingId}-${room.roomId}`}
+            isExpanded={selectedRoom ? selectedRoom.roomId === room.roomId && selectedRoom.buildingId === room.buildingId : false}
+            onClick={(room) => handleRoomClick(room)}
+            cachedSubrooms={allBuildingSubrooms}
+          />
+        );
+        const currentRowIndex = Math.floor(index / cardsPerRow);
+        const isLastCardInRow = (index + 1) % cardsPerRow === 0;
+        const isLastCardOverall = index === visibleRooms.length - 1;
 
-          if (selectedRoom !== null && currentRowIndex === expandedRowIndex && (isLastCardInRow || isLastCardOverall)) {
-            items.push(
-              <div
-                key={`details-${selectedRoom?.buildingId}-${selectedRoom?.roomId}`}
-                className="
+        if (selectedRoom !== null && currentRowIndex === expandedRowIndex && (isLastCardInRow || isLastCardOverall)) {
+          items.push(
+            <div
+              key={`details-${selectedRoom?.buildingId}-${selectedRoom?.roomId}`}
+              className="
                 col-span-full bg-gray-50 p-8 rounded-xl shadow-inner
                 border border-gray-200
                 transition-all duration-500 ease-in-out transform
                 opacity-100 translate-y-0
               "
-                style={{
-                  gridColumn: "1 / -1",
-                  animation: "fadeInSlideUp 0.5s ease-out forwards",
-                }}
-              >
-                <h4 className="flex justify-between text-normal text-gray-700 mb-2">
-                  {selectedRoom?.roomName}
-                  <button
-                    onClick={() => setSelectedRoom(undefined)}
-                    className="px-2 py-1 bg-orange-500 text-white rounded-lg text-xs hover:bg-orange-600 transition-colors duration-300"
-                  >
-                    Close &times;
-                  </button>
-                </h4>
-                <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3">
-                  {subRooms &&
-                    subRooms.map((room) => (
-                      <RoomCard key={`${room.buildingId}-${room.roomId}`} onClick={handleRoomClick} room={room} cachedSubrooms={allBuildingSubrooms} />
-                    ))}
-                </div>
+              style={{
+                gridColumn: "1 / -1",
+                animation: "fadeInSlideUp 0.5s ease-out forwards",
+              }}
+            >
+              <h4 className="flex justify-between text-normal text-gray-700 mb-2">
+                {selectedRoom?.roomName}
+                <button
+                  onClick={() => setSelectedRoom(undefined)}
+                  className="px-2 py-1 bg-orange-500 text-white rounded-lg text-xs hover:bg-orange-600 transition-colors duration-300"
+                >
+                  Close &times;
+                </button>
+              </h4>
+              <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3">
+                {subRooms &&
+                  subRooms.map((room) => (
+                    <RoomCard key={`${room.buildingId}-${room.roomId}`} onClick={handleRoomClick} room={room} cachedSubrooms={allBuildingSubrooms} />
+                  ))}
               </div>
-            );
-          }
-        })
-      : items.push(
-          <div key={"No Room Found"} className="text-gray-600">
-            No rooms found{" "}
-          </div>
-        );
+            </div>
+          );
+        }
+      });
+    } else {
+      items.push(
+        <div key={"No Room Found"} className="text-gray-600">
+          No rooms found{" "}
+        </div>
+      );
+    }
 
     return items;
   };

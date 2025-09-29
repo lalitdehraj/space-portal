@@ -125,7 +125,10 @@ function RoomPage() {
     let allSucceeded = true;
     for (const allocation of allocations) {
       try {
-        const response = await callApi<any>(process.env.NEXT_PUBLIC_INSERT_SPACE_ALLOCATION_ENTRY || URL_NOT_FOUND, allocation);
+        const response = await callApi<{ success: boolean; data?: unknown }>(
+          process.env.NEXT_PUBLIC_INSERT_SPACE_ALLOCATION_ENTRY || URL_NOT_FOUND,
+          allocation
+        );
         if (!response?.data) {
           console.warn("Insert failed for allocation:", allocation, response);
           allSucceeded = false;
@@ -252,7 +255,7 @@ function RoomPage() {
                       <p className="text-lg font-semibold">{roomInfo.capacity}</p>
                     </div>
                     <div>
-                      <p className="text-sm text-gray-500">Today's Bookings</p>
+                      <p className="text-sm text-gray-500">Today&apos;s Bookings</p>
                       <p className="text-lg font-semibold">
                         {roomInfo.occupants?.filter((o) => moment().format("YYYY-MM-DD") === moment(new Date(o.scheduledDate)).format("YYYY-MM-DD")).length}
                       </p>

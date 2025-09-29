@@ -19,9 +19,9 @@ const handler = NextAuth({
     },
     async session({ session, token }) {
       // console.log("Logger: ", session, token);
-      //@ts-expect-error
+      //@ts-expect-error - Extending session object with custom properties
       session.accessToken = token.accessToken;
-      //@ts-expect-error
+      //@ts-expect-error - Extending session object with custom properties
       session.idToken = token.idToken;
       return session;
     },

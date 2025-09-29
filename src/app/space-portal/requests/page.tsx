@@ -49,18 +49,18 @@ const recurrenceStatus: { [key: string]: number } = {
 function sortData(data: RoomRequest[], key: keyof RoomRequest, sortOrder: sortingTypes) {
   if (sortOrder === "") return data;
   return [...data].sort((a, b) => {
-    let valueA: any = a[key];
-    let valueB: any = b[key];
+    let valueA: unknown = a[key];
+    let valueB: unknown = b[key];
 
     if (key === "priority") {
-      valueA = priorityOrder[valueA] || 999;
-      valueB = priorityOrder[valueB] || 999;
+      valueA = priorityOrder[valueA as string] || 999;
+      valueB = priorityOrder[valueB as string] || 999;
     } else if (key === "status") {
-      valueA = statusOrder[valueA] || 999;
-      valueB = statusOrder[valueB] || 999;
+      valueA = statusOrder[valueA as string] || 999;
+      valueB = statusOrder[valueB as string] || 999;
     } else if (key === "recurrence") {
-      valueA = recurrenceStatus[valueA] || 1;
-      valueB = recurrenceStatus[valueB] || 1;
+      valueA = recurrenceStatus[valueA as string] || 1;
+      valueB = recurrenceStatus[valueB as string] || 1;
     }
 
     if (valueA === null || valueA === undefined) valueA = "";
@@ -71,10 +71,17 @@ function sortData(data: RoomRequest[], key: keyof RoomRequest, sortOrder: sortin
     if (typeof valueA === "string" && typeof valueB === "string") {
       comparison = valueA.localeCompare(valueB);
     } else {
-      if (valueA > valueB) {
-        comparison = 1;
-      } else if (valueA < valueB) {
-        comparison = -1;
+      // Convert to numbers for comparison if possible, otherwise compare as strings
+      const numA = typeof valueA === "number" ? valueA : Number(valueA);
+      const numB = typeof valueB === "number" ? valueB : Number(valueB);
+
+      if (!isNaN(numA) && !isNaN(numB)) {
+        comparison = numA - numB;
+      } else {
+        // Fallback to string comparison
+        const strA = String(valueA);
+        const strB = String(valueB);
+        comparison = strA.localeCompare(strB);
       }
     }
     return sortOrder === "desc" ? comparison * -1 : comparison;
@@ -82,7 +89,7 @@ function sortData(data: RoomRequest[], key: keyof RoomRequest, sortOrder: sortin
 }
 
 function filterData(data: RoomRequest[], filters: { [key: string]: string[] }, searchQuery: string) {
-  let filteredBySearch = data.filter((item) => {
+  const filteredBySearch = data.filter((item) => {
     const searchableKeys = Object.values(tableHeadersList);
 
     return searchableKeys.some((key) => {

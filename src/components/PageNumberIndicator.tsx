@@ -7,25 +7,19 @@ interface PaginationProps {
   maxVisiblePages?: number;
 }
 
-const Pagination: React.FC<PaginationProps> = ({
-  currentPage,
-  totalPages,
-  onPageChange,
-  maxVisiblePages = 5,
-}) => {
+const Pagination: React.FC<PaginationProps> = ({ currentPage, totalPages, onPageChange, maxVisiblePages = 5 }) => {
   if (totalPages <= 1) return null;
 
   const getPageNumbers = () => {
     const pages: (number | "...")[] = [];
 
     const showLeftEllipsis = currentPage > Math.ceil(maxVisiblePages / 2);
-    const showRightEllipsis =
-      currentPage < totalPages - Math.floor(maxVisiblePages / 2);
+    const showRightEllipsis = currentPage < totalPages - Math.floor(maxVisiblePages / 2);
 
     const numMiddlePages = maxVisiblePages - 2; // First + Last always shown
 
     let start = Math.max(2, currentPage - Math.floor(numMiddlePages / 2));
-    let end = Math.min(totalPages - 1, start + numMiddlePages - 1);
+    const end = Math.min(totalPages - 1, start + numMiddlePages - 1);
 
     // Adjust start if end is too close to totalPages
     start = Math.max(2, end - numMiddlePages + 1);
@@ -74,9 +68,7 @@ const Pagination: React.FC<PaginationProps> = ({
             onClick={() => onPageChange(page)}
             disabled={currentPage === page}
             className={`px-2 py-1 text-xs rounded-lg shadow-sm hover:scale-125 transition-transform duration-150 ${
-              currentPage === page
-                ? "bg-orange-500 text-white cursor-default"
-                : "bg-white text-gray-700 hover:bg-gray-100 transition-colors"
+              currentPage === page ? "bg-orange-500 text-white cursor-default" : "bg-white text-gray-700 hover:bg-gray-100 transition-colors"
             }`}
           >
             {page}

@@ -23,7 +23,7 @@ const RoomIcon = (props: SVGProps<SVGSVGElement>) => (
 );
 
 const BuildingCard = ({ building, onClick }: BuildingCardProps) => {
-  let occupancyRate = Math.ceil((building.occupied / building.totalOccupancy) * 100) || 0;
+  const occupancyRate = Math.ceil((building.occupied / building.totalOccupancy) * 100) || 0;
   const occupancyBgClass = occupancyRate <= 10 ? "bg-green-700/50" : occupancyRate >= 80 ? "bg-red-700/50" : "bg-yellow-500/50";
 
   return (

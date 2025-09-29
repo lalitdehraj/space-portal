@@ -6,7 +6,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { callApi } from "@/utils/apiIntercepter";
 import { URL_NOT_FOUND } from "@/constants";
 import { useSelector } from "react-redux";
-import {  DashboardDataResponse } from "@/types";
+import { DashboardDataResponse } from "@/types";
 import { useBuildingsData } from "@/hooks/useBuildingsData";
 import { isValidDateRange } from "@/utils";
 import moment from "moment";
@@ -351,29 +351,3 @@ export default function Dashboard() {
     </div>
   );
 }
-
-type getReportData = (
-  roomId: string,
-  startDate: "YYYY-MM-DD",
-  endDate: "YYYY-MM-DD"
-) => {
-  roomNo: string; // room id would be passed here
-  programName: string; // program fetch program name using room allocation,
-  programCode: string; // program code using room allocation
-  roomType: string; // type of room
-  facultyName: string; // Employee name
-  employeeId: string; //Employee id to which the room is allocated
-  buildingId: string; //buildingId of the particular building of that room
-  facultyBlockName: string; // in case of faculty block type write name here
-  keys: string; // keys of the room
-  roomCapacity: string; // capacity of that room
-  occupancyMon: string; // in the selected date range find all mondays and calculate the total time in minutes
-  occupancyTues: string; // in the selected date range find all tuesdays and calculate the total time in minutes
-  occupancyWed: string; // in the selected date range find all wednesdays and calculate the total time in minutes
-  occupancyThus: string; // in the selected date range find all thursdays and calculate the total time in minutes
-  occupancyFri: string; // in the selected date range find all fridays and calculate the total time in minutes
-  occupancySat: string; // in the selected date range find all saturdays and calculate the total time in minutes
-  occupancySun: string; // in the selected date range find all sundays and calculate the total time in minutes
-  occupancyWeekly: string; // sum up all occupancies above
-  totalOccupancy: string; // in our case 9 hour * 60 minutes
-};

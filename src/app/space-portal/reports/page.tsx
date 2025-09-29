@@ -47,8 +47,8 @@ function sortData(data: Report[], key: keyof Report, sortOrder: sortingTypes) {
   if (!data || !Array.isArray(data)) return [];
   if (sortOrder === "") return data;
   return [...data].sort((a, b) => {
-    let valueA: any = a[key];
-    let valueB: any = b[key];
+    let valueA: unknown = a[key];
+    let valueB: unknown = b[key];
 
     if (valueA === null || valueA === undefined) valueA = "";
     if (valueB === null || valueB === undefined) valueB = "";
@@ -61,12 +61,17 @@ function sortData(data: Report[], key: keyof Report, sortOrder: sortingTypes) {
     } else if (typeof valueA === "string" && typeof valueB === "string") {
       comparison = valueA.localeCompare(valueB);
     } else {
-      if (valueA > valueB) {
-        comparison = 1;
-      } else if (valueA < valueB) {
-        comparison = -1;
+      // Convert to numbers for comparison if possible, otherwise compare as strings
+      const numA = typeof valueA === "number" ? valueA : Number(valueA);
+      const numB = typeof valueB === "number" ? valueB : Number(valueB);
+
+      if (!isNaN(numA) && !isNaN(numB)) {
+        comparison = numA - numB;
       } else {
-        comparison = 0;
+        // Fallback to string comparison
+        const strA = String(valueA);
+        const strB = String(valueB);
+        comparison = strA.localeCompare(strB);
       }
     }
     return sortOrder === "desc" ? comparison * -1 : comparison;
@@ -75,7 +80,7 @@ function sortData(data: Report[], key: keyof Report, sortOrder: sortingTypes) {
 
 export default function UtilizationReport() {
   const [jobId, setJobId] = useState<string | null>(null);
-  const [ready, setReady] = useState(false);
+  const [, setReady] = useState(false);
   const [polling, setPolling] = useState(false);
   const [isLoadingReports, setIsLoadingReports] = useState(false);
 
@@ -382,7 +387,7 @@ type FormProps = {
   setPolling: (polling: boolean) => void;
 };
 
-function GenerateReportForm({ onClosePressed, startJob, setJobId, setReady, setPolling }: FormProps) {
+function GenerateReportForm({ onClosePressed, setJobId, setReady, setPolling }: FormProps) {
   const [selectedBuildingId, setSelectedBuildingId] = useState<string>("");
   const [timePeriod, setTimePeriod] = useState<string>("thisWeek");
   const [selectedRoomId, setSelectedRoomId] = useState<string>("");
@@ -419,7 +424,7 @@ function GenerateReportForm({ onClosePressed, startJob, setJobId, setReady, setP
           setAcademicYearsList(acadYearsList);
         }
 
-        let responseSession = await callApi<AcademicSessionResponse>(process.env.NEXT_PUBLIC_GET_ACADMIC_SESSIONS || URL_NOT_FOUND);
+        const responseSession = await callApi<AcademicSessionResponse>(process.env.NEXT_PUBLIC_GET_ACADMIC_SESSIONS || URL_NOT_FOUND);
 
         if (responseSession.success) {
           setAcademicSessionsList(responseSession.data?.["Academic Session"]);
@@ -599,8 +604,8 @@ function GenerateReportForm({ onClosePressed, startJob, setJobId, setReady, setP
       } else if (reportType === "faculty") {
         fileName = `faculty_${selectedFaculty}_${acadmeicYear}_${acadmeicSession}`;
       }
-      let isNeededToGenrate= false
-      if(timePeriod === "active" || timePeriod === "thisWeek" || timePeriod === "thisMonth"){
+      let isNeededToGenrate = false;
+      if (timePeriod === "active" || timePeriod === "thisWeek" || timePeriod === "thisMonth") {
         isNeededToGenrate = true;
       }
 

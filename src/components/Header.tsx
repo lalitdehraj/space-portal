@@ -20,7 +20,6 @@ import { useRouter } from "next/navigation";
 import { encrypt } from "@/utils/encryption";
 import { signOut, useSession } from "next-auth/react";
 import { AdvancedSearch } from "./SearchBar";
-import path from "path";
 import { RootState } from "@/app/store";
 
 export type AcademicYearResponse = {
@@ -57,7 +56,7 @@ export default function Header() {
 
   // State for handling subrooms in search
   const [parentRoomsForSearch, setParentRoomsForSearch] = useState<Room[]>([]);
-  const [subroomsForSearch, setSubroomsForSearch] = useState<Room[]>([]);
+  const [, setSubroomsForSearch] = useState<Room[]>([]);
   const [loadingSubrooms, setLoadingSubrooms] = useState(false);
 
   // advanced search placeholder toggle
@@ -223,9 +222,9 @@ export default function Header() {
       const buildingResponses = await Promise.all(buildingPromises);
 
       for (const buildingRes of buildingResponses) {
-        if (buildingRes && (buildingRes as any).success && (buildingRes as any).data) {
+        if (buildingRes && (buildingRes as { success: boolean; data?: Room[] }).success && (buildingRes as { success: boolean; data?: Room[] }).data) {
           // types: callApi returns { success, data, ...}
-          aggregatedRooms.push(...((buildingRes as any).data as Room[]));
+          aggregatedRooms.push(...(buildingRes as { success: boolean; data: Room[] }).data);
         }
       }
 
@@ -273,7 +272,7 @@ export default function Header() {
 
           // Convert regular rooms to search results
           const filteredRooms: SearchResult[] = regularRooms.map((r) => ({
-            buildingId: (r as any).buildingId || (r as any).building, // defensive
+            buildingId: (r as { buildingId?: string; building?: string }).buildingId || (r as { buildingId?: string; building?: string }).building || "", // defensive
             roomId: r.roomId,
             name: r.roomName,
             type: "room",

@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { RoomRequest, Building, Room, SpaceAllocation, UserProfile, Maintenance } from "@/types";
+import { RoomRequest, Building, Room, SpaceAllocation, UserProfile, Maintenance, Occupant } from "@/types";
 import { callApi } from "@/utils/apiIntercepter";
 import { URL_NOT_FOUND } from "@/constants";
 import { useSelector } from "react-redux";
@@ -212,7 +212,7 @@ export default function RequestApproval({ requestData, onApprovalComplete, onClo
       const response = await callApi(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, requestbody);
       if (response.success) {
         const existingSlots: Slot[] =
-          (response.data as any)?.occupants?.map((o: any) => ({
+          (response.data as { occupants?: Occupant[] })?.occupants?.map((o: Occupant) => ({
             date: moment(o.scheduledDate).format("YYYY-MM-DD"),
             start: o.startTime,
             end: o.endTime,
@@ -483,7 +483,6 @@ export default function RequestApproval({ requestData, onApprovalComplete, onClo
                   {/* Subrooms */}
                   {subrooms?.map((subroom) => {
                     const subroomName = subroom.roomName || "Unknown Subroom";
-                    const subroomId = subroom?.roomId || "N/A";
                     const subroomType = subroom?.roomType ? subroom?.roomType : "N/A";
                     const capacity = subroom?.roomCapactiy || 0;
 

@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
   });
 }
 
-async function createBigXLS(filePath: string, jsonObject: any) {
+async function createBigXLS(filePath: string, jsonObject: Record<string, unknown>) {
   try {
     fs.mkdirSync(path.dirname(filePath), {
       recursive: true,
@@ -228,15 +228,9 @@ async function createBigXLS(filePath: string, jsonObject: any) {
       },
     ];
 
-    const { data: programs } = await callApi<any>(process.env.NEXT_PUBLIC_GET_PROGRAM || URL_NOT_FOUND);
+    const { data: programs } = await callApi<{ programCode: Program[] }>(process.env.NEXT_PUBLIC_GET_PROGRAM || URL_NOT_FOUND);
     const { data: employees } = await callApi<Employee[]>(process.env.NEXT_PUBLIC_GET_EMPLOYEES || URL_NOT_FOUND, {
       employeeCode: "",
-    });
-    const { data: departments } = await callApi<Department[]>(process.env.NEXT_PUBLIC_GET_FACULTY_OR_DEPARTMENT || URL_NOT_FOUND, {
-      filterValue: "DEPARTMENT",
-    });
-    const { data: faculties } = await callApi<Faculty[]>(process.env.NEXT_PUBLIC_GET_FACULTY_OR_DEPARTMENT || URL_NOT_FOUND, {
-      filterValue: "FACULTY",
     });
 
     const { data: roomAllocation } = await callApi<Allocation[]>(process.env.NEXT_PUBLIC_GET_ROOM_ALLOCATIONS || URL_NOT_FOUND, {
@@ -244,15 +238,15 @@ async function createBigXLS(filePath: string, jsonObject: any) {
       acadYear: jsonObject.academicYr,
     });
 
-    const handleRoom = async (roomData: any) => {
+    const handleRoom = async (roomData: RoomInfo) => {
       const allocations = roomAllocation?.filter((a) => a.roomNo === roomData.id);
 
-      let occupants = roomData?.occupants;
+      let occupants = roomData?.occupants || [];
       if (jsonObject.reportType === "department") occupants = occupants.filter((o: Occupant) => o.department === jsonObject.departmentId);
       if (jsonObject.reportType === "faculty") occupants = occupants.filter((o: Occupant) => o.department === jsonObject.facultyId);
 
-      const week = getRoomOccupancyByWeekday(occupants || []);
-      const vacant = getVacantSlotsByWeekday(occupants || []);
+      const week = getRoomOccupancyByWeekday(occupants);
+      const vacant = getVacantSlotsByWeekday(occupants);
       const programsCode: string[] = allocations?.map((a) => a.program) ?? [];
       const startRow = worksheet.rowCount + 1;
 
@@ -285,7 +279,7 @@ async function createBigXLS(filePath: string, jsonObject: any) {
       } else {
         // If there are programs, process them normally.
         programsCode.forEach((code) => {
-          const program = programs?.programCode?.find((p: any) => p.code === code);
+          const program = programs?.programCode?.find((p: Program) => p.code === code);
           const rowEntry: ReportData = {
             roomNo: String(roomData.parentId ? `${roomData?.parentId} - ${roomData?.id}` : `${roomData?.id}`),
             roomType: roomData?.roomType ?? "",
@@ -323,13 +317,13 @@ async function createBigXLS(filePath: string, jsonObject: any) {
       }
     };
 
-    const handleFacultySeating = async (emp: Employee, roomData: any) => {
+    const handleFacultySeating = async (emp: Employee, roomData: RoomInfo[]) => {
       const program = programs?.programCode?.find((p: Program) => p.code === emp.programCode);
 
-      const roomsMap: Record<string, any> = {};
+      const roomsMap: Record<string, RoomInfo> = {};
 
       if (jsonObject.reportType === "building") {
-        roomData.forEach((r: any) => {
+        roomData.forEach((r: RoomInfo) => {
           r?.occupants?.forEach((o: Occupant) => {
             if (o.occupantId === emp.employeeCode) {
               roomsMap[r.id] = r; // keyed by room id
@@ -338,7 +332,7 @@ async function createBigXLS(filePath: string, jsonObject: any) {
         });
       }
       if (jsonObject.reportType === "department") {
-        roomData.forEach((r: any) => {
+        roomData.forEach((r: RoomInfo) => {
           r?.occupants?.forEach((o: Occupant) => {
             if (o.department && o.department === jsonObject.departmentId) {
               roomsMap[r.id] = r; // keyed by room id
@@ -347,7 +341,7 @@ async function createBigXLS(filePath: string, jsonObject: any) {
         });
       }
       if (jsonObject.reportType === "faculty") {
-        roomData.forEach((r: any) => {
+        roomData.forEach((r: RoomInfo) => {
           r?.occupants?.forEach((o: Occupant) => {
             if (o.facultyCode && o.facultyCode === jsonObject.facultyId) {
               roomsMap[r.id] = r; // keyed by room id
@@ -357,7 +351,7 @@ async function createBigXLS(filePath: string, jsonObject: any) {
       }
 
       // Convert hashmap back to array if needed
-      const roomsInWhichEmp: any[] = Object.values(roomsMap);
+      const roomsInWhichEmp: RoomInfo[] = Object.values(roomsMap);
       const startRow = worksheetFaculty.rowCount + 1;
 
       // // Add one row per matched room
@@ -369,10 +363,10 @@ async function createBigXLS(filePath: string, jsonObject: any) {
           programCode: String(emp.programCode ?? ""),
           programName: program ? program.description : "",
           academicBlock: String(room?.building ?? ""),
-          facultyBlock: String(room?.isRoom ? room?.id : room?.parentId ?? ""),
+          facultyBlock: String(room?.hasSubtype ? room?.parentId : room?.id ?? ""),
           workStation: String(room?.roomType.replace(" ", "").toLowerCase() === "workstation" ? room?.id : ""),
           cabinNo: String(room?.roomType.toLowerCase() === "cubical" ? room?.id : ""),
-          keyNo: String(room?.keys ?? ""),
+          keyNo: String(room?.occupants?.find((o: Occupant) => o.occupantId === emp.employeeCode)?.keyNo ?? ""),
           occupancy: String(room?.capacity ?? ""),
         };
 
@@ -390,7 +384,7 @@ async function createBigXLS(filePath: string, jsonObject: any) {
       }
     };
 
-    const dataManupulation = async (object: any) => {
+    const dataManupulation = async (object: Record<string, unknown>) => {
       const reqBody = {
         roomID: object.roomID,
         subroomID: "",
@@ -402,7 +396,7 @@ async function createBigXLS(filePath: string, jsonObject: any) {
 
       const roomInfoResponse = await callApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, reqBody);
       if (roomInfoResponse.success) {
-        if (!roomInfoResponse.data?.roomType.toLowerCase().includes("faculty")) {
+        if (roomInfoResponse.data && !roomInfoResponse.data?.roomType.toLowerCase().includes("faculty")) {
           // Process parent room only - occupants already contain subroom data
           await handleRoom(roomInfoResponse.data);
         }
@@ -500,7 +494,7 @@ async function createBigXLS(filePath: string, jsonObject: any) {
       });
 
       // Run everything in parallel and flatten
-      const roomInfoResponses = (await Promise.all(roomInfoPromises)).flat().filter((r) => (r.occupants?.length || 0) > 0);
+      const roomInfoResponses = (await Promise.all(roomInfoPromises)).flat().filter((r) => r && (r.occupants?.length || 0) > 0) as RoomInfo[];
 
       for (const emp of employees || []) {
         await handleFacultySeating(emp, roomInfoResponses);
@@ -565,7 +559,7 @@ async function createBigXLS(filePath: string, jsonObject: any) {
       });
 
       // Run everything in parallel and flatten
-      const roomInfoResponses = (await Promise.all(roomInfoPromises)).flat().filter((r) => (r.occupants?.length || 0) > 0);
+      const roomInfoResponses = (await Promise.all(roomInfoPromises)).flat().filter((r) => r && (r.occupants?.length || 0) > 0) as RoomInfo[];
 
       const filteredEmployees =
         employees?.filter((e) => {
@@ -635,7 +629,7 @@ async function createBigXLS(filePath: string, jsonObject: any) {
       });
 
       // Run everything in parallel and flatten
-      const roomInfoResponses = (await Promise.all(roomInfoPromises)).flat().filter((r) => (r.occupants?.length || 0) > 0);
+      const roomInfoResponses = (await Promise.all(roomInfoPromises)).flat().filter((r) => r && (r.occupants?.length || 0) > 0) as RoomInfo[];
 
       const filteredEmployees =
         employees?.filter((e) => {
@@ -660,7 +654,7 @@ async function createBigXLS(filePath: string, jsonObject: any) {
     // - Creating a fallback error report
   }
 }
-async function insertFileInfo(filePath: string, jsonObject: any) {
+async function insertFileInfo(filePath: string, jsonObject: Record<string, unknown>) {
   try {
     const fileName = path.basename(filePath);
     const stats = fs.statSync(filePath);

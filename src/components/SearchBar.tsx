@@ -15,10 +15,10 @@ export function AdvancedSearch({ onClose }: { onClose: () => void }) {
   const acadSession = useSelector((state: RootState) => state.dataState.selectedAcademicSession);
 
   // State management
-  const [buildings, setBuildings] = useState<Building[]>([]);
+  const [, setBuildings] = useState<Building[]>([]);
   const [allRooms, setAllRooms] = useState<Room[]>([]);
   const [maintenanceRecords, setMaintenanceRecords] = useState<Maintenance[]>([]);
-  const [roomInfos, setRoomInfos] = useState<Record<string, RoomInfo>>({});
+  const [, setRoomInfos] = useState<Record<string, RoomInfo>>({});
   const [loading, setLoading] = useState(false);
   const [filteredRooms, setFilteredRooms] = useState<Room[]>([]);
   const [subroomData, setSubroomData] = useState<Record<string, Room[]>>({});
@@ -636,7 +636,7 @@ export function AdvancedSearch({ onClose }: { onClose: () => void }) {
                         </svg>
                       </div>
                       <p className="text-lg font-medium">No subrooms found</p>
-                      <p className="text-sm">This room doesn't have any subrooms</p>
+                      <p className="text-sm">This room doesn&apos;t have any subrooms</p>
                     </div>
                   ) : (
                     <div>

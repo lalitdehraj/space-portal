@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { RoomInfo, Occupant, Building, Room, Maintenance } from "@/types";
 import { callApi } from "@/utils/apiIntercepter";
-import { URL_NOT_FOUND, credentials } from "@/constants";
+import { URL_NOT_FOUND } from "@/constants";
 import moment from "moment";
 import { checkSlotConflicts, Slot } from "@/utils/slotsHelper";
 import { useSelector } from "react-redux";
@@ -641,7 +641,7 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
     // Combine all occupied intervals (occupants + maintenance)
     const occupiedIntervals = [...occupantIntervals, ...maintenanceIntervals].sort((a, b) => a.start - b.start);
 
-    let freeIntervals: { start: number; end: number }[] = [];
+    const freeIntervals: { start: number; end: number }[] = [];
     let currentPosition = workingStart;
 
     // If it's today, start from current time
@@ -712,7 +712,7 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
         }) || [];
 
       // Use the proven conflict detection function from slotsHelper
-      const conflictingSlots = checkSlotConflicts([maintenanceSlot], existingSlots);
+      // const conflictingSlots = checkSlotConflicts([maintenanceSlot], existingSlots);
 
       // Find the actual occupants that conflict with the maintenance slot
       // Since checkSlotConflicts returns the NEW slots that conflict, we need to find
@@ -786,7 +786,6 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
         const existingMaintenanceEnd = moment(`${maintenanceDate} ${existingEndTime}`, "YYYY-MM-DD HH:mm");
 
         const overlaps = newMaintenanceStart.isBefore(existingMaintenanceEnd) && newMaintenanceEnd.isAfter(existingMaintenanceStart);
-
 
         return overlaps;
       });
@@ -1039,142 +1038,6 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
       setConflictRoomConflictStatus((prev) => ({ ...prev, [conflictId]: false }));
       setConflictRoomConflictType((prev) => ({ ...prev, [conflictId]: "" }));
       return false;
-    }
-  };
-
-  const handleMoveOccupant = async (occupantId: string) => {
-    const newRoomId = conflictRoomSelections[occupantId];
-    const newDate = conflictDates[occupantId];
-    const newStartTime = conflictStartTimes[occupantId];
-    const newEndTime = conflictEndTimes[occupantId];
-
-    if (!newRoomId || !newDate || !newStartTime || !newEndTime) {
-      alert("Please fill in all new slot details for this conflict");
-      return;
-    }
-
-    // Check for conflicts in the new room
-    const hasConflicts = await checkConflictRoomConflicts(occupantId, newRoomId, newDate, newStartTime, newEndTime);
-    if (hasConflicts) {
-      if (newRoomId === selectedRoomId && newDate === maintenanceDate) {
-        alert("The selected time slot conflicts with the scheduled maintenance time. Please choose a different time or room.");
-      } else {
-        alert("The selected time slot conflicts with existing occupants or maintenance in the new room. Please choose a different time or room.");
-      }
-      return;
-    }
-
-    try {
-      // First, deactivate the current allocation
-      const occupant = conflicts.find((c) => c.occupant.Id === occupantId)?.occupant;
-      if (!occupant) return;
-
-      await callApi(process.env.NEXT_PUBLIC_UPDATE_SPACE_ALLOCATION_ENTRY || URL_NOT_FOUND, {
-        allocationEntNo: occupantId,
-        isAllocationActive: false,
-        startTime: moment(occupant.startTime, "HH:mm").format("HH:mm:ss"),
-        endTime: moment(occupant.endTime, "HH:mm").format("HH:mm:ss"),
-        remarks: "Moved for maintenance",
-        scheduledDate: moment(occupant.scheduledDate).format("YYYY-MM-DD"),
-      });
-
-      // Create new allocation in the new room
-      // Find the new room (either parent room or subroom) to determine if it's a subroom
-      const newRoom = findRoomById(newRoomId);
-
-      const newAllocation = {
-        allocationDate: newDate,
-        startTime: newStartTime,
-        endTime: newEndTime,
-        purpose: occupant.type || "Class",
-        type: occupant.type || "Class",
-        allocatedRoomID: newRoom?.parentId || newRoomId, // Use parentId if it's a subroom, otherwise use the room ID
-        buildingId: allBuildingsData.find((b) => b.floors.some((f) => f.id === selectedRoomInfo?.floor))?.id,
-        subRoom: newRoom?.parentId ? newRoomId : "0", // If it's a subroom, use the subroom ID, otherwise "0"
-        academicSession: academicSession,
-        academicYear: academicYear,
-        allocatedTo: occupant.occupantName || "",
-        isAllocationActive: true,
-        keyAssigned: "",
-        remarks: `Moved from ${selectedRoomInfo?.roomName || selectedRoomInfo?.id} for maintenance`,
-        allocatedfrom: occupant.occupantName || "",
-        allocatedBy: "System", // You might want to get this from user context
-        allocatedOnDate: moment().format("YYYY-MM-DD"),
-      };
-
-      await callApi(process.env.NEXT_PUBLIC_INSERT_SPACE_ALLOCATION_ENTRY || URL_NOT_FOUND, newAllocation);
-
-      // Remove from conflicts list and clear conflict-specific data
-      setConflicts((prev) => prev.filter((c) => c.occupant.Id !== occupantId));
-      setSelectedConflicts((prev) => prev.filter((id) => id !== occupantId));
-
-      // Clear conflict-specific data
-      setConflictRoomSelections((prev) => {
-        const newSelections = { ...prev };
-        delete newSelections[occupantId];
-        return newSelections;
-      });
-      setConflictDates((prev) => {
-        const newDates = { ...prev };
-        delete newDates[occupantId];
-        return newDates;
-      });
-      setConflictStartTimes((prev) => {
-        const newTimes = { ...prev };
-        delete newTimes[occupantId];
-        return newTimes;
-      });
-      setConflictEndTimes((prev) => {
-        const newTimes = { ...prev };
-        delete newTimes[occupantId];
-        return newTimes;
-      });
-      setConflictRoomInfos((prev) => {
-        const newInfos = { ...prev };
-        delete newInfos[occupantId];
-        return newInfos;
-      });
-      setConflictAvailableSlots((prev) => {
-        const newSlots = { ...prev };
-        delete newSlots[occupantId];
-        return newSlots;
-      });
-      setConflictRoomConflictStatus((prev) => {
-        const newStatus = { ...prev };
-        delete newStatus[occupantId];
-        return newStatus;
-      });
-      setConflictRoomConflictType((prev) => {
-        const newType = { ...prev };
-        delete newType[occupantId];
-        return newType;
-      });
-      setShowConflictRoomSchedule((prev) => {
-        const newSchedule = { ...prev };
-        delete newSchedule[occupantId];
-        return newSchedule;
-      });
-      // Clear search states
-      setConflictRoomSearchInputs((prev) => {
-        const newInputs = { ...prev };
-        delete newInputs[occupantId];
-        return newInputs;
-      });
-      setShowConflictRoomDropdowns((prev) => {
-        const newDropdowns = { ...prev };
-        delete newDropdowns[occupantId];
-        return newDropdowns;
-      });
-      setConflictRoomSearchErrors((prev) => {
-        const newErrors = { ...prev };
-        delete newErrors[occupantId];
-        return newErrors;
-      });
-
-      alert("Occupant moved successfully");
-    } catch (error) {
-      console.error("Error moving occupant:", error);
-      alert("Failed to move occupant");
     }
   };
 
@@ -1503,7 +1366,7 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
                           );
                         })
                       ) : (
-                        <div className="px-3 py-2 text-sm text-gray-500 italic">No rooms found matching "{roomSearchInput}"</div>
+                        <div className="px-3 py-2 text-sm text-gray-500 italic">No rooms found matching &quot;{roomSearchInput}&quot;</div>
                       );
                     })()}
                   </div>
@@ -1778,7 +1641,7 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
                                         })
                                       ) : (
                                         <div className="px-3 py-2 text-sm text-gray-500 italic">
-                                          No rooms found matching "{conflictRoomSearchInputs[conflict.occupant.Id] || ""}"
+                                          No rooms found matching &quot;{conflictRoomSearchInputs[conflict.occupant.Id] || ""}&quot;
                                         </div>
                                       );
                                     })()}

@@ -59,8 +59,12 @@ function AllocationPage() {
   // Fetch courses
   useEffect(() => {
     const fetchCourses = async () => {
-      const res = await callApi<any>(process.env.NEXT_PUBLIC_GET_PROGRAM || URL_NOT_FOUND);
-      if (res.success) setCourses(res?.data?.programCode || []);
+      const res = await callApi<{ programCode: string[] }>(process.env.NEXT_PUBLIC_GET_PROGRAM || URL_NOT_FOUND);
+      if (res.success) {
+        const programCodes = res?.data?.programCode || [];
+        const programs: Program[] = programCodes.map((code) => ({ code, description: code }));
+        setCourses(programs);
+      }
     };
 
     fetchCourses();

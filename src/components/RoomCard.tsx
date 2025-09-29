@@ -4,6 +4,7 @@ import { callApi } from "@/utils/apiIntercepter";
 import moment from "moment";
 import { useEffect, useState } from "react";
 import { useSelector } from "react-redux";
+import { RootState } from "@/app/store";
 
 interface RoomCardProps {
   room: Room;
@@ -44,15 +45,15 @@ export default function RoomCard({ room, isExpanded = false, onClick, cachedSubr
     },
   };
 
-  const isActiveSession = useSelector((state: any) => state.dataState.isActiveSession);
-  const academicSessionStartDate = useSelector((state: any) => state.dataState.selectedAcademicSessionStartDate);
-  const academicSessionEndDate = useSelector((state: any) => state.dataState.selectedAcademicSessionEndDate);
-  const acadmeicYear = useSelector((state: any) => state.dataState.selectedAcademicYear);
-  const acadmeicSession = useSelector((state: any) => state.dataState.selectedAcademicSession);
+  const isActiveSession = useSelector((state: RootState) => state.dataState.isActiveSession);
+  const academicSessionStartDate = useSelector((state: RootState) => state.dataState.selectedAcademicSessionStartDate);
+  const academicSessionEndDate = useSelector((state: RootState) => state.dataState.selectedAcademicSessionEndDate);
+  const acadmeicYear = useSelector((state: RootState) => state.dataState.selectedAcademicYear);
+  const acadmeicSession = useSelector((state: RootState) => state.dataState.selectedAcademicSession);
 
   const [totalOccupants, setTotalOccupants] = useState<number>(0);
   const [occupancyPercent, setOccupancyPercent] = useState<number>(0);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
     const fetchRoomInfo = async () => {

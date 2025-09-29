@@ -13,7 +13,6 @@ export async function middleware(req: NextRequest) {
   // const { pathname } = req.nextUrl;
   // const userRoles = new Set<string>();
   // // const session = await getServerSession(authOptions);
-
   // const fetchUser = async (email: string | null) => {
   //   if (!email) return;
   //   try {
@@ -28,23 +27,18 @@ export async function middleware(req: NextRequest) {
   //     console.error("Error fetching user profile:", error);
   //   }
   // };
-
   // if (PUBLIC_PATHS.some((path) => pathname.startsWith(path)) || PUBLIC_FILE.test(pathname)) {
   //   return NextResponse.next();
   // }
-
   // // If there's no session, redirect to the login page
   // if (!session) {
   //   const url = req.nextUrl.clone();
   //   url.pathname = "/login";
   //   return NextResponse.redirect(url);
   // }
-
   // fetchUser(null);
-
   // const hasAccess = Array.from(userRoles).some((role) => pathname.includes(role));
   // console.log("hasAccess::", hasAccess);
-
   // if (hasAccess) return NextResponse.next();
 }
 export const config = {

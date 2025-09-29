@@ -1,5 +1,5 @@
 import React from "react";
-import { X, Eye } from "lucide-react";
+import { X } from "lucide-react";
 import moment from "moment";
 import { Maintenance } from "@/types";
 

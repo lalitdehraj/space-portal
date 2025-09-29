@@ -38,6 +38,7 @@ export interface Occupant {
   occupantName?: string;
   type?: string;
   Id: string;
+  keyNo: string;
   roomId?: string;
   subroomId?: string;
   department?: string;

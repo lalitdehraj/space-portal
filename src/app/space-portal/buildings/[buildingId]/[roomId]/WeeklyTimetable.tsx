@@ -234,7 +234,7 @@ function WeeklyTimetable({
                     {/* Occupants floating */}
                     {occupants
                       .filter((o) => {
-                        const scheduledDate = new Date(o.scheduledDate as any);
+                        const scheduledDate = o.scheduledDate instanceof Date ? o.scheduledDate : new Date(o.scheduledDate);
                         return scheduledDate.toDateString() === date.toDateString();
                       })
                       .map((occupant) => {

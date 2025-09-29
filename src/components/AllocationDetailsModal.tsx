@@ -8,7 +8,7 @@ type AllocationDetailsModalProps = {
   onClose: () => void; // close modal
   onDelete: (id: string) => void; // delete callback
   onUpdate: () => void; // update callback
-  isManagedByThisUser: Boolean;
+  isManagedByThisUser: boolean;
 };
 
 export default function AllocationDetailsModal({ occupant, onClose, isManagedByThisUser, onDelete, onUpdate }: AllocationDetailsModalProps) {
