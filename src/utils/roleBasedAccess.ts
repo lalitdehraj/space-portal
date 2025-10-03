@@ -35,6 +35,7 @@ export const roleBasedAccess: RouteAccess = {
  * @returns boolean indicating if user has access
  */
 export const checkRouteAccess = (currentPath: string, userRoles: string[]): boolean => {
+  console.log("Checking route access for:", currentPath, "with roles:", userRoles);
   // Find the matching route pattern
   const matchingRoute = Object.keys(roleBasedAccess).find((route) => {
     if (route === "/space-portal/role") {
@@ -79,8 +80,8 @@ export const checkRouteAccess = (currentPath: string, userRoles: string[]): bool
  * @returns Array of unique user roles
  */
 export const extractUserRoles = (userProfiles: UserProfile[]): string[] => {
-  const roles = userProfiles?.map((u) => u.userRole) || [];
-  return Array.from(new Set(roles));
+  const roles = userProfiles?.map((u) => u.userRole.split("|")) || [];
+  return Array.from(new Set(roles.flat()));
 };
 
 /**

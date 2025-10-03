@@ -176,7 +176,7 @@ export default function RoomCard({ room, isExpanded = false, onClick, cachedSubr
     const fetchRegularRoomOccupancy = async (startDate: string, endDate: string) => {
       const requestBody = {
         roomID: room.parentId ? room.parentId : room.roomId,
-        subroomID: room.parentId ? room.roomId : 0,
+        subroomID: room.parentId ? room.roomId : "",
         academicYr: acadmeicYear,
         acadSess: acadmeicSession,
         startDate,

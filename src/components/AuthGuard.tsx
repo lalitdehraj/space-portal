@@ -30,6 +30,7 @@ export default function AuthGuard({ children }: AuthGuardProps) {
           // Filter roles for the current user only
           const currentUserRoles = response.data?.filter((u) => u.userEmail.toLowerCase() === session?.user?.email?.toLowerCase()) || [];
           const roles = extractUserRoles(currentUserRoles);
+          console.log("User roles:", roles);
           setUserRoles(roles);
         }
       } catch (error) {

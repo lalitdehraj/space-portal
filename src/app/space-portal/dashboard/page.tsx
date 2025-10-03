@@ -51,7 +51,6 @@ export default function Dashboard() {
           requestBody,
           { ttl: 2 * 60 * 1000 } // Cache for 2 minutes
         );
-        console.log(response.data);
         setData(response.data || null);
       } catch (error) {
         console.error("Error fetching dashboard data:", error);

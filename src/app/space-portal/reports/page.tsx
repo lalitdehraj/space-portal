@@ -622,7 +622,7 @@ function GenerateReportForm({ onClosePressed, setJobId, setReady, setPolling }: 
           buildingId: selectedBuildingId,
           departmentId: selectedDepartment,
           facultyId: selectedFaculty,
-          subroomID: 0,
+          subroomID: "",
           academicYr: acadmeicYear,
           acadSess: acadmeicSession,
           startDate: startDate,

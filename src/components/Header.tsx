@@ -76,7 +76,6 @@ export default function Header() {
         const response = await callApi<UserProfile[]>(process.env.NEXT_PUBLIC_GET_USER || URL_NOT_FOUND);
         if (response.success) {
           const user = response.data?.filter((u) => u.userEmail.toLowerCase() === data?.user?.email?.toLowerCase());
-          console.log(data.user, user, response.data);
           if (user && user.length > 0) {
             dispatcher(setUserRoleId(user[0].userRole));
             dispatcher(setUser(user[0]));
