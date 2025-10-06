@@ -10,7 +10,7 @@ import { RootState } from "@/app/store";
 type FormProps = {
   roomInfo: RoomInfo;
   onClose: () => void;
-  onSuccessfulAllocation: (allocation: SpaceAllocation) => void;
+  onSuccessfulAllocation: (allocations: SpaceAllocation[]) => void;
 };
 
 export default function CabinWorkstationAllocationForm({ roomInfo, onClose, onSuccessfulAllocation }: FormProps) {
@@ -58,41 +58,53 @@ export default function CabinWorkstationAllocationForm({ roomInfo, onClose, onSu
     setValidationErrors(errors);
   }, [employeeId, startDate, endDate, purpose, remarks, allocationType, keysAssigned]);
 
-  const createSpaceAllocation = (): SpaceAllocation => {
-    return {
-      allocationDate: startDate,
-      startTime: "09:00:00",
-      endTime: "18:00:00",
-      subRoom: roomInfo.parentId ? roomInfo.id : "",
-      allocatedRoomID: roomInfo.parentId ? roomInfo.parentId : roomInfo.id,
-      buildingId: roomInfo.building,
-      academicSession: acadmeicSession,
-      academicYear: acadmeicYear,
-      allocatedTo: employeeId,
-      isAllocationActive: true,
-      remarks: remarks,
-      allocatedOnDate: moment().format("YYYY-MM-DD"),
-      allocatedfrom: "Direct Allocation",
-      allocatedBy: user?.employeeId || "",
-      purpose: purpose,
-      types: allocationType,
-      keyAssigned: keysAssigned,
-    } as SpaceAllocation;
+  const createSpaceAllocations = (): SpaceAllocation[] => {
+    const allocations: SpaceAllocation[] = [];
+    const startMoment = moment(startDate);
+    const endMoment = moment(endDate);
+
+    // Generate allocations for each day between start and end date (inclusive)
+    const currentDate = startMoment.clone();
+    while (currentDate.isSameOrBefore(endMoment, "day")) {
+      allocations.push({
+        allocationDate: currentDate.format("YYYY-MM-DD"),
+        startTime: "09:00:00",
+        endTime: "18:00:00",
+        subRoom: roomInfo.parentId ? roomInfo.id : "",
+        allocatedRoomID: roomInfo.parentId ? roomInfo.parentId : roomInfo.id,
+        buildingId: roomInfo.building,
+        academicSession: acadmeicSession,
+        academicYear: acadmeicYear,
+        allocatedTo: employeeId,
+        isAllocationActive: true,
+        remarks: remarks,
+        allocatedOnDate: moment().format("YYYY-MM-DD"),
+        allocatedfrom: "Direct Allocation",
+        allocatedBy: user?.employeeId || "",
+        purpose: purpose,
+        types: allocationType,
+        keyAssigned: keysAssigned,
+      } as SpaceAllocation);
+
+      currentDate.add(1, "day");
+    }
+
+    return allocations;
   };
 
   const handleAllocate = async () => {
     setIsValidationVisible(true);
     if (validationErrors.length === 0) {
       try {
-        const allocation = createSpaceAllocation();
-        onSuccessfulAllocation(allocation);
-        setSuccessMessage("Allocation created successfully!");
+        const allocations = createSpaceAllocations();
+        onSuccessfulAllocation(allocations);
+        setSuccessMessage(`Allocations created successfully! ${allocations.length} days allocated.`);
         setTimeout(() => {
           onClose();
         }, 1500);
       } catch (error) {
-        console.error("Error creating allocation:", error);
-        setValidationErrors(["Failed to create allocation. Please try again."]);
+        console.error("Error creating allocations:", error);
+        setValidationErrors(["Failed to create allocations. Please try again."]);
       }
     }
   };
@@ -251,6 +263,24 @@ export default function CabinWorkstationAllocationForm({ roomInfo, onClose, onSu
                 </p>
               </div>
             </div>
+
+            {/* Allocation Preview */}
+            {startDate && endDate && startDate <= endDate && (
+              <div className="bg-blue-50 border border-blue-200 p-4 rounded-md">
+                <h4 className="text-sm font-medium text-blue-700 mb-2">Allocation Preview</h4>
+                <div className="text-sm text-blue-600">
+                  <p>
+                    <span className="font-medium">Duration:</span> {moment(endDate).diff(moment(startDate), "days") + 1} days
+                  </p>
+                  <p>
+                    <span className="font-medium">Period:</span> {moment(startDate).format("MMM DD, YYYY")} - {moment(endDate).format("MMM DD, YYYY")}
+                  </p>
+                  <p>
+                    <span className="font-medium">Daily Schedule:</span> 9:00 AM - 6:00 PM
+                  </p>
+                </div>
+              </div>
+            )}
           </form>
         </div>
 

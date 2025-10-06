@@ -191,17 +191,24 @@ function RoomPage() {
   };
 
   /** Handle cabin/workstation allocation */
-  const handleCabinWorkstationAllocation = async (allocation: SpaceAllocation) => {
-    try {
-      const response = await callApi<{ success: boolean; data?: unknown }>(process.env.NEXT_PUBLIC_INSERT_SPACE_ALLOCATION_ENTRY || URL_NOT_FOUND, allocation);
-      if (response?.data) {
-        fetchRoomInfo(); // Refresh data
-      } else {
-        console.warn("Insert failed for allocation:", allocation, response);
+  const handleCabinWorkstationAllocation = async (allocations: SpaceAllocation[]) => {
+    let allSucceeded = true;
+    for (const allocation of allocations) {
+      try {
+        const response = await callApi<{ success: boolean; data?: unknown }>(
+          process.env.NEXT_PUBLIC_INSERT_SPACE_ALLOCATION_ENTRY || URL_NOT_FOUND,
+          allocation
+        );
+        if (!response?.data) {
+          console.warn("Insert failed for allocation:", allocation, response);
+          allSucceeded = false;
+        }
+      } catch (error) {
+        console.error("Error inserting allocation:", allocation, error);
+        allSucceeded = false;
       }
-    } catch (error) {
-      console.error("Error inserting allocation:", allocation, error);
     }
+    if (allSucceeded) fetchRoomInfo(); // Refresh data only if all succeeded
   };
 
   /** Weekly occupancy calculation based on selected week */
@@ -227,6 +234,101 @@ function RoomPage() {
   const strokeDashoffset = circumference - (weeklyOccupancy / 100) * circumference;
 
   const borderColor = roomInfo?.occupied === 0 ? "text-green-400" : totalMinutes >= MAX_WEEKLY_MINUTES * 0.8 ? "text-red-500" : "text-yellow-400";
+
+  /** Group consecutive occupants by occupantId for Cabin/Workstation only */
+  const groupConsecutiveOccupants = (occupants: Occupant[]) => {
+    if (!occupants || occupants.length === 0) return [];
+
+    // Sort occupants by occupantId and then by scheduledDate
+    const sortedOccupants = [...occupants].sort((a, b) => {
+      const aId = a.occupantId || a.Id || "";
+      const bId = b.occupantId || b.Id || "";
+      if (aId !== bId) return aId.localeCompare(bId);
+
+      const aDate = moment(a.scheduledDate);
+      const bDate = moment(b.scheduledDate);
+      return aDate.diff(bDate);
+    });
+
+    const groupedOccupants: Array<{
+      occupantId: string;
+      occupantName: string;
+      startDate: string;
+      endDate: string;
+      isEditable: string;
+      originalOccupants: Occupant[];
+    }> = [];
+
+    let currentGroup: Occupant[] = [];
+    let currentOccupantId = "";
+
+    for (const occupant of sortedOccupants) {
+      const occupantId = occupant.occupantId || occupant.Id || "";
+
+      if (occupantId !== currentOccupantId) {
+        // Start a new group
+        if (currentGroup.length > 0) {
+          // Process the previous group
+          const groupStartDate = moment.min(currentGroup.map((o) => moment(o.scheduledDate))).format("YYYY-MM-DD");
+          const groupEndDate = moment.max(currentGroup.map((o) => moment(o.scheduledDate))).format("YYYY-MM-DD");
+
+          groupedOccupants.push({
+            occupantId: currentOccupantId,
+            occupantName: currentGroup[0].occupantName || "N/A",
+            startDate: groupStartDate,
+            endDate: groupEndDate,
+            isEditable: currentGroup[0].isEditable || "false",
+            originalOccupants: [...currentGroup],
+          });
+        }
+
+        currentGroup = [occupant];
+        currentOccupantId = occupantId;
+      } else {
+        // Check if this occupant's date is consecutive to the last occupant in the group
+        const lastOccupantDate = moment(currentGroup[currentGroup.length - 1].scheduledDate);
+        const currentOccupantDate = moment(occupant.scheduledDate);
+
+        if (currentOccupantDate.diff(lastOccupantDate, "days") === 1) {
+          // Consecutive day, add to current group
+          currentGroup.push(occupant);
+        } else {
+          // Non-consecutive day, start a new group for the same occupant
+          const groupStartDate = moment.min(currentGroup.map((o) => moment(o.scheduledDate))).format("YYYY-MM-DD");
+          const groupEndDate = moment.max(currentGroup.map((o) => moment(o.scheduledDate))).format("YYYY-MM-DD");
+
+          groupedOccupants.push({
+            occupantId: currentOccupantId,
+            occupantName: currentGroup[0].occupantName || "N/A",
+            startDate: groupStartDate,
+            endDate: groupEndDate,
+            isEditable: currentGroup[0].isEditable || "false",
+            originalOccupants: [...currentGroup],
+          });
+
+          currentGroup = [occupant];
+        }
+      }
+    }
+
+    // Process the last group
+    if (currentGroup.length > 0) {
+      const groupStartDate = moment.min(currentGroup.map((o) => moment(o.scheduledDate))).format("YYYY-MM-DD");
+      const groupEndDate = moment.max(currentGroup.map((o) => moment(o.scheduledDate))).format("YYYY-MM-DD");
+
+      groupedOccupants.push({
+        occupantId: currentOccupantId,
+        occupantName: currentGroup[0].occupantName || "N/A",
+        startDate: groupStartDate,
+        endDate: groupEndDate,
+        isEditable: currentGroup[0].isEditable || "false",
+        originalOccupants: [...currentGroup],
+      });
+    }
+
+    return groupedOccupants;
+  };
+
   return roomInfo ? (
     <>
       <section className="bg-white w-full">
@@ -370,35 +472,80 @@ function RoomPage() {
                             </tr>
                           </thead>
                           <tbody className="bg-white divide-y divide-gray-200">
-                            {roomInfo.occupants && roomInfo.occupants.length > 0 ? (
-                              roomInfo.occupants.map((occupant, index) => (
-                                <tr key={occupant.Id || index} className="hover:bg-gray-50">
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{occupant.occupantId || occupant.Id || "N/A"}</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{occupant.occupantName || "N/A"}</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                    {occupant.scheduledDate ? moment(occupant.scheduledDate).format("DD/MM/YYYY") : "N/A"}
-                                  </td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                    {occupant.endTime ? moment(occupant.scheduledDate).format("DD/MM/YYYY") : "N/A"}
-                                  </td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                    {occupant.isEditable === "true" && isManagedByThisUser ? (
-                                      <button className="text-[#F26722] hover:text-[#a5705a] transition-colors" onClick={() => handleEditOccupant(occupant)}>
-                                        Edit
-                                      </button>
-                                    ) : (
-                                      <span className="text-gray-400">Not editable</span>
-                                    )}
+                            {(() => {
+                              // Use grouped occupants for Cabin/Workstation, individual occupants for other room types
+                              const shouldGroup = roomInfo.roomType.toLowerCase() === "workstation" || roomInfo.roomType.toLowerCase() === "cabin";
+                              const displayData = shouldGroup ? groupConsecutiveOccupants(roomInfo.occupants || []) : roomInfo.occupants || [];
+
+                              return displayData.length > 0 ? (
+                                displayData.map((item, index) => {
+                                  if (shouldGroup) {
+                                    // Grouped data for Cabin/Workstation
+                                    const group = item as {
+                                      occupantId: string;
+                                      occupantName: string;
+                                      startDate: string;
+                                      endDate: string;
+                                      isEditable: string;
+                                      originalOccupants: Occupant[];
+                                    };
+                                    return (
+                                      <tr key={`${group.occupantId}-${index}`} className="hover:bg-gray-50">
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{group.occupantId}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{group.occupantName}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{moment(group.startDate).format("DD/MM/YYYY")}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{moment(group.endDate).format("DD/MM/YYYY")}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                          {group.isEditable === "true" && isManagedByThisUser ? (
+                                            <button
+                                              className="text-[#F26722] hover:text-[#a5705a] transition-colors"
+                                              onClick={() => handleEditOccupant(group.originalOccupants[0])}
+                                            >
+                                              Edit
+                                            </button>
+                                          ) : (
+                                            <span className="text-gray-400">Not editable</span>
+                                          )}
+                                        </td>
+                                      </tr>
+                                    );
+                                  } else {
+                                    // Individual data for other room types
+                                    const occupant = item as Occupant;
+                                    return (
+                                      <tr key={occupant.Id || index} className="hover:bg-gray-50">
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{occupant.occupantId || occupant.Id || "N/A"}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{occupant.occupantName || "N/A"}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                          {occupant.scheduledDate ? moment(occupant.scheduledDate).format("DD/MM/YYYY") : "N/A"}
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                          {occupant.endTime ? moment(occupant.scheduledDate).format("DD/MM/YYYY") : "N/A"}
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                          {occupant.isEditable === "true" && isManagedByThisUser ? (
+                                            <button
+                                              className="text-[#F26722] hover:text-[#a5705a] transition-colors"
+                                              onClick={() => handleEditOccupant(occupant)}
+                                            >
+                                              Edit
+                                            </button>
+                                          ) : (
+                                            <span className="text-gray-400">Not editable</span>
+                                          )}
+                                        </td>
+                                      </tr>
+                                    );
+                                  }
+                                })
+                              ) : (
+                                <tr>
+                                  <td colSpan={5} className="px-6 py-4 text-center text-sm text-gray-500">
+                                    No occupants found
                                   </td>
                                 </tr>
-                              ))
-                            ) : (
-                              <tr>
-                                <td colSpan={5} className="px-6 py-4 text-center text-sm text-gray-500">
-                                  No occupants found
-                                </td>
-                              </tr>
-                            )}
+                              );
+                            })()}
                           </tbody>
                         </table>
                       </div>
