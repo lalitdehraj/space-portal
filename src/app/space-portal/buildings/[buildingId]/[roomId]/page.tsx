@@ -235,15 +235,13 @@ function RoomPage() {
     }
 
     try {
-      // Here you would typically call an API to update the occupant
-      // For now, we'll just refresh the data
-      console.log("Saving occupant edit:", editingOccupant, editFormData);
-
-      // TODO: Implement actual API call to update occupant
-      // await callApi(process.env.NEXT_PUBLIC_UPDATE_OCCUPANT || URL_NOT_FOUND, {
-      //   occupantId: editingOccupant.Id,
-      //   ...editFormData
-      // });
+      // For cabins and workstations, we need to handle date range changes
+      if (roomInfo?.roomType.toLowerCase() === "workstation" || roomInfo?.roomType.toLowerCase() === "cabin") {
+        await handleCabinWorkstationDateChange();
+      } else {
+        // For other room types, handle individual occupant update
+        await handleIndividualOccupantUpdate();
+      }
 
       setEditingOccupant(null);
       setEditFormData({ startDate: "", endDate: "", startTime: "", endTime: "" });
@@ -251,6 +249,175 @@ function RoomPage() {
       fetchRoomInfo(); // Refresh data
     } catch (error) {
       console.error("Error updating occupant:", error);
+    }
+  };
+
+  /** Handle cabin/workstation date range changes */
+  const handleCabinWorkstationDateChange = async () => {
+    if (!editingOccupant || !roomInfo) return;
+
+    // Find the grouped occupants for this occupant
+    const groupedOccupants = groupConsecutiveOccupants(roomInfo.occupants || []);
+    const group = groupedOccupants.find((g) => g.originalOccupants.some((o) => o.Id === editingOccupant.Id || o.occupantId === editingOccupant.occupantId));
+
+    if (!group) {
+      console.error("Could not find occupant group");
+      return;
+    }
+
+    const newStartDate = moment(editFormData.startDate);
+    const newEndDate = moment(editFormData.endDate);
+    const originalStartDate = moment(group.startDate);
+    const originalEndDate = moment(group.endDate);
+
+    // Split occupants into two groups
+    const occupantsToKeep: Occupant[] = [];
+    const occupantsToUnallocate: Occupant[] = [];
+
+    group.originalOccupants.forEach((occupant) => {
+      const occupantDate = moment(occupant.scheduledDate);
+
+      if (occupantDate.isBetween(newStartDate, newEndDate, "day", "[]")) {
+        // Occupant date is within the new range - keep them
+        occupantsToKeep.push(occupant);
+      } else {
+        // Occupant date is beyond the new range - unallocate them
+        occupantsToUnallocate.push(occupant);
+      }
+    });
+
+    console.log("Occupants to keep:", occupantsToKeep.length);
+    console.log("Occupants to unallocate:", occupantsToUnallocate.length);
+
+    // Unallocate occupants that are beyond the new end date
+    if (occupantsToUnallocate.length > 0) {
+      await unallocateOccupants(occupantsToUnallocate);
+    }
+
+    // Check if we need to create new allocations for extended dates
+    if (newEndDate.isAfter(originalEndDate, "day")) {
+      console.log("End date extended beyond original allocation - creating new allocations");
+      await createExtendedAllocations(group, originalEndDate, newEndDate);
+    }
+
+    // If there are no occupants left to keep, we might need to handle this case
+    if (occupantsToKeep.length === 0) {
+      console.warn("No occupants left after date change - this might need special handling");
+    }
+  };
+
+  /** Create new allocations for extended date range */
+  const createExtendedAllocations = async (group: any, originalEndDate: moment.Moment, newEndDate: moment.Moment) => {
+    try {
+      // Get the first occupant to use as template for new allocations
+      const templateOccupant = group.originalOccupants[0];
+      if (!templateOccupant) {
+        console.error("No template occupant found for creating extended allocations");
+        return;
+      }
+
+      // Create allocations for each day from day after original end date to new end date
+      const currentDate = originalEndDate.clone().add(1, "day");
+      const allocations: SpaceAllocation[] = [];
+
+      while (currentDate.isSameOrBefore(newEndDate, "day")) {
+        // Copy all details from the existing allocation
+        const newAllocation: SpaceAllocation = {
+          allocationDate: currentDate.format("YYYY-MM-DD"),
+          startTime: "09:00:00",
+          endTime: "18:00:00",
+          subRoom: templateOccupant.subroomId || (roomInfo?.parentId ? roomInfo.id : ""),
+          allocatedRoomID: templateOccupant.roomId || (roomInfo?.parentId ? roomInfo.parentId : roomInfo?.id || ""),
+          buildingId: templateOccupant.buildingId || roomInfo?.building || "",
+          academicSession: templateOccupant.academicSession || acadmeicSession,
+          academicYear: templateOccupant.academicYear || acadmeicYear,
+          allocatedTo: templateOccupant.occupantId || templateOccupant.Id || "",
+          isAllocationActive: true,
+          remarks: templateOccupant.remarks || "",
+          allocatedOnDate: moment().format("YYYY-MM-DD"),
+          allocatedfrom: templateOccupant.allocatedfrom || "Extended Allocation",
+          allocatedBy: templateOccupant.allocatedBy || "",
+          purpose: templateOccupant.purpose || "",
+          types: templateOccupant.type || "",
+          keyAssigned: templateOccupant.keyAssigned || "",
+        };
+
+        allocations.push(newAllocation);
+        currentDate.add(1, "day");
+      }
+
+      console.log(`Creating ${allocations.length} new allocations for extended period`);
+      console.log("Using template occupant for extended allocations:", templateOccupant);
+      console.log("Sample allocation data:", allocations[0]);
+
+      // Insert the new allocations
+      let allSucceeded = true;
+      for (const allocation of allocations) {
+        try {
+          const response = await callApi<{ success: boolean; data?: unknown }>(
+            process.env.NEXT_PUBLIC_INSERT_SPACE_ALLOCATION_ENTRY || URL_NOT_FOUND,
+            allocation
+          );
+          if (!response?.data) {
+            console.warn("Insert failed for extended allocation:", allocation, response);
+            allSucceeded = false;
+          } else {
+            console.log("Successfully created allocation for:", allocation.allocationDate);
+          }
+        } catch (error) {
+          console.error("Error inserting extended allocation:", allocation, error);
+          allSucceeded = false;
+        }
+      }
+
+      if (allSucceeded) {
+        console.log("Successfully created extended allocations");
+      } else {
+        console.error("Some extended allocations failed to create");
+      }
+    } catch (error) {
+      console.error("Error creating extended allocations:", error);
+    }
+  };
+
+  /** Handle individual occupant update for non-cabin/workstation rooms */
+  const handleIndividualOccupantUpdate = async () => {
+    if (!editingOccupant) return;
+
+    console.log("Saving individual occupant edit:", editingOccupant, editFormData);
+
+    // TODO: Implement actual API call to update individual occupant
+    // await callApi(process.env.NEXT_PUBLIC_UPDATE_OCCUPANT || URL_NOT_FOUND, {
+    //   occupantId: editingOccupant.Id,
+    //   ...editFormData
+    // });
+  };
+
+  /** Unallocate occupants by calling the appropriate API */
+  const unallocateOccupants = async (occupants: Occupant[]) => {
+    try {
+      for (const occupant of occupants) {
+        console.log("Unallocating occupant:", occupant.Id, "for date:", occupant.scheduledDate);
+
+        const response = await callApi(process.env.NEXT_PUBLIC_UPDATE_SPACE_ALLOCATION_ENTRY || URL_NOT_FOUND, {
+          allocationEntNo: occupant.Id,
+          isAllocationActive: false,
+          roomID: occupant.roomId || roomId || "",
+          subRoomID: occupant.subroomId || subRoomId || "",
+          startTime: occupant.startTime ? moment(occupant.startTime, "HH:mm").format("HH:mm:ss") : "",
+          endTime: occupant.endTime ? moment(occupant.endTime, "HH:mm").format("HH:mm:ss") : "",
+          remarks: "",
+          scheduledDate: occupant.scheduledDate ? moment(occupant.scheduledDate).format("YYYY-MM-DD") : "",
+        });
+
+        if (!response.success) {
+          console.error("Failed to unallocate occupant:", occupant.Id, response);
+          throw new Error(`Failed to unallocate occupant ${occupant.Id}`);
+        }
+      }
+    } catch (error) {
+      console.error("Error unallocating occupants:", error);
+      throw error;
     }
   };
 
