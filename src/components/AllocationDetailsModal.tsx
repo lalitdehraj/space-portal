@@ -53,9 +53,17 @@ export default function AllocationDetailsModal({ occupant, onClose, isManagedByT
             <p className="font-medium text-gray-800">{occupant.occupantName}</p>
           </div>
 
-          <div>
-            <p className="text-gray-500">Type</p>
-            <p className="font-medium text-gray-800">{occupant.type}</p>
+          <div className="flex gap-12">
+            <div>
+              <p className="text-gray-500">Type</p>
+              <p className="font-medium text-gray-800">{occupant.type}</p>
+            </div>
+            {occupant.programCode && (
+              <div>
+                <p className="text-gray-500">Program Code</p>
+                <p className="font-medium text-gray-800">{occupant.programCode}</p>
+              </div>
+            )}
           </div>
 
           <div>
