@@ -47,6 +47,7 @@ function RoomPage() {
     startTime: "",
     endTime: "",
   });
+  const [editValidationErrors, setEditValidationErrors] = useState<string[]>([]);
 
   // Use custom hook for buildings data
   const { buildings: allBuildingsData } = useBuildingsData();
@@ -153,17 +154,85 @@ function RoomPage() {
   /** Handle edit occupant */
   const handleEditOccupant = (occupant: Occupant) => {
     setEditingOccupant(occupant);
-    setEditFormData({
-      startDate: occupant.scheduledDate ? moment(occupant.scheduledDate).format("YYYY-MM-DD") : "",
-      endDate: occupant.scheduledDate ? moment(occupant.scheduledDate).format("YYYY-MM-DD") : "",
-      startTime: occupant.startTime || "",
-      endTime: occupant.endTime || "",
-    });
+
+    // For cabins and workstations, we need to find the grouped data to get the actual date range
+    if (roomInfo?.roomType.toLowerCase() === "workstation" || roomInfo?.roomType.toLowerCase() === "cabin") {
+      const groupedOccupants = groupConsecutiveOccupants(roomInfo.occupants || []);
+      const group = groupedOccupants.find((g) => g.originalOccupants.some((o) => o.Id === occupant.Id || o.occupantId === occupant.occupantId));
+
+      if (group) {
+        setEditFormData({
+          startDate: group.startDate,
+          endDate: group.endDate,
+          startTime: "", // No time fields for cabins/workstations
+          endTime: "", // No time fields for cabins/workstations
+        });
+      } else {
+        // Fallback to individual occupant data
+        setEditFormData({
+          startDate: occupant.scheduledDate ? moment(occupant.scheduledDate).format("YYYY-MM-DD") : "",
+          endDate: occupant.scheduledDate ? moment(occupant.scheduledDate).format("YYYY-MM-DD") : "",
+          startTime: "",
+          endTime: "",
+        });
+      }
+    } else {
+      // For other room types, use individual occupant data
+      setEditFormData({
+        startDate: occupant.scheduledDate ? moment(occupant.scheduledDate).format("YYYY-MM-DD") : "",
+        endDate: occupant.scheduledDate ? moment(occupant.scheduledDate).format("YYYY-MM-DD") : "",
+        startTime: occupant.startTime || "",
+        endTime: occupant.endTime || "",
+      });
+    }
+  };
+
+  /** Validate edit form data */
+  const validateEditForm = (): string[] => {
+    const errors: string[] = [];
+
+    if (!editFormData.endDate) {
+      errors.push("End date is required.");
+    } else {
+      const endDate = moment(editFormData.endDate);
+      const startDate = moment(editFormData.startDate);
+      const today = moment();
+
+      if (endDate.isBefore(today, "day")) {
+        errors.push("End date cannot be before today's date.");
+      }
+
+      if (endDate.isBefore(startDate, "day")) {
+        errors.push("End date cannot be before start date.");
+      }
+    }
+
+    // For non-cabin/workstation room types, validate time fields
+    if (roomInfo?.roomType.toLowerCase() !== "workstation" && roomInfo?.roomType.toLowerCase() !== "cabin") {
+      if (!editFormData.startTime) {
+        errors.push("Start time is required.");
+      }
+      if (!editFormData.endTime) {
+        errors.push("End time is required.");
+      }
+      if (editFormData.startTime && editFormData.endTime && editFormData.startTime >= editFormData.endTime) {
+        errors.push("End time must be after start time.");
+      }
+    }
+
+    return errors;
   };
 
   /** Handle save edit */
   const handleSaveEdit = async () => {
     if (!editingOccupant) return;
+
+    const validationErrors = validateEditForm();
+    setEditValidationErrors(validationErrors);
+
+    if (validationErrors.length > 0) {
+      return; // Don't proceed if there are validation errors
+    }
 
     try {
       // Here you would typically call an API to update the occupant
@@ -178,6 +247,7 @@ function RoomPage() {
 
       setEditingOccupant(null);
       setEditFormData({ startDate: "", endDate: "", startTime: "", endTime: "" });
+      setEditValidationErrors([]);
       fetchRoomInfo(); // Refresh data
     } catch (error) {
       console.error("Error updating occupant:", error);
@@ -188,6 +258,7 @@ function RoomPage() {
   const handleCancelEdit = () => {
     setEditingOccupant(null);
     setEditFormData({ startDate: "", endDate: "", startTime: "", endTime: "" });
+    setEditValidationErrors([]);
   };
 
   /** Handle cabin/workstation allocation */
@@ -601,9 +672,30 @@ function RoomPage() {
 
       {/* Edit Occupant Modal */}
       {editingOccupant && (
-        <div className="fixed inset-0 bg-[#00000070] bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-[#00000070] bg-opacity-50 text-gray-500 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
             <h3 className="text-lg font-semibold mb-4 text-gray-800">Edit Occupant</h3>
+
+            {/* Validation Errors */}
+            {editValidationErrors.length > 0 && (
+              <div className="bg-red-100 border border-red-300 text-red-700 rounded p-3 mb-4">
+                <div className="flex items-center mb-2">
+                  <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <path
+                      fillRule="evenodd"
+                      d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                  <span className="text-sm font-medium">Please fix the following errors:</span>
+                </div>
+                <ul className="text-sm list-disc ml-6">
+                  {editValidationErrors.map((error, idx) => (
+                    <li key={idx}>{error}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             <div className="space-y-4">
               <div>
@@ -615,9 +707,10 @@ function RoomPage() {
                 <input
                   type="date"
                   value={editFormData.startDate}
-                  onChange={(e) => setEditFormData({ ...editFormData, startDate: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#F26722]"
+                  disabled
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 text-gray-500 cursor-not-allowed"
                 />
+                <p className="text-xs text-gray-500 mt-1">Start date cannot be modified</p>
               </div>
 
               <div>
@@ -625,30 +718,37 @@ function RoomPage() {
                 <input
                   type="date"
                   value={editFormData.endDate}
+                  min={editFormData.startDate > moment().format("YYYY-MM-DD") ? editFormData.startDate : moment().format("YYYY-MM-DD")}
                   onChange={(e) => setEditFormData({ ...editFormData, endDate: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#F26722]"
                 />
+                <p className="text-xs text-gray-500 mt-1">End date must be after start date and not before today</p>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Start Time</label>
-                <input
-                  type="time"
-                  value={editFormData.startTime}
-                  onChange={(e) => setEditFormData({ ...editFormData, startTime: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#F26722]"
-                />
-              </div>
+              {/* Only show time fields for non-cabin/workstation room types */}
+              {roomInfo?.roomType.toLowerCase() !== "workstation" && roomInfo?.roomType.toLowerCase() !== "cabin" && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Start Time</label>
+                    <input
+                      type="time"
+                      value={editFormData.startTime}
+                      onChange={(e) => setEditFormData({ ...editFormData, startTime: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#F26722]"
+                    />
+                  </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">End Time</label>
-                <input
-                  type="time"
-                  value={editFormData.endTime}
-                  onChange={(e) => setEditFormData({ ...editFormData, endTime: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#F26722]"
-                />
-              </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">End Time</label>
+                    <input
+                      type="time"
+                      value={editFormData.endTime}
+                      onChange={(e) => setEditFormData({ ...editFormData, endTime: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#F26722]"
+                    />
+                  </div>
+                </>
+              )}
             </div>
 
             <div className="flex justify-end space-x-3 mt-6">

@@ -1,11 +1,48 @@
 import React, { useState, useEffect } from "react";
 import { callApi } from "@/utils/apiIntercepter";
 import { URL_NOT_FOUND } from "@/constants";
-import { Employee, RoomInfo, SpaceAllocation, UserProfile } from "@/types";
+import { Employee, RoomInfo, SpaceAllocation, UserProfile, Maintenance, Occupant } from "@/types";
 import { useSelector } from "react-redux";
 import { Check, X } from "lucide-react";
 import moment from "moment";
 import { RootState } from "@/app/store";
+
+// Helper function to group consecutive dates and format conflicts
+const groupConsecutiveDates = (dates: string[]): string => {
+  if (dates.length === 0) return "";
+  if (dates.length === 1) return moment(dates[0]).format("MMM DD, YYYY");
+
+  const sortedDates = [...dates].sort();
+  const ranges: string[] = [];
+  let start = moment(sortedDates[0]);
+  let end = moment(sortedDates[0]);
+
+  for (let i = 1; i < sortedDates.length; i++) {
+    const current = moment(sortedDates[i]);
+    const prev = moment(sortedDates[i - 1]);
+
+    if (current.diff(prev, "days") === 1) {
+      end = current;
+    } else {
+      if (start.isSame(end)) {
+        ranges.push(start.format("MMM DD, YYYY"));
+      } else {
+        ranges.push(`${start.format("MMM DD")} - ${end.format("MMM DD, YYYY")}`);
+      }
+      start = current;
+      end = current;
+    }
+  }
+
+  // Add the last range
+  if (start.isSame(end)) {
+    ranges.push(start.format("MMM DD, YYYY"));
+  } else {
+    ranges.push(`${start.format("MMM DD")} - ${end.format("MMM DD, YYYY")}`);
+  }
+
+  return ranges.join(", ");
+};
 
 type FormProps = {
   roomInfo: RoomInfo;
@@ -30,6 +67,9 @@ export default function CabinWorkstationAllocationForm({ roomInfo, onClose, onSu
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [employeesList, setEmployeesList] = useState<Employee[]>([]);
   const [isValidationVisible, setIsValidationVisible] = useState(false);
+  const [hasConflicts, setHasConflicts] = useState(false);
+  const [conflictDetails, setConflictDetails] = useState<string[]>([]);
+  const [isCheckingConflicts, setIsCheckingConflicts] = useState(false);
 
   useEffect(() => {
     const fetchEmployees = async () => {
@@ -40,6 +80,146 @@ export default function CabinWorkstationAllocationForm({ roomInfo, onClose, onSu
     };
     fetchEmployees();
   }, []);
+
+  // Function to check maintenance conflicts for the specific room
+  const checkMaintenanceConflicts = async (): Promise<string[]> => {
+    if (!startDate || !endDate) return [];
+
+    try {
+      const response = await callApi<Maintenance[]>(process.env.NEXT_PUBLIC_GET_MAINTENANCE_DATA || URL_NOT_FOUND);
+      if (!response.success || !response.data) return [];
+
+      const allocationStart = moment(startDate);
+      const allocationEnd = moment(endDate);
+      const conflictDates: string[] = [];
+
+      response.data.forEach((maintenance) => {
+        // Only check maintenance for this specific room
+        if (!maintenance.isMainteneceActive) return;
+        if (maintenance.buildingId !== roomInfo.building || maintenance.roomid !== roomInfo.id) return;
+
+        const maintenanceDate = moment(maintenance.maintanceDate).format("YYYY-MM-DD");
+        const maintenanceStart = moment(`${maintenanceDate} ${maintenance.startTime.split("T")[1]?.split("Z")[0]?.substring(0, 5) || "00:00"}`);
+        const maintenanceEnd = moment(`${maintenanceDate} ${maintenance.endTime.split("T")[1]?.split("Z")[0]?.substring(0, 5) || "00:00"}`);
+
+        // Check if allocation period overlaps with maintenance
+        if (maintenanceEnd.isAfter(allocationStart, "day") && maintenanceStart.isBefore(allocationEnd, "day")) {
+          conflictDates.push(maintenanceDate);
+        }
+      });
+
+      // Group consecutive dates and format the conflict message
+      if (conflictDates.length > 0) {
+        const groupedDates = groupConsecutiveDates(conflictDates);
+        const startTime =
+          response.data
+            .find((m) => m.buildingId === roomInfo.building && m.roomid === roomInfo.id && m.isMainteneceActive)
+            ?.startTime.split("T")[1]
+            ?.split("Z")[0]
+            ?.substring(0, 5) || "00:00";
+        const endTime =
+          response.data
+            .find((m) => m.buildingId === roomInfo.building && m.roomid === roomInfo.id && m.isMainteneceActive)
+            ?.endTime.split("T")[1]
+            ?.split("Z")[0]
+            ?.substring(0, 5) || "00:00";
+
+        return [`Maintenance scheduled ${groupedDates} (${startTime} - ${endTime})`];
+      }
+
+      return [];
+    } catch (error) {
+      console.error("Error checking maintenance conflicts:", error);
+      return [];
+    }
+  };
+
+  // Function to check grouped occupant conflicts
+  const checkGroupedOccupantConflicts = async (): Promise<string[]> => {
+    if (!startDate || !endDate) return [];
+
+    try {
+      const allocationStart = moment(startDate);
+      const allocationEnd = moment(endDate);
+      const occupantConflicts: { [key: string]: { dates: string[]; startTime: string; endTime: string } } = {};
+
+      // Check existing occupants in the room
+      if (roomInfo.occupants && roomInfo.occupants.length > 0) {
+        roomInfo.occupants.forEach((occupant) => {
+          if (!occupant.scheduledDate || !occupant.startTime || !occupant.endTime) return;
+
+          const occupantDate = moment(occupant.scheduledDate).format("YYYY-MM-DD");
+          const occupantStart = moment(`${occupantDate} ${occupant.startTime}`);
+          const occupantEnd = moment(`${occupantDate} ${occupant.endTime}`);
+
+          // Check if allocation period overlaps with existing occupant
+          if (occupantEnd.isAfter(allocationStart, "day") && occupantStart.isBefore(allocationEnd, "day")) {
+            const occupantName = occupant.occupantName || occupant.Id || "Unknown";
+            const conflictKey = `${occupantName}_${occupant.startTime}_${occupant.endTime}`;
+
+            if (!occupantConflicts[conflictKey]) {
+              occupantConflicts[conflictKey] = {
+                dates: [],
+                startTime: occupant.startTime,
+                endTime: occupant.endTime,
+              };
+            }
+            occupantConflicts[conflictKey].dates.push(occupantDate);
+          }
+        });
+      }
+
+      // Format grouped conflicts
+      const conflicts: string[] = [];
+      Object.keys(occupantConflicts).forEach((key) => {
+        const [occupantName] = key.split("_");
+        const { dates, startTime, endTime } = occupantConflicts[key];
+        const groupedDates = groupConsecutiveDates(dates);
+        conflicts.push(`Occupied by ${occupantName} ${groupedDates} (${startTime} - ${endTime})`);
+      });
+
+      return conflicts;
+    } catch (error) {
+      console.error("Error checking occupant conflicts:", error);
+      return [];
+    }
+  };
+
+  // Function to check all conflicts for cabins and workstations
+  const checkAllConflicts = async () => {
+    // Only check conflicts for cabins and workstations
+    if (!roomInfo.roomType || !["cabin", "workstation"].includes(roomInfo.roomType.toLowerCase())) {
+      setHasConflicts(false);
+      setConflictDetails([]);
+      return;
+    }
+
+    if (!startDate || !endDate) {
+      setHasConflicts(false);
+      setConflictDetails([]);
+      return;
+    }
+
+    setIsCheckingConflicts(true);
+    try {
+      const [maintenanceConflicts, occupantConflicts] = await Promise.all([checkMaintenanceConflicts(), checkGroupedOccupantConflicts()]);
+
+      const allConflicts = [...maintenanceConflicts, ...occupantConflicts];
+      setHasConflicts(allConflicts.length > 0);
+      setConflictDetails(allConflicts);
+    } catch (error) {
+      console.error("Error checking conflicts:", error);
+      setHasConflicts(false);
+      setConflictDetails([]);
+    } finally {
+      setIsCheckingConflicts(false);
+    }
+  };
+
+  // Check conflicts when dates change
+  useEffect(() => {
+    checkAllConflicts();
+  }, [startDate, endDate]);
 
   useEffect(() => {
     const errors: string[] = [];
@@ -94,7 +274,7 @@ export default function CabinWorkstationAllocationForm({ roomInfo, onClose, onSu
 
   const handleAllocate = async () => {
     setIsValidationVisible(true);
-    if (validationErrors.length === 0) {
+    if (validationErrors.length === 0 && !hasConflicts) {
       try {
         const allocations = createSpaceAllocations();
         onSuccessfulAllocation(allocations);
@@ -137,6 +317,36 @@ export default function CabinWorkstationAllocationForm({ roomInfo, onClose, onSu
                   <li key={idx}>{err}</li>
                 ))}
               </ul>
+            </div>
+          )}
+
+          {/* Conflict Warning - Only for cabins and workstations */}
+          {["cabin", "workstation"].includes(roomInfo.roomType.toLowerCase()) && hasConflicts && (
+            <div className="bg-red-100 border border-red-300 text-red-700 rounded p-3 mb-4">
+              <div className="flex items-center mb-3">
+                <X size={16} className="mr-2" />
+                <span className="text-sm font-medium">Conflicts Detected - Cannot Assign</span>
+              </div>
+              <div className="bg-white rounded border border-red-200 p-3">
+                <div className="text-xs font-medium text-gray-600 mb-2 uppercase tracking-wide">Schedule Conflicts</div>
+                <div className="space-y-2">
+                  {conflictDetails.map((conflict, idx) => (
+                    <div key={idx} className="text-sm text-red-700 py-1 px-2 bg-red-50 rounded border-l-2 border-red-300">
+                      {conflict}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Conflict Checking Indicator */}
+          {["cabin", "workstation"].includes(roomInfo.roomType.toLowerCase()) && isCheckingConflicts && (
+            <div className="bg-blue-100 border border-blue-300 text-blue-700 rounded p-3 mb-4">
+              <div className="flex items-center">
+                <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mr-2"></div>
+                <span className="text-sm">Checking for conflicts...</span>
+              </div>
             </div>
           )}
         </div>
@@ -292,8 +502,22 @@ export default function CabinWorkstationAllocationForm({ roomInfo, onClose, onSu
           >
             Cancel
           </button>
-          <button onClick={handleAllocate} className="px-4 py-2 text-sm font-medium text-white bg-[#F26722] rounded-md hover:bg-[#a5705a] transition-colors">
-            {roomInfo.roomType.toLowerCase() === "cabin" ? "Assign Cabin" : "Assign Workstation"}
+          <button
+            onClick={handleAllocate}
+            disabled={validationErrors.length > 0 || hasConflicts || isCheckingConflicts}
+            className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+              validationErrors.length > 0 || hasConflicts || isCheckingConflicts
+                ? "text-gray-400 bg-gray-200 cursor-not-allowed"
+                : "text-white bg-[#F26722] hover:bg-[#a5705a]"
+            }`}
+          >
+            {isCheckingConflicts
+              ? "Checking Conflicts..."
+              : hasConflicts
+              ? "Cannot Assign - Conflicts Detected"
+              : roomInfo.roomType.toLowerCase() === "cabin"
+              ? "Assign Cabin"
+              : "Assign Workstation"}
           </button>
         </div>
       </div>
