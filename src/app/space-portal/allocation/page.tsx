@@ -59,11 +59,11 @@ function AllocationPage() {
   // Fetch courses
   useEffect(() => {
     const fetchCourses = async () => {
-      const res = await callApi<{ programCode: string[] }>(process.env.NEXT_PUBLIC_GET_PROGRAM || URL_NOT_FOUND);
+      const res = await callApi<{ programCode: Program[] }>(process.env.NEXT_PUBLIC_GET_PROGRAM || URL_NOT_FOUND);
       if (res.success) {
         const programCodes = res?.data?.programCode || [];
-        const programs: Program[] = programCodes.map((code) => ({ code, description: code }));
-        setCourses(programs);
+        console.log("  ", programCodes);
+        setCourses(programCodes);
       }
     };
 
@@ -158,6 +158,13 @@ function AllocationPage() {
       );
     });
   }, [allocations, courses, searchQuery]);
+  // filteredAllocations.forEach((alloc) => {
+  //   console.log(
+  //     alloc.program,
+  //     courses,
+  //     courses.find((c) => c.code === alloc.program)
+  //   );
+  // });
 
   return (
     <div>
@@ -201,8 +208,8 @@ function AllocationPage() {
                 </td>
               </tr>
             ) : (
-              filteredAllocations.map((alloc) => (
-                <tr key={alloc.systemId}>
+              filteredAllocations.map((alloc, index) => (
+                <tr key={alloc.systemId || `allocation-${index}`}>
                   <td className="px-4 py-2">
                     {`${courses.find((c) => c.code === alloc.program)?.description} ( ${courses.find((c) => c.code === alloc.program)?.code} )`}
                   </td>
@@ -239,8 +246,8 @@ function AllocationPage() {
                   required
                 >
                   <option value="">Select building</option>
-                  {buildings.map((b) => (
-                    <option key={b.id} value={b.id}>
+                  {buildings.map((b, index) => (
+                    <option key={b.id || `building-${index}`} value={b.id}>
                       {b.name}
                     </option>
                   ))}
@@ -258,8 +265,8 @@ function AllocationPage() {
                   <option value="">Select floor</option>
                   {buildings
                     .find((b) => b.id === selectedBuildingId)
-                    ?.floors.map((f) => (
-                      <option key={f.id} value={f.id}>
+                    ?.floors.map((f, index) => (
+                      <option key={f.id || `floor-${index}`} value={f.id}>
                         {f.name}
                       </option>
                     ))}
@@ -275,14 +282,14 @@ function AllocationPage() {
                   required
                 >
                   <option value="">Select room</option>
-                  {rooms.map((r) => (
-                    <option key={r.roomId} value={r.roomId}>
+                  {rooms.map((r, index) => (
+                    <option key={r.roomId || `room-${index}`} value={r.roomId}>
                       {r.roomName}
                     </option>
                   ))}
                 </select>
               </div>
-              <div className="mb-4">
+              {/* <div className="mb-4">
                 <label className="block text-sm text-gray-700 mb-1">Program Code</label>
                 <select
                   className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
@@ -291,13 +298,13 @@ function AllocationPage() {
                   required
                 >
                   <option value="">Select Course</option>
-                  {courses.map((d) => (
-                    <option key={d.code} value={d.code}>
+                  {courses.map((d, index) => (
+                    <option key={`${d.code} course-${index}`} value={d.code}>
                       {d.description}
                     </option>
                   ))}
                 </select>
-              </div>
+              </div> */}
               <div className="flex justify-end space-x-2 mt-6">
                 <button
                   type="button"

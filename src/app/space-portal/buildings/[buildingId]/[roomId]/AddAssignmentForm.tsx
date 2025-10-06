@@ -204,7 +204,7 @@ export default function AddAssignmentForm({
         startTime: `${slot.start}:00`,
         endTime: `${slot.end}:00`,
         keyAssigned: keys,
-        subRoom: roomInfo.parentId ? roomInfo.id : 0,
+        subRoom: roomInfo.parentId ? roomInfo.id : "",
         allocatedRoomID: roomInfo.parentId ? roomInfo.parentId : roomInfo.id,
         buildingId: roomInfo.building,
         academicSession: acadmeicSession,

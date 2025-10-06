@@ -256,7 +256,7 @@ export default function RequestApproval({ requestData, onApprovalComplete, onClo
       startTime: `${slot.start}`,
       endTime: `${slot.end}`,
       keyAssigned: keys,
-      subRoom: isSubroom ? subroomId : "0",
+      subRoom: isSubroom ? subroomId : "",
       allocatedRoomID: roomId,
       buildingId: selectedBuildingId,
       academicSession: academicSession,
