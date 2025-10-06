@@ -10,6 +10,7 @@ import { useSelector } from "react-redux";
 import { useBuildingsData } from "@/hooks/useBuildingsData";
 import WeeklyTimetable from "./WeeklyTimetable";
 import AddAssignmentForm from "./AddAssignmentForm";
+import CabinWorkstationAllocationForm from "./CabinWorkstationAllocationForm";
 import moment from "moment";
 import { RootState } from "@/app/store";
 
@@ -29,6 +30,7 @@ function RoomPage() {
   const subRoomId = string.split("|")?.[1];
 
   const [isAllocationFormVisible, setIsAllocationFormVisible] = useState(false);
+  const [isCabinWorkstationFormVisible, setIsCabinWorkstationFormVisible] = useState(false);
   const [roomInfo, setRoomInfo] = useState<RoomInfo>();
   const [startDate, setStartDate] = useState(() => new Date());
   const [selectedSlot, setSelectedSlot] = useState<{
@@ -38,6 +40,13 @@ function RoomPage() {
   } | null>(null);
   const [selectedWeekStart, setSelectedWeekStart] = useState(() => moment().startOf("isoWeek").toDate());
   const [maintenanceData, setMaintenanceData] = useState<Maintenance[]>([]);
+  const [editingOccupant, setEditingOccupant] = useState<Occupant | null>(null);
+  const [editFormData, setEditFormData] = useState({
+    startDate: "",
+    endDate: "",
+    startTime: "",
+    endTime: "",
+  });
 
   // Use custom hook for buildings data
   const { buildings: allBuildingsData } = useBuildingsData();
@@ -139,6 +148,60 @@ function RoomPage() {
       }
     }
     if (allSucceeded) fetchRoomInfo();
+  };
+
+  /** Handle edit occupant */
+  const handleEditOccupant = (occupant: Occupant) => {
+    setEditingOccupant(occupant);
+    setEditFormData({
+      startDate: occupant.scheduledDate ? moment(occupant.scheduledDate).format("YYYY-MM-DD") : "",
+      endDate: occupant.scheduledDate ? moment(occupant.scheduledDate).format("YYYY-MM-DD") : "",
+      startTime: occupant.startTime || "",
+      endTime: occupant.endTime || "",
+    });
+  };
+
+  /** Handle save edit */
+  const handleSaveEdit = async () => {
+    if (!editingOccupant) return;
+
+    try {
+      // Here you would typically call an API to update the occupant
+      // For now, we'll just refresh the data
+      console.log("Saving occupant edit:", editingOccupant, editFormData);
+
+      // TODO: Implement actual API call to update occupant
+      // await callApi(process.env.NEXT_PUBLIC_UPDATE_OCCUPANT || URL_NOT_FOUND, {
+      //   occupantId: editingOccupant.Id,
+      //   ...editFormData
+      // });
+
+      setEditingOccupant(null);
+      setEditFormData({ startDate: "", endDate: "", startTime: "", endTime: "" });
+      fetchRoomInfo(); // Refresh data
+    } catch (error) {
+      console.error("Error updating occupant:", error);
+    }
+  };
+
+  /** Handle cancel edit */
+  const handleCancelEdit = () => {
+    setEditingOccupant(null);
+    setEditFormData({ startDate: "", endDate: "", startTime: "", endTime: "" });
+  };
+
+  /** Handle cabin/workstation allocation */
+  const handleCabinWorkstationAllocation = async (allocation: SpaceAllocation) => {
+    try {
+      const response = await callApi<{ success: boolean; data?: unknown }>(process.env.NEXT_PUBLIC_INSERT_SPACE_ALLOCATION_ENTRY || URL_NOT_FOUND, allocation);
+      if (response?.data) {
+        fetchRoomInfo(); // Refresh data
+      } else {
+        console.warn("Insert failed for allocation:", allocation, response);
+      }
+    } catch (error) {
+      console.error("Error inserting allocation:", allocation, error);
+    }
   };
 
   /** Weekly occupancy calculation based on selected week */
@@ -277,33 +340,91 @@ function RoomPage() {
                     {isManagedByThisUser && isActiveSession && (
                       <button
                         className="mt-4 flex h-fit items-center rounded-md bg-[#F26722] px-4 py-2 text-xs text-white shadow-md transition-all hover:bg-[#a5705a] md:mt-0"
-                        onClick={() => setIsAllocationFormVisible(true)}
+                        onClick={() => {
+                          if (roomInfo.roomType.toLowerCase() === "workstation" || roomInfo.roomType.toLowerCase() === "cabin") {
+                            setIsCabinWorkstationFormVisible(true);
+                          } else {
+                            setIsAllocationFormVisible(true);
+                          }
+                        }}
                       >
                         + Add Allocation
                       </button>
                     )}
                   </div>
 
-                  <WeeklyTimetable
-                    startDate={startDate}
-                    isManagedByThisUser={isManagedByThisUser}
-                    refreshData={() => fetchRoomInfo()}
-                    setStartDate={(date) => {
-                      setStartDate(date);
-                      setSelectedWeekStart(
-                        moment(date as Date)
-                          .startOf("isoWeek")
-                          .toDate()
-                      );
-                    }}
-                    occupants={roomInfo.occupants || []}
-                    maintenanceData={maintenanceData}
-                    academicSessionStartDate={academicSessionStartDate || ""}
-                    academicSessionEndDate={academicSessionEndDate || ""}
-                    onClickTimeTableSlot={handleTimeTableClick}
-                    roomId={roomId}
-                    roomParentId={roomInfo.parentId}
-                  />
+                  {roomInfo.roomType.toLowerCase() === "workstation" || roomInfo.roomType.toLowerCase() === "cabin" ? (
+                    <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                      <div className="px-6 py-4 border-b border-gray-200">
+                        <h3 className="text-lg font-semibold text-gray-800">Occupant List</h3>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-gray-200">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Occupant ID</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Start Date</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">End Date</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-gray-200">
+                            {roomInfo.occupants && roomInfo.occupants.length > 0 ? (
+                              roomInfo.occupants.map((occupant, index) => (
+                                <tr key={occupant.Id || index} className="hover:bg-gray-50">
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{occupant.occupantId || occupant.Id || "N/A"}</td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{occupant.occupantName || "N/A"}</td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                    {occupant.scheduledDate ? moment(occupant.scheduledDate).format("DD/MM/YYYY") : "N/A"}
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                    {occupant.endTime ? moment(occupant.scheduledDate).format("DD/MM/YYYY") : "N/A"}
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                    {occupant.isEditable === "true" && isManagedByThisUser ? (
+                                      <button className="text-[#F26722] hover:text-[#a5705a] transition-colors" onClick={() => handleEditOccupant(occupant)}>
+                                        Edit
+                                      </button>
+                                    ) : (
+                                      <span className="text-gray-400">Not editable</span>
+                                    )}
+                                  </td>
+                                </tr>
+                              ))
+                            ) : (
+                              <tr>
+                                <td colSpan={5} className="px-6 py-4 text-center text-sm text-gray-500">
+                                  No occupants found
+                                </td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  ) : (
+                    <WeeklyTimetable
+                      startDate={startDate}
+                      isManagedByThisUser={isManagedByThisUser}
+                      refreshData={() => fetchRoomInfo()}
+                      setStartDate={(date) => {
+                        setStartDate(date);
+                        setSelectedWeekStart(
+                          moment(date as Date)
+                            .startOf("isoWeek")
+                            .toDate()
+                        );
+                      }}
+                      occupants={roomInfo.occupants || []}
+                      maintenanceData={maintenanceData}
+                      academicSessionStartDate={academicSessionStartDate || ""}
+                      academicSessionEndDate={academicSessionEndDate || ""}
+                      onClickTimeTableSlot={handleTimeTableClick}
+                      roomId={roomId}
+                      roomParentId={roomInfo.parentId}
+                    />
+                  )}
                 </div>
               </div>
             </div>
@@ -321,6 +442,84 @@ function RoomPage() {
           initialEndTime={selectedSlot?.end}
           maintenanceData={maintenanceData}
         />
+      )}
+
+      {isCabinWorkstationFormVisible && (
+        <CabinWorkstationAllocationForm
+          onSuccessfulAllocation={handleCabinWorkstationAllocation}
+          onClose={() => setIsCabinWorkstationFormVisible(false)}
+          roomInfo={roomInfo}
+        />
+      )}
+
+      {/* Edit Occupant Modal */}
+      {editingOccupant && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <h3 className="text-lg font-semibold mb-4 text-gray-800">Edit Occupant</h3>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Occupant: {editingOccupant.occupantName || editingOccupant.Id}</label>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+                <input
+                  type="date"
+                  value={editFormData.startDate}
+                  onChange={(e) => setEditFormData({ ...editFormData, startDate: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#F26722]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
+                <input
+                  type="date"
+                  value={editFormData.endDate}
+                  onChange={(e) => setEditFormData({ ...editFormData, endDate: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#F26722]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Start Time</label>
+                <input
+                  type="time"
+                  value={editFormData.startTime}
+                  onChange={(e) => setEditFormData({ ...editFormData, startTime: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#F26722]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">End Time</label>
+                <input
+                  type="time"
+                  value={editFormData.endTime}
+                  onChange={(e) => setEditFormData({ ...editFormData, endTime: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#F26722]"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end space-x-3 mt-6">
+              <button
+                onClick={handleCancelEdit}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveEdit}
+                className="px-4 py-2 text-sm font-medium text-white bg-[#F26722] rounded-md hover:bg-[#a5705a] transition-colors"
+              >
+                Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   ) : (

@@ -153,7 +153,7 @@ export default function Buildings() {
   const filteredRooms: Room[] = roomsList.filter((room) => {
     if (selectedRoomType === "All Rooms") return true;
     if (!room.roomType || room.roomType.trim() === "") return false;
-    return removeSpaces(room.roomType).toLowerCase().includes(removeSpaces(selectedRoomType).toLowerCase());
+    return removeSpaces(room.roomType).toLowerCase() === removeSpaces(selectedRoomType).toLowerCase();
   });
 
   // Apply search filter and pagination
