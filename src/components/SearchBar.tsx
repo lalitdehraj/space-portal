@@ -15,7 +15,7 @@ export function AdvancedSearch({ onClose }: { onClose: () => void }) {
   const acadSession = useSelector((state: RootState) => state.dataState.selectedAcademicSession);
 
   // State management
-  const [, setBuildings] = useState<Building[]>([]);
+  const [buildings, setBuildings] = useState<Building[]>([]);
   const [allRooms, setAllRooms] = useState<Room[]>([]);
   const [maintenanceRecords, setMaintenanceRecords] = useState<Maintenance[]>([]);
   const [, setRoomInfos] = useState<Record<string, RoomInfo>>({});
@@ -28,6 +28,7 @@ export function AdvancedSearch({ onClose }: { onClose: () => void }) {
   const [loadingSubrooms, setLoadingSubrooms] = useState(false);
 
   // Filters
+  const [selectedBuilding, setSelectedBuilding] = useState<string>("");
   const [capacity, setCapacity] = useState("");
   const [status, setStatus] = useState<string>("");
   const [roomType, setRoomType] = useState<string>("");
@@ -46,40 +47,62 @@ export function AdvancedSearch({ onClose }: { onClose: () => void }) {
     }
   };
 
-  // Load buildings + rooms
+  // Load buildings only
   useEffect(() => {
-    const fetchBuildingsAndRooms = async () => {
+    const fetchBuildings = async () => {
       try {
-        setLoading(true);
         const buildingsRes = await callApi<Building[]>(process.env.NEXT_PUBLIC_GET_BUILDING_LIST || URL_NOT_FOUND, {
           acadSession: `${acadSession}`,
           acadYear: `${academicYear}`,
         });
 
-        if (!buildingsRes.success) return;
-        setBuildings(buildingsRes.data || []);
-
-        const rooms: Room[] = [];
-        for (const b of buildingsRes.data || []) {
-          const res = await callApi<Room[]>(process.env.NEXT_PUBLIC_GET_ROOMS_LIST || URL_NOT_FOUND, {
-            buildingNo: b.id,
-            floorID: "",
-            curreentTime: moment().format("HH:mm"),
-          });
-          if (res.success && res.data) rooms.push(...res.data);
+        if (buildingsRes.success) {
+          setBuildings(buildingsRes.data || []);
         }
-        setAllRooms(rooms);
-        setFilteredRooms(rooms);
       } catch (err) {
-        console.error("Error fetching buildings/rooms:", err);
+        console.error("Error fetching buildings:", err);
+      }
+    };
+
+    fetchBuildings();
+    fetchMaintenanceRecords();
+  }, [acadSession, academicYear]);
+
+  // Load rooms for selected building only
+  useEffect(() => {
+    const fetchRoomsForBuilding = async () => {
+      if (!selectedBuilding) {
+        setAllRooms([]);
+        setFilteredRooms([]);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        const res = await callApi<Room[]>(process.env.NEXT_PUBLIC_GET_ROOMS_LIST || URL_NOT_FOUND, {
+          buildingNo: selectedBuilding,
+          floorID: "",
+          curreentTime: moment().format("HH:mm"),
+        });
+
+        if (res.success && res.data) {
+          setAllRooms(res.data);
+          setFilteredRooms(res.data);
+        } else {
+          setAllRooms([]);
+          setFilteredRooms([]);
+        }
+      } catch (err) {
+        console.error("Error fetching rooms for building:", err);
+        setAllRooms([]);
+        setFilteredRooms([]);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchBuildingsAndRooms();
-    fetchMaintenanceRecords();
-  }, [acadSession, academicYear]);
+    fetchRoomsForBuilding();
+  }, [selectedBuilding, acadSession, academicYear]);
 
   /**
    * Memoized maintenance room IDs for current search parameters
@@ -413,6 +436,23 @@ export function AdvancedSearch({ onClose }: { onClose: () => void }) {
               <div>
                 <h3 className="text-sm font-semibold text-gray-700 mb-4 uppercase tracking-wide">Search Filters</h3>
 
+                {/* Building Filter */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700">Select Building</label>
+                  <select
+                    value={selectedBuilding}
+                    onChange={(e) => setSelectedBuilding(e.target.value)}
+                    className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  >
+                    <option value="">Select a building</option>
+                    {buildings.map((building) => (
+                      <option key={building.id} value={building.id}>
+                        {building.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
                 {/* Capacity Filter */}
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-gray-700">Minimum Capacity</label>
@@ -495,9 +535,12 @@ export function AdvancedSearch({ onClose }: { onClose: () => void }) {
             <div className="p-6 border-t border-gray-200 bg-white">
               <button
                 onClick={handleSearch}
-                className="w-full bg-orange-500 text-white py-3 rounded-lg hover:bg-orange-600 text-sm font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2"
+                disabled={!selectedBuilding}
+                className={`w-full py-3 rounded-lg text-sm font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 ${
+                  selectedBuilding ? "bg-orange-500 text-white hover:bg-orange-600" : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                }`}
               >
-                Search Rooms
+                {selectedBuilding ? "Search Rooms" : "Select a building first"}
               </button>
             </div>
           </div>
@@ -515,7 +558,22 @@ export function AdvancedSearch({ onClose }: { onClose: () => void }) {
               </div>
 
               <div className="overflow-y-auto" style={{ maxHeight: "calc(100vh - 280px)" }}>
-                {loading ? (
+                {!selectedBuilding ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-gray-500">
+                    <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                      <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
+                        />
+                      </svg>
+                    </div>
+                    <p className="text-lg font-medium">Select a building to search</p>
+                    <p className="text-sm">Choose a building from the filters to start searching for rooms</p>
+                  </div>
+                ) : loading ? (
                   <div className="flex items-center justify-center py-12">
                     <div className="flex items-center space-x-3">
                       <div className="w-6 h-6 border-2 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
