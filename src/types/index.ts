@@ -40,6 +40,7 @@ export interface Occupant {
   Id: string;
   keyNo: string;
   roomId?: string;
+  programCode?: string;
   subroomId?: string;
   department?: string;
   facultyCode?: string;

@@ -1,5 +1,5 @@
 "use client";
-import React, { JSX, useEffect, useState } from "react";
+import React, { JSX, useEffect, useState, useRef } from "react";
 import Image from "next/image";
 import { useParams, useRouter } from "next/navigation";
 import { useSelector, useDispatch } from "react-redux";
@@ -28,6 +28,12 @@ export default function Buildings() {
   const [itemsPerPage] = useState(16);
   const [initialLoad] = useState(8);
   const [searchQuery, setSearchQuery] = useState("");
+  const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
+  const [appliedFilters, setAppliedFilters] = useState<{ [key: string]: string[] }>({
+    building: [],
+    floor: [],
+  });
+  const filterRef = useRef<HTMLDivElement>(null);
   const acadmeicYear = useSelector((state: RootState) => state.dataState.selectedAcademicYear);
   const acadmeicSession = useSelector((state: RootState) => state.dataState.selectedAcademicSession);
   const selectedRoomType = useSelector((state: RootState) => state.dataState.selectedRoomType);
@@ -156,9 +162,51 @@ export default function Buildings() {
     return removeSpaces(room.roomType).toLowerCase() === removeSpaces(selectedRoomType).toLowerCase();
   });
 
-  // Apply search filter and pagination
+  // Handle click outside to close filter dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (filterRef.current && !filterRef.current.contains(event.target as Node)) {
+        setIsFilterDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [filterRef]);
+
+  // Filter handler functions
+  const handleFilterChange = (filterType: string, value: string) => {
+    setAppliedFilters((prevFilters) => {
+      const currentOptions = prevFilters[filterType] || [];
+      const newOptions = currentOptions.includes(value) ? currentOptions.filter((item) => item !== value) : [...currentOptions, value];
+      return {
+        ...prevFilters,
+        [filterType]: newOptions,
+      };
+    });
+  };
+
+  const handleRemoveFilter = (filterType: string, value: string) => {
+    setAppliedFilters((prevFilters) => {
+      const newFilters = { ...prevFilters };
+      newFilters[filterType] = newFilters[filterType].filter((item) => item !== value);
+      return newFilters;
+    });
+  };
+
+  // Apply search filter and building/floor filters
   const searchRooms = filteredRooms.filter((room) => {
-    return room.roomName.toLowerCase().includes(searchQuery.toLowerCase()) || room.roomId.toLowerCase().includes(searchQuery.toLowerCase());
+    // Search filter
+    const matchesSearch = room.roomName.toLowerCase().includes(searchQuery.toLowerCase()) || room.roomId.toLowerCase().includes(searchQuery.toLowerCase());
+
+    // Building filter
+    const matchesBuilding = appliedFilters.building.length === 0 || appliedFilters.building.includes(room.buildingId);
+
+    // Floor filter
+    const matchesFloor = appliedFilters.floor.length === 0 || appliedFilters.floor.includes(room.floorId);
+
+    return matchesSearch && matchesBuilding && matchesFloor;
   });
 
   const visibleRooms = searchRooms.slice(0, currentPage === 1 ? initialLoad : initialLoad + (currentPage - 1) * itemsPerPage);
@@ -271,14 +319,89 @@ export default function Buildings() {
                 </h4>
               </div>
 
-              <input
-                type="text"
-                placeholder="Search"
-                value={searchQuery ? searchQuery : ""}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="border border-gray-300 rounded-md py-1 px-2 text-sm focus:outline-none text-gray-700 focus:ring-1 focus:ring-orange-500 mr-2"
-              />
+              <div className="flex items-center space-x-4">
+                <input
+                  type="text"
+                  placeholder="Search"
+                  value={searchQuery ? searchQuery : ""}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="border border-gray-300 rounded-md py-1 px-2 text-sm focus:outline-none text-gray-700 focus:ring-1 focus:ring-orange-500"
+                />
+                <div className="relative" ref={filterRef}>
+                  <button
+                    onClick={() => setIsFilterDropdownOpen(!isFilterDropdownOpen)}
+                    className="flex flex-row items-center text-gray-600 text-sm bg-gray-100 py-1 px-2 border border-gray-300 rounded-md hover:bg-gray-200 transition-colors duration-150"
+                  >
+                    <img src={"/images/bx-filter-alt.svg"} alt="icon filter" className="h-5 w-5 mr-2 fill-gray-600" />
+                    Filter
+                    {Object.values(appliedFilters).flat().length > 0 && (
+                      <span className="ml-2 bg-orange-500 text-white rounded-full h-5 w-5 flex items-center justify-center text-xs">
+                        {Object.values(appliedFilters).flat().length}
+                      </span>
+                    )}
+                  </button>
+                  {isFilterDropdownOpen && (
+                    <div className="absolute right-0 mt-2   w-64 bg-white border border-gray-300 rounded-md shadow-lg p-4 z-10">
+                      <div className="space-y-4 overflow-y-auto max-h-92">
+                        <div>
+                          <h4 className="text-sm font-semibold mb-2 text-gray-500">Building</h4>
+                          {buildings?.map((building) => (
+                            <label key={building.id} className="flex items-center text-gray-700 text-xs">
+                              <input
+                                type="checkbox"
+                                checked={appliedFilters.building?.includes(building.id) || false}
+                                onChange={() => handleFilterChange("building", building.id)}
+                                className="mr-2 rounded text-orange-600"
+                              />
+                              {building.name}
+                            </label>
+                          ))}
+                        </div>
+                        <hr className="my-2" />
+                        <div>
+                          <h4 className="text-sm font-semibold mb-2 text-gray-500">Floor</h4>
+                          {buildings?.flatMap((building) =>
+                            building.floors.map((floor) => (
+                              <label key={`${building.id}-${floor.id}`} className="flex items-center text-gray-700 text-xs">
+                                <input
+                                  type="checkbox"
+                                  checked={appliedFilters.floor?.includes(floor.id) || false}
+                                  onChange={() => handleFilterChange("floor", floor.id)}
+                                  className="mr-2 rounded text-orange-600"
+                                />
+                                {building.name} - {floor.name}
+                              </label>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
+
+            {/* Applied Filters Display */}
+            {Object.values(appliedFilters).flat().length > 0 && (
+              <div className="flex flex-wrap space-x-2 space-y-1 mb-4">
+                {Object.entries(appliedFilters).flatMap(([key, values]) =>
+                  values.map((value) => (
+                    <span key={`${key}-${value}`} className="flex items-center bg-gray-200 text-gray-800 text-sm px-3 py-1 rounded-full">
+                      {key === "building"
+                        ? buildings?.find((b) => b.id === value)?.name || value
+                        : key === "floor"
+                        ? buildings?.flatMap((b) => b.floors.map((f) => ({ ...f, buildingName: b.name }))).find((f) => f.id === value)?.buildingName +
+                            " - " +
+                            buildings?.flatMap((b) => b.floors).find((f) => f.id === value)?.name || value
+                        : value}
+                      <button onClick={() => handleRemoveFilter(key, value)} className="ml-2 text-gray-500 hover:text-gray-900 focus:outline-none">
+                        &times;
+                      </button>
+                    </span>
+                  ))
+                )}
+              </div>
+            )}
 
             <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
               {isLoadingBuildings || isLoadingRooms
