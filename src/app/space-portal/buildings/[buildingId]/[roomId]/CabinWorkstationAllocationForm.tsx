@@ -185,10 +185,10 @@ export default function CabinWorkstationAllocationForm({ roomInfo, onClose, onSu
     }
   };
 
-  // Function to check all conflicts for cabins and workstations
+  // Function to check all conflicts for cabins, workstations, and offices
   const checkAllConflicts = async () => {
-    // Only check conflicts for cabins and workstations
-    if (!roomInfo.roomType || !["cabin", "workstation"].includes(roomInfo.roomType.toLowerCase())) {
+    // Only check conflicts for cabins, workstations, and offices
+    if (!roomInfo.roomType || !["cabin", "workstation", "office"].includes(roomInfo.roomType.toLowerCase())) {
       setHasConflicts(false);
       setConflictDetails([]);
       return;
@@ -293,7 +293,13 @@ export default function CabinWorkstationAllocationForm({ roomInfo, onClose, onSu
     <section className="fixed inset-0 z-50 h-screen w-screen bg-[#00000070] flex items-center justify-center text-gray-500">
       <div className="max-h-[80vh] relative w-full max-w-lg bg-white rounded-xl shadow-2xl px-8 py-6 flex flex-col">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="font-semibold text-gray-700 text-lg">{roomInfo.roomType.toLowerCase() === "cabin" ? "Assign Cabin" : "Assign Workstation"}</h2>
+          <h2 className="font-semibold text-gray-700 text-lg">
+            {roomInfo.roomType.toLowerCase() === "cabin"
+              ? "Assign Cabin"
+              : roomInfo.roomType.toLowerCase() === "workstation"
+              ? "Assign Workstation"
+              : "Assign Office"}
+          </h2>
           <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600" aria-label="Close">
             <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -320,8 +326,8 @@ export default function CabinWorkstationAllocationForm({ roomInfo, onClose, onSu
             </div>
           )}
 
-          {/* Conflict Warning - Only for cabins and workstations */}
-          {["cabin", "workstation"].includes(roomInfo.roomType.toLowerCase()) && hasConflicts && (
+          {/* Conflict Warning - Only for cabins, workstations, and offices */}
+          {["cabin", "workstation", "office"].includes(roomInfo.roomType.toLowerCase()) && hasConflicts && (
             <div className="bg-red-100 border border-red-300 text-red-700 rounded p-3 mb-4">
               <div className="flex items-center mb-3">
                 <X size={16} className="mr-2" />
@@ -341,7 +347,7 @@ export default function CabinWorkstationAllocationForm({ roomInfo, onClose, onSu
           )}
 
           {/* Conflict Checking Indicator */}
-          {["cabin", "workstation"].includes(roomInfo.roomType.toLowerCase()) && isCheckingConflicts && (
+          {["cabin", "workstation", "office"].includes(roomInfo.roomType.toLowerCase()) && isCheckingConflicts && (
             <div className="bg-blue-100 border border-blue-300 text-blue-700 rounded p-3 mb-4">
               <div className="flex items-center">
                 <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mr-2"></div>
@@ -517,7 +523,9 @@ export default function CabinWorkstationAllocationForm({ roomInfo, onClose, onSu
               ? "Cannot Assign - Conflicts Detected"
               : roomInfo.roomType.toLowerCase() === "cabin"
               ? "Assign Cabin"
-              : "Assign Workstation"}
+              : roomInfo.roomType.toLowerCase() === "workstation"
+              ? "Assign Workstation"
+              : "Assign Office"}
           </button>
         </div>
       </div>
