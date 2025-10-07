@@ -54,6 +54,13 @@ function RoomPage() {
 
   const MAX_WEEKLY_MINUTES = 63 * 60; // adjustable max weekly minutes
 
+  /** Helper function to check if room type is cabin, workstation, or office */
+  const isCabinWorkstationOrOffice = (roomType?: string): boolean => {
+    if (!roomType) return false;
+    const type = roomType.toLowerCase();
+    return type === "cabin" || type === "workstation" || type === "office";
+  };
+
   /** Fetch room info */
   const fetchRoomInfo = async () => {
     if (!roomId || !acadmeicYear || !acadmeicSession || !academicSessionStartDate || !academicSessionEndDate) return;
@@ -155,8 +162,8 @@ function RoomPage() {
   const handleEditOccupant = (occupant: Occupant) => {
     setEditingOccupant(occupant);
 
-    // For cabins and workstations, we need to find the grouped data to get the actual date range
-    if (roomInfo?.roomType.toLowerCase() === "workstation" || roomInfo?.roomType.toLowerCase() === "cabin") {
+    // For cabins, workstations, and offices, we need to find the grouped data to get the actual date range
+    if (roomInfo && isCabinWorkstationOrOffice(roomInfo.roomType)) {
       const groupedOccupants = groupConsecutiveOccupants(roomInfo.occupants || []);
       const group = groupedOccupants.find((g) => g.originalOccupants.some((o) => o.Id === occupant.Id || o.occupantId === occupant.occupantId));
 
@@ -164,8 +171,8 @@ function RoomPage() {
         setEditFormData({
           startDate: group.startDate,
           endDate: group.endDate,
-          startTime: "", // No time fields for cabins/workstations
-          endTime: "", // No time fields for cabins/workstations
+          startTime: "", // No time fields for cabins/workstations/offices
+          endTime: "", // No time fields for cabins/workstations/offices
         });
       } else {
         // Fallback to individual occupant data
@@ -207,8 +214,8 @@ function RoomPage() {
       }
     }
 
-    // For non-cabin/workstation room types, validate time fields
-    if (roomInfo?.roomType.toLowerCase() !== "workstation" && roomInfo?.roomType.toLowerCase() !== "cabin") {
+    // For non-cabin/workstation/office room types, validate time fields
+    if (!isCabinWorkstationOrOffice(roomInfo?.roomType)) {
       if (!editFormData.startTime) {
         errors.push("Start time is required.");
       }
@@ -235,8 +242,8 @@ function RoomPage() {
     }
 
     try {
-      // For cabins and workstations, we need to handle date range changes
-      if (roomInfo?.roomType.toLowerCase() === "workstation" || roomInfo?.roomType.toLowerCase() === "cabin") {
+      // For cabins, workstations, and offices, we need to handle date range changes
+      if (isCabinWorkstationOrOffice(roomInfo?.roomType)) {
         await handleCabinWorkstationDateChange();
       } else {
         // For other room types, handle individual occupant update
@@ -681,7 +688,7 @@ function RoomPage() {
                       <button
                         className="mt-4 flex h-fit items-center rounded-md bg-[#F26722] px-4 py-2 text-xs text-white shadow-md transition-all hover:bg-[#a5705a] md:mt-0"
                         onClick={() => {
-                          if (roomInfo.roomType.toLowerCase() === "workstation" || roomInfo.roomType.toLowerCase() === "cabin") {
+                          if (isCabinWorkstationOrOffice(roomInfo.roomType)) {
                             setIsCabinWorkstationFormVisible(true);
                           } else {
                             setIsAllocationFormVisible(true);
@@ -693,7 +700,7 @@ function RoomPage() {
                     )}
                   </div>
 
-                  {roomInfo.roomType.toLowerCase() === "workstation" || roomInfo.roomType.toLowerCase() === "cabin" ? (
+                  {isCabinWorkstationOrOffice(roomInfo.roomType) ? (
                     <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
                       <div className="px-6 py-4 border-b border-gray-200">
                         <h3 className="text-lg font-semibold text-gray-800">Occupant List</h3>
@@ -711,8 +718,8 @@ function RoomPage() {
                           </thead>
                           <tbody className="bg-white divide-y divide-gray-200">
                             {(() => {
-                              // Use grouped occupants for Cabin/Workstation, individual occupants for other room types
-                              const shouldGroup = roomInfo.roomType.toLowerCase() === "workstation" || roomInfo.roomType.toLowerCase() === "cabin";
+                              // Use grouped occupants for Cabin/Workstation/Office, individual occupants for other room types
+                              const shouldGroup = isCabinWorkstationOrOffice(roomInfo.roomType);
                               const displayData = shouldGroup ? groupConsecutiveOccupants(roomInfo.occupants || []) : roomInfo.occupants || [];
 
                               return displayData.length > 0 ? (
@@ -892,8 +899,8 @@ function RoomPage() {
                 <p className="text-xs text-gray-500 mt-1">End date must be after start date and not before today</p>
               </div>
 
-              {/* Only show time fields for non-cabin/workstation room types */}
-              {roomInfo?.roomType.toLowerCase() !== "workstation" && roomInfo?.roomType.toLowerCase() !== "cabin" && (
+              {/* Only show time fields for non-cabin/workstation/office room types */}
+              {!isCabinWorkstationOrOffice(roomInfo?.roomType) && (
                 <>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Start Time</label>
