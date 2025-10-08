@@ -46,6 +46,7 @@ export interface Occupant {
   facultyCode?: string;
   startTime: string;
   scheduledDate: Date;
+  scheduledEndDate: Date;
   endTime: string;
   isEditable: string;
 }
@@ -205,6 +206,7 @@ export interface Program {
 
 export interface SpaceAllocation {
   allocationDate: string;
+  allocatedEndDate?: string; // For faculty sittings (cabin/workstation/office)
   startTime: string;
   endTime: string;
   purpose?: string; //

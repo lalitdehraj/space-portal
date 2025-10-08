@@ -124,6 +124,7 @@ function WeeklyTimetable({
       allocationEntNo: id,
       isAllocationActive: false,
       roomID: selectedOccupant?.roomId,
+      allocatedEndDate: selectedOccupant?.scheduledDate ? moment(selectedOccupant.scheduledDate).format("YYYY-MM-DD") : "",
       subRoomID: selectedOccupant?.subroomId,
       startTime: selectedOccupant?.startTime ? moment(selectedOccupant.startTime, "HH:mm").format("HH:mm:ss") : "",
       endTime: selectedOccupant?.endTime ? moment(selectedOccupant.endTime, "HH:mm").format("HH:mm:ss") : "",

@@ -141,42 +141,37 @@ export default function CabinWorkstationAllocationForm({ roomInfo, onClose, onSu
     try {
       const allocationStart = moment(startDate);
       const allocationEnd = moment(endDate);
-      const occupantConflicts: { [key: string]: { dates: string[]; startTime: string; endTime: string } } = {};
+      const conflicts: string[] = [];
 
       // Check existing occupants in the room
       if (roomInfo.occupants && roomInfo.occupants.length > 0) {
         roomInfo.occupants.forEach((occupant) => {
-          if (!occupant.scheduledDate || !occupant.startTime || !occupant.endTime) return;
+          if (!occupant.scheduledDate) return;
 
-          const occupantDate = moment(occupant.scheduledDate).format("YYYY-MM-DD");
-          const occupantStart = moment(`${occupantDate} ${occupant.startTime}`);
-          const occupantEnd = moment(`${occupantDate} ${occupant.endTime}`);
+          const occupantStartDate = moment(occupant.scheduledDate);
+          const occupantEndDate = occupant.scheduledEndDate ? moment(occupant.scheduledEndDate) : occupantStartDate;
 
-          // Check if allocation period overlaps with existing occupant
-          if (occupantEnd.isAfter(allocationStart, "day") && occupantStart.isBefore(allocationEnd, "day")) {
+          // For faculty sittings (cabin/workstation/office), check date range overlap
+          // For other room types, check if dates overlap
+          const hasOverlap = occupantEndDate.isAfter(allocationStart, "day") && occupantStartDate.isBefore(allocationEnd, "day");
+
+          if (hasOverlap) {
             const occupantName = occupant.occupantName || occupant.Id || "Unknown";
-            const conflictKey = `${occupantName}_${occupant.startTime}_${occupant.endTime}`;
 
-            if (!occupantConflicts[conflictKey]) {
-              occupantConflicts[conflictKey] = {
-                dates: [],
-                startTime: occupant.startTime,
-                endTime: occupant.endTime,
-              };
+            // For faculty sittings, show the date range
+            if (occupant.scheduledEndDate) {
+              const startDateStr = occupantStartDate.format("MMM DD, YYYY");
+              const endDateStr = occupantEndDate.format("MMM DD, YYYY");
+              conflicts.push(`Occupied by ${occupantName} (${startDateStr} - ${endDateStr})`);
+            } else {
+              // For single-day allocations, show the specific date
+              const occupantDate = occupantStartDate.format("MMM DD, YYYY");
+              const timeRange = occupant.startTime && occupant.endTime ? ` (${occupant.startTime} - ${occupant.endTime})` : "";
+              conflicts.push(`Occupied by ${occupantName} on ${occupantDate}${timeRange}`);
             }
-            occupantConflicts[conflictKey].dates.push(occupantDate);
           }
         });
       }
-
-      // Format grouped conflicts
-      const conflicts: string[] = [];
-      Object.keys(occupantConflicts).forEach((key) => {
-        const [occupantName] = key.split("_");
-        const { dates, startTime, endTime } = occupantConflicts[key];
-        const groupedDates = groupConsecutiveDates(dates);
-        conflicts.push(`Occupied by ${occupantName} ${groupedDates} (${startTime} - ${endTime})`);
-      });
 
       return conflicts;
     } catch (error) {
@@ -239,37 +234,29 @@ export default function CabinWorkstationAllocationForm({ roomInfo, onClose, onSu
   }, [employeeId, startDate, endDate, purpose, remarks, allocationType, keysAssigned]);
 
   const createSpaceAllocations = (): SpaceAllocation[] => {
-    const allocations: SpaceAllocation[] = [];
-    const startMoment = moment(startDate);
-    const endMoment = moment(endDate);
+    // Create single allocation entry for faculty sitting (cabin/workstation/office)
+    const allocation: SpaceAllocation = {
+      allocationDate: startDate,
+      allocatedEndDate: endDate,
+      startTime: "09:00:00",
+      endTime: "18:00:00",
+      subRoom: roomInfo.parentId ? roomInfo.id : "",
+      allocatedRoomID: roomInfo.parentId ? roomInfo.parentId : roomInfo.id,
+      buildingId: roomInfo.building,
+      academicSession: acadmeicSession,
+      academicYear: acadmeicYear,
+      allocatedTo: employeeId,
+      isAllocationActive: true,
+      remarks: remarks,
+      allocatedOnDate: moment().format("YYYY-MM-DD"),
+      allocatedfrom: "faculty sitting",
+      allocatedBy: user?.employeeId || "",
+      purpose: purpose,
+      types: allocationType,
+      keyAssigned: keysAssigned,
+    };
 
-    // Generate allocations for each day between start and end date (inclusive)
-    const currentDate = startMoment.clone();
-    while (currentDate.isSameOrBefore(endMoment, "day")) {
-      allocations.push({
-        allocationDate: currentDate.format("YYYY-MM-DD"),
-        startTime: "09:00:00",
-        endTime: "18:00:00",
-        subRoom: roomInfo.parentId ? roomInfo.id : "",
-        allocatedRoomID: roomInfo.parentId ? roomInfo.parentId : roomInfo.id,
-        buildingId: roomInfo.building,
-        academicSession: acadmeicSession,
-        academicYear: acadmeicYear,
-        allocatedTo: employeeId,
-        isAllocationActive: true,
-        remarks: remarks,
-        allocatedOnDate: moment().format("YYYY-MM-DD"),
-        allocatedfrom: "Direct Allocation",
-        allocatedBy: user?.employeeId || "",
-        purpose: purpose,
-        types: allocationType,
-        keyAssigned: keysAssigned,
-      } as SpaceAllocation);
-
-      currentDate.add(1, "day");
-    }
-
-    return allocations;
+    return [allocation];
   };
 
   const handleAllocate = async () => {
@@ -278,7 +265,9 @@ export default function CabinWorkstationAllocationForm({ roomInfo, onClose, onSu
       try {
         const allocations = createSpaceAllocations();
         onSuccessfulAllocation(allocations);
-        setSuccessMessage(`Allocations created successfully! ${allocations.length} days allocated.`);
+        setSuccessMessage(
+          `Faculty sitting allocated successfully! Period: ${moment(startDate).format("MMM DD, YYYY")} - ${moment(endDate).format("MMM DD, YYYY")}`
+        );
         setTimeout(() => {
           onClose();
         }, 1500);

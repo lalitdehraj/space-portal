@@ -162,27 +162,18 @@ function RoomPage() {
   const handleEditOccupant = (occupant: Occupant) => {
     setEditingOccupant(occupant);
 
-    // For cabins, workstations, and offices, we need to find the grouped data to get the actual date range
+    // For cabins, workstations, and offices, use scheduledEndDate if available
     if (roomInfo && isCabinWorkstationOrOffice(roomInfo.roomType)) {
-      const groupedOccupants = groupConsecutiveOccupants(roomInfo.occupants || []);
-      const group = groupedOccupants.find((g) => g.originalOccupants.some((o) => o.Id === occupant.Id || o.occupantId === occupant.occupantId));
-
-      if (group) {
-        setEditFormData({
-          startDate: group.startDate,
-          endDate: group.endDate,
-          startTime: "", // No time fields for cabins/workstations/offices
-          endTime: "", // No time fields for cabins/workstations/offices
-        });
-      } else {
-        // Fallback to individual occupant data
-        setEditFormData({
-          startDate: occupant.scheduledDate ? moment(occupant.scheduledDate).format("YYYY-MM-DD") : "",
-          endDate: occupant.scheduledDate ? moment(occupant.scheduledDate).format("YYYY-MM-DD") : "",
-          startTime: "",
-          endTime: "",
-        });
-      }
+      setEditFormData({
+        startDate: occupant.scheduledDate ? moment(occupant.scheduledDate).format("YYYY-MM-DD") : "",
+        endDate: occupant.scheduledEndDate
+          ? moment(occupant.scheduledEndDate).format("YYYY-MM-DD")
+          : occupant.scheduledDate
+          ? moment(occupant.scheduledDate).format("YYYY-MM-DD")
+          : "",
+        startTime: "", // No time fields for cabins/workstations/offices
+        endTime: "", // No time fields for cabins/workstations/offices
+      });
     } else {
       // For other room types, use individual occupant data
       setEditFormData({
@@ -263,127 +254,29 @@ function RoomPage() {
   const handleCabinWorkstationDateChange = async () => {
     if (!editingOccupant || !roomInfo) return;
 
-    // Find the grouped occupants for this occupant
-    const groupedOccupants = groupConsecutiveOccupants(roomInfo.occupants || []);
-    const group = groupedOccupants.find((g) => g.originalOccupants.some((o) => o.Id === editingOccupant.Id || o.occupantId === editingOccupant.occupantId));
-
-    if (!group) {
-      console.error("Could not find occupant group");
-      return;
-    }
-
-    const newStartDate = moment(editFormData.startDate);
-    const newEndDate = moment(editFormData.endDate);
-    const originalStartDate = moment(group.startDate);
-    const originalEndDate = moment(group.endDate);
-
-    // Split occupants into two groups
-    const occupantsToKeep: Occupant[] = [];
-    const occupantsToUnallocate: Occupant[] = [];
-
-    group.originalOccupants.forEach((occupant) => {
-      const occupantDate = moment(occupant.scheduledDate);
-
-      if (occupantDate.isBetween(newStartDate, newEndDate, "day", "[]")) {
-        // Occupant date is within the new range - keep them
-        occupantsToKeep.push(occupant);
-      } else {
-        // Occupant date is beyond the new range - unallocate them
-        occupantsToUnallocate.push(occupant);
-      }
-    });
-
-    console.log("Occupants to keep:", occupantsToKeep.length);
-    console.log("Occupants to unallocate:", occupantsToUnallocate.length);
-
-    // Unallocate occupants that are beyond the new end date
-    if (occupantsToUnallocate.length > 0) {
-      await unallocateOccupants(occupantsToUnallocate);
-    }
-
-    // Check if we need to create new allocations for extended dates
-    if (newEndDate.isAfter(originalEndDate, "day")) {
-      console.log("End date extended beyond original allocation - creating new allocations");
-      await createExtendedAllocations(group, originalEndDate, newEndDate);
-    }
-
-    // If there are no occupants left to keep, we might need to handle this case
-    if (occupantsToKeep.length === 0) {
-      console.warn("No occupants left after date change - this might need special handling");
-    }
-  };
-
-  /** Create new allocations for extended date range */
-  const createExtendedAllocations = async (group: any, originalEndDate: moment.Moment, newEndDate: moment.Moment) => {
     try {
-      // Get the first occupant to use as template for new allocations
-      const templateOccupant = group.originalOccupants[0];
-      if (!templateOccupant) {
-        console.error("No template occupant found for creating extended allocations");
-        return;
+      // Update the allocationEndDate for the single occupant entry
+      const response = await callApi(process.env.NEXT_PUBLIC_UPDATE_SPACE_ALLOCATION_ENTRY || URL_NOT_FOUND, {
+        allocationEntNo: editingOccupant.Id,
+        isAllocationActive: true,
+        roomID: editingOccupant.roomId || roomId || "",
+        subRoomID: editingOccupant.subroomId || subRoomId || "",
+        startTime: editingOccupant.startTime ? moment(editingOccupant.startTime, "HH:mm").format("HH:mm:ss") : "",
+        endTime: editingOccupant.endTime ? moment(editingOccupant.endTime, "HH:mm").format("HH:mm:ss") : "",
+        remarks: "",
+        scheduledDate: editingOccupant.scheduledDate ? moment(editingOccupant.scheduledDate).format("YYYY-MM-DD") : "",
+        allocatedEndDate: editFormData.endDate,
+      });
+
+      if (!response.success) {
+        console.error("Failed to update occupant:", editingOccupant.Id, response);
+        throw new Error(`Failed to update occupant ${editingOccupant.Id}`);
       }
 
-      // Create allocations for each day from day after original end date to new end date
-      const currentDate = originalEndDate.clone().add(1, "day");
-      const allocations: SpaceAllocation[] = [];
-
-      while (currentDate.isSameOrBefore(newEndDate, "day")) {
-        // Copy all details from the existing allocation
-        const newAllocation: SpaceAllocation = {
-          allocationDate: currentDate.format("YYYY-MM-DD"),
-          startTime: "09:00:00",
-          endTime: "18:00:00",
-          subRoom: templateOccupant.subroomId || (roomInfo?.parentId ? roomInfo.id : ""),
-          allocatedRoomID: templateOccupant.roomId || (roomInfo?.parentId ? roomInfo.parentId : roomInfo?.id || ""),
-          buildingId: templateOccupant.buildingId || roomInfo?.building || "",
-          academicSession: templateOccupant.academicSession || acadmeicSession,
-          academicYear: templateOccupant.academicYear || acadmeicYear,
-          allocatedTo: templateOccupant.occupantId || templateOccupant.Id || "",
-          isAllocationActive: true,
-          remarks: templateOccupant.remarks || "",
-          allocatedOnDate: moment().format("YYYY-MM-DD"),
-          allocatedfrom: templateOccupant.allocatedfrom || "Extended Allocation",
-          allocatedBy: templateOccupant.allocatedBy || "",
-          purpose: templateOccupant.purpose || "",
-          types: templateOccupant.type || "",
-          keyAssigned: templateOccupant.keyAssigned || "",
-        };
-
-        allocations.push(newAllocation);
-        currentDate.add(1, "day");
-      }
-
-      console.log(`Creating ${allocations.length} new allocations for extended period`);
-      console.log("Using template occupant for extended allocations:", templateOccupant);
-      console.log("Sample allocation data:", allocations[0]);
-
-      // Insert the new allocations
-      let allSucceeded = true;
-      for (const allocation of allocations) {
-        try {
-          const response = await callApi<{ success: boolean; data?: unknown }>(
-            process.env.NEXT_PUBLIC_INSERT_SPACE_ALLOCATION_ENTRY || URL_NOT_FOUND,
-            allocation
-          );
-          if (!response?.data) {
-            console.warn("Insert failed for extended allocation:", allocation, response);
-            allSucceeded = false;
-          } else {
-            console.log("Successfully created allocation for:", allocation.allocationDate);
-          }
-        } catch (error) {
-          console.error("Error inserting extended allocation:", allocation, error);
-          allSucceeded = false;
-        }
-      }
-
-      if (allSucceeded) {
-        console.log("Successfully created extended allocations");
-      } else {
-        console.error("Some extended allocations failed to create");
-      }
+      console.log("Successfully updated occupant allocation end date");
     } catch (error) {
-      console.error("Error creating extended allocations:", error);
+      console.error("Error updating occupant:", error);
+      throw error;
     }
   };
 
@@ -393,38 +286,64 @@ function RoomPage() {
 
     console.log("Saving individual occupant edit:", editingOccupant, editFormData);
 
-    // TODO: Implement actual API call to update individual occupant
-    // await callApi(process.env.NEXT_PUBLIC_UPDATE_OCCUPANT || URL_NOT_FOUND, {
-    //   occupantId: editingOccupant.Id,
-    //   ...editFormData
-    // });
+    try {
+      const response = await callApi(process.env.NEXT_PUBLIC_UPDATE_SPACE_ALLOCATION_ENTRY || URL_NOT_FOUND, {
+        allocationEntNo: editingOccupant.Id,
+        isAllocationActive: true,
+        roomID: editingOccupant.roomId || roomId || "",
+        subRoomID: editingOccupant.subroomId || subRoomId || "",
+        startTime: editFormData.startTime ? moment(editFormData.startTime, "HH:mm").format("HH:mm:ss") : "",
+        endTime: editFormData.endTime ? moment(editFormData.endTime, "HH:mm").format("HH:mm:ss") : "",
+        remarks: "",
+        scheduledDate: editFormData.startDate,
+        allocatedEndDate: editFormData.endDate,
+      });
+
+      if (!response.success) {
+        console.error("Failed to update occupant:", editingOccupant.Id, response);
+        throw new Error(`Failed to update occupant ${editingOccupant.Id}`);
+      }
+
+      console.log("Successfully updated individual occupant");
+    } catch (error) {
+      console.error("Error updating individual occupant:", error);
+    }
   };
 
-  /** Unallocate occupants by calling the appropriate API */
-  const unallocateOccupants = async (occupants: Occupant[]) => {
+  /** Handle un-allocate occupant */
+  const handleUnallocateOccupant = async () => {
+    if (!editingOccupant) return;
+
+    if (!confirm(`Are you sure you want to un-allocate ${editingOccupant.occupantName || editingOccupant.Id}?`)) {
+      return;
+    }
+
     try {
-      for (const occupant of occupants) {
-        console.log("Unallocating occupant:", occupant.Id, "for date:", occupant.scheduledDate);
+      const response = await callApi(process.env.NEXT_PUBLIC_UPDATE_SPACE_ALLOCATION_ENTRY || URL_NOT_FOUND, {
+        allocationEntNo: editingOccupant.Id,
+        isAllocationActive: false,
+        roomID: editingOccupant.roomId || roomId || "",
+        subRoomID: editingOccupant.subroomId || subRoomId || "",
+        startTime: editingOccupant.startTime ? moment(editingOccupant.startTime, "HH:mm").format("HH:mm:ss") : "",
+        endTime: editingOccupant.endTime ? moment(editingOccupant.endTime, "HH:mm").format("HH:mm:ss") : "",
+        remarks: "Un-allocated",
+        scheduledDate: editingOccupant.scheduledDate ? moment(editingOccupant.scheduledDate).format("YYYY-MM-DD") : "",
+        allocatedEndDate: editingOccupant.scheduledEndDate ? moment(editingOccupant.scheduledEndDate).format("YYYY-MM-DD") : "",
+      });
 
-        const response = await callApi(process.env.NEXT_PUBLIC_UPDATE_SPACE_ALLOCATION_ENTRY || URL_NOT_FOUND, {
-          allocationEntNo: occupant.Id,
-          isAllocationActive: false,
-          roomID: occupant.roomId || roomId || "",
-          subRoomID: occupant.subroomId || subRoomId || "",
-          startTime: occupant.startTime ? moment(occupant.startTime, "HH:mm").format("HH:mm:ss") : "",
-          endTime: occupant.endTime ? moment(occupant.endTime, "HH:mm").format("HH:mm:ss") : "",
-          remarks: "",
-          scheduledDate: occupant.scheduledDate ? moment(occupant.scheduledDate).format("YYYY-MM-DD") : "",
-        });
-
-        if (!response.success) {
-          console.error("Failed to unallocate occupant:", occupant.Id, response);
-          throw new Error(`Failed to unallocate occupant ${occupant.Id}`);
-        }
+      if (!response.success) {
+        console.error("Failed to un-allocate occupant:", editingOccupant.Id, response);
+        throw new Error(`Failed to un-allocate occupant ${editingOccupant.Id}`);
       }
+
+      console.log("Successfully un-allocated occupant");
+      setEditingOccupant(null);
+      setEditFormData({ startDate: "", endDate: "", startTime: "", endTime: "" });
+      setEditValidationErrors([]);
+      fetchRoomInfo(); // Refresh data
     } catch (error) {
-      console.error("Error unallocating occupants:", error);
-      throw error;
+      console.error("Error un-allocating occupant:", error);
+      alert("Failed to un-allocate occupant. Please try again.");
     }
   };
 
@@ -479,100 +398,6 @@ function RoomPage() {
   const strokeDashoffset = circumference - (weeklyOccupancy / 100) * circumference;
 
   const borderColor = roomInfo?.occupied === 0 ? "text-green-400" : totalMinutes >= MAX_WEEKLY_MINUTES * 0.8 ? "text-red-500" : "text-yellow-400";
-
-  /** Group consecutive occupants by occupantId for Cabin/Workstation only */
-  const groupConsecutiveOccupants = (occupants: Occupant[]) => {
-    if (!occupants || occupants.length === 0) return [];
-
-    // Sort occupants by occupantId and then by scheduledDate
-    const sortedOccupants = [...occupants].sort((a, b) => {
-      const aId = a.occupantId || a.Id || "";
-      const bId = b.occupantId || b.Id || "";
-      if (aId !== bId) return aId.localeCompare(bId);
-
-      const aDate = moment(a.scheduledDate);
-      const bDate = moment(b.scheduledDate);
-      return aDate.diff(bDate);
-    });
-
-    const groupedOccupants: Array<{
-      occupantId: string;
-      occupantName: string;
-      startDate: string;
-      endDate: string;
-      isEditable: string;
-      originalOccupants: Occupant[];
-    }> = [];
-
-    let currentGroup: Occupant[] = [];
-    let currentOccupantId = "";
-
-    for (const occupant of sortedOccupants) {
-      const occupantId = occupant.occupantId || occupant.Id || "";
-
-      if (occupantId !== currentOccupantId) {
-        // Start a new group
-        if (currentGroup.length > 0) {
-          // Process the previous group
-          const groupStartDate = moment.min(currentGroup.map((o) => moment(o.scheduledDate))).format("YYYY-MM-DD");
-          const groupEndDate = moment.max(currentGroup.map((o) => moment(o.scheduledDate))).format("YYYY-MM-DD");
-
-          groupedOccupants.push({
-            occupantId: currentOccupantId,
-            occupantName: currentGroup[0].occupantName || "N/A",
-            startDate: groupStartDate,
-            endDate: groupEndDate,
-            isEditable: currentGroup[0].isEditable || "false",
-            originalOccupants: [...currentGroup],
-          });
-        }
-
-        currentGroup = [occupant];
-        currentOccupantId = occupantId;
-      } else {
-        // Check if this occupant's date is consecutive to the last occupant in the group
-        const lastOccupantDate = moment(currentGroup[currentGroup.length - 1].scheduledDate);
-        const currentOccupantDate = moment(occupant.scheduledDate);
-
-        if (currentOccupantDate.diff(lastOccupantDate, "days") === 1) {
-          // Consecutive day, add to current group
-          currentGroup.push(occupant);
-        } else {
-          // Non-consecutive day, start a new group for the same occupant
-          const groupStartDate = moment.min(currentGroup.map((o) => moment(o.scheduledDate))).format("YYYY-MM-DD");
-          const groupEndDate = moment.max(currentGroup.map((o) => moment(o.scheduledDate))).format("YYYY-MM-DD");
-
-          groupedOccupants.push({
-            occupantId: currentOccupantId,
-            occupantName: currentGroup[0].occupantName || "N/A",
-            startDate: groupStartDate,
-            endDate: groupEndDate,
-            isEditable: currentGroup[0].isEditable || "false",
-            originalOccupants: [...currentGroup],
-          });
-
-          currentGroup = [occupant];
-        }
-      }
-    }
-
-    // Process the last group
-    if (currentGroup.length > 0) {
-      const groupStartDate = moment.min(currentGroup.map((o) => moment(o.scheduledDate))).format("YYYY-MM-DD");
-      const groupEndDate = moment.max(currentGroup.map((o) => moment(o.scheduledDate))).format("YYYY-MM-DD");
-
-      groupedOccupants.push({
-        occupantId: currentOccupantId,
-        occupantName: currentGroup[0].occupantName || "N/A",
-        startDate: groupStartDate,
-        endDate: groupEndDate,
-        isEditable: currentGroup[0].isEditable || "false",
-        originalOccupants: [...currentGroup],
-      });
-    }
-
-    return groupedOccupants;
-  };
 
   return roomInfo ? (
     <>
@@ -717,80 +542,39 @@ function RoomPage() {
                             </tr>
                           </thead>
                           <tbody className="bg-white divide-y divide-gray-200">
-                            {(() => {
-                              // Use grouped occupants for Cabin/Workstation/Office, individual occupants for other room types
-                              const shouldGroup = isCabinWorkstationOrOffice(roomInfo.roomType);
-                              const displayData = shouldGroup ? groupConsecutiveOccupants(roomInfo.occupants || []) : roomInfo.occupants || [];
-
-                              return displayData.length > 0 ? (
-                                displayData.map((item, index) => {
-                                  if (shouldGroup) {
-                                    // Grouped data for Cabin/Workstation
-                                    const group = item as {
-                                      occupantId: string;
-                                      occupantName: string;
-                                      startDate: string;
-                                      endDate: string;
-                                      isEditable: string;
-                                      originalOccupants: Occupant[];
-                                    };
-                                    return (
-                                      <tr key={`${group.occupantId}-${index}`} className="hover:bg-gray-50">
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{group.occupantId}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{group.occupantName}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{moment(group.startDate).format("DD/MM/YYYY")}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{moment(group.endDate).format("DD/MM/YYYY")}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                          {group.isEditable === "true" && isManagedByThisUser ? (
-                                            <button
-                                              className="text-[#F26722] hover:text-[#a5705a] transition-colors"
-                                              onClick={() => handleEditOccupant(group.originalOccupants[0])}
-                                            >
-                                              Edit
-                                            </button>
-                                          ) : (
-                                            <span className="text-gray-400">Not editable</span>
-                                          )}
-                                        </td>
-                                      </tr>
-                                    );
-                                  } else {
-                                    // Individual data for other room types
-                                    const occupant = item as Occupant;
-                                    return (
-                                      <tr key={occupant.Id || index} className="hover:bg-gray-50">
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{occupant.occupantId || occupant.Id || "N/A"}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{occupant.occupantName || "N/A"}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                          {occupant.scheduledDate ? moment(occupant.scheduledDate).format("DD/MM/YYYY") : "N/A"}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                          {occupant.endTime ? moment(occupant.scheduledDate).format("DD/MM/YYYY") : "N/A"}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                          {occupant.isEditable === "true" && isManagedByThisUser ? (
-                                            <button
-                                              className="text-[#F26722] hover:text-[#a5705a] transition-colors"
-                                              onClick={() => handleEditOccupant(occupant)}
-                                            >
-                                              Edit
-                                            </button>
-                                          ) : (
-                                            <span className="text-gray-400">Not editable</span>
-                                          )}
-                                        </td>
-                                      </tr>
-                                    );
-                                  }
-                                })
-                              ) : (
-                                <tr>
-                                  <td colSpan={5} className="px-6 py-4 text-center text-sm text-gray-500">
-                                    No occupants found
+                            {roomInfo.occupants && roomInfo.occupants.length > 0 ? (
+                              roomInfo.occupants.map((occupant, index) => (
+                                <tr key={occupant.Id || index} className="hover:bg-gray-50">
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{occupant.occupantId || occupant.Id || "N/A"}</td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{occupant.occupantName || "N/A"}</td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                    {occupant.scheduledDate ? moment(occupant.scheduledDate).format("DD/MM/YYYY") : "N/A"}
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                    {occupant.scheduledEndDate
+                                      ? moment(occupant.scheduledEndDate).format("DD/MM/YYYY")
+                                      : occupant.scheduledDate
+                                      ? moment(occupant.scheduledDate).format("DD/MM/YYYY")
+                                      : "N/A"}
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                    {occupant.isEditable === "true" && isManagedByThisUser ? (
+                                      <button className="text-[#F26722] hover:text-[#a5705a] transition-colors" onClick={() => handleEditOccupant(occupant)}>
+                                        Edit
+                                      </button>
+                                    ) : (
+                                      <span className="text-gray-400">Not editable</span>
+                                    )}
                                   </td>
                                 </tr>
-                              );
-                            })()}
+                              ))
+                            ) : (
+                              <tr>
+                                <td colSpan={5} className="px-6 py-4 text-center text-sm text-gray-500">
+                                  No occupants found
+                                </td>
+                              </tr>
+                            )}
                           </tbody>
                         </table>
                       </div>
@@ -925,19 +709,27 @@ function RoomPage() {
               )}
             </div>
 
-            <div className="flex justify-end space-x-3 mt-6">
+            <div className="flex justify-between mt-6">
               <button
-                onClick={handleCancelEdit}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 transition-colors"
+                onClick={handleUnallocateOccupant}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 transition-colors"
               >
-                Cancel
+                Un-allocate
               </button>
-              <button
-                onClick={handleSaveEdit}
-                className="px-4 py-2 text-sm font-medium text-white bg-[#F26722] rounded-md hover:bg-[#a5705a] transition-colors"
-              >
-                Save Changes
-              </button>
+              <div className="flex space-x-3">
+                <button
+                  onClick={handleCancelEdit}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveEdit}
+                  className="px-4 py-2 text-sm font-medium text-white bg-[#F26722] rounded-md hover:bg-[#a5705a] transition-colors"
+                >
+                  Save Changes
+                </button>
+              </div>
             </div>
           </div>
         </div>

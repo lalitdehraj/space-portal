@@ -203,6 +203,7 @@ export default function AddAssignmentForm({
         allocationDate: slot.date,
         startTime: `${slot.start}:00`,
         endTime: `${slot.end}:00`,
+        allocatedEndDate: slot.date,
         keyAssigned: keys,
         subRoom: roomInfo.parentId ? roomInfo.id : "",
         allocatedRoomID: roomInfo.parentId ? roomInfo.parentId : roomInfo.id,

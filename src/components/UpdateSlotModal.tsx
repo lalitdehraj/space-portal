@@ -240,6 +240,7 @@ export default function UpdateSlotModal({ occupant, occupants, onClose, onUpdate
       const updateData = {
         allocationEntNo: occupant.Id,
         scheduledDate: selectedDate,
+        allocatedEndDate: selectedDate,
         startTime: `${startTime}:00`,
         endTime: `${endTime}:00`,
         roomID: occupant.roomId,
