@@ -54,13 +54,6 @@ function RoomPage() {
 
   const MAX_WEEKLY_MINUTES = 63 * 60; // adjustable max weekly minutes
 
-  /** Helper function to check if room type is cabin, workstation, or office */
-  const isCabinWorkstationOrOffice = (roomType?: string): boolean => {
-    if (!roomType) return false;
-    const type = roomType.toLowerCase();
-    return type === "cabin" || type === "workstation" || type === "office";
-  };
-
   /** Fetch room info */
   const fetchRoomInfo = async () => {
     if (!roomId || !acadmeicYear || !acadmeicSession || !academicSessionStartDate || !academicSessionEndDate) return;
@@ -79,6 +72,7 @@ function RoomPage() {
       });
       setIsManagedByThisUser(isAllocationAllowed || false);
       if (res.success) setRoomInfo(res.data);
+      console.log("res", res.data);
     } catch (error) {
       console.error("Error fetching room info:", error);
     }
@@ -162,8 +156,8 @@ function RoomPage() {
   const handleEditOccupant = (occupant: Occupant) => {
     setEditingOccupant(occupant);
 
-    // For cabins, workstations, and offices, use scheduledEndDate if available
-    if (roomInfo && isCabinWorkstationOrOffice(roomInfo.roomType)) {
+    // For sitting rooms (cabins, workstations, offices), use scheduledEndDate if available
+    if (roomInfo && roomInfo.isSitting) {
       setEditFormData({
         startDate: occupant.scheduledDate ? moment(occupant.scheduledDate).format("YYYY-MM-DD") : "",
         endDate: occupant.scheduledEndDate
@@ -171,8 +165,8 @@ function RoomPage() {
           : occupant.scheduledDate
           ? moment(occupant.scheduledDate).format("YYYY-MM-DD")
           : "",
-        startTime: "", // No time fields for cabins/workstations/offices
-        endTime: "", // No time fields for cabins/workstations/offices
+        startTime: "", // No time fields for sitting rooms
+        endTime: "", // No time fields for sitting rooms
       });
     } else {
       // For other room types, use individual occupant data
@@ -205,8 +199,8 @@ function RoomPage() {
       }
     }
 
-    // For non-cabin/workstation/office room types, validate time fields
-    if (!isCabinWorkstationOrOffice(roomInfo?.roomType)) {
+    // For non-sitting room types, validate time fields
+    if (!roomInfo?.isSitting) {
       if (!editFormData.startTime) {
         errors.push("Start time is required.");
       }
@@ -233,8 +227,8 @@ function RoomPage() {
     }
 
     try {
-      // For cabins, workstations, and offices, we need to handle date range changes
-      if (isCabinWorkstationOrOffice(roomInfo?.roomType)) {
+      // For sitting rooms (cabins, workstations, offices), we need to handle date range changes
+      if (roomInfo?.isSitting) {
         await handleCabinWorkstationDateChange();
       } else {
         // For other room types, handle individual occupant update
@@ -386,18 +380,40 @@ function RoomPage() {
       return scheduled.isBetween(startOfSelectedWeek, endOfSelectedWeek, "day", "[]");
     }) || [];
 
-  const totalMinutes = weeklyOccupants.reduce((sum, occupant) => {
-    if (!occupant.startTime || !occupant.endTime) return sum;
-    const start = moment(occupant.startTime, "HH:mm");
-    const end = moment(occupant.endTime, "HH:mm");
-    return sum + Math.max(end.diff(start, "minutes"), 0);
-  }, 0);
+  // Calculate occupancy differently for sitting vs non-sitting rooms
+  let weeklyOccupancy = 0;
 
-  const weeklyOccupancy = ((totalMinutes || 0) / MAX_WEEKLY_MINUTES) * 100;
+  if (roomInfo?.isSitting) {
+    // For sitting rooms (cabins, workstations, offices), calculate based on current active occupants
+    const today = moment();
+    const activeOccupants =
+      roomInfo.occupants?.filter((o: Occupant) => {
+        if (!o.scheduledDate) return false;
+        const startDate = moment(o.scheduledDate);
+        const endDate = o.scheduledEndDate ? moment(o.scheduledEndDate) : startDate;
+
+        // Check if the occupant is currently active (today is between start and end date)
+        return today.isBetween(startDate, endDate, "day", "[]");
+      }) || [];
+
+    // Calculate occupancy percentage based on room capacity
+    const capacity = roomInfo.capacity || 1; // Avoid division by zero
+    weeklyOccupancy = Math.min((activeOccupants.length / capacity) * 100, 100);
+  } else {
+    // For non-sitting rooms, use time-based calculation
+    const totalMinutes = weeklyOccupants.reduce((sum, occupant) => {
+      if (!occupant.startTime || !occupant.endTime) return sum;
+      const start = moment(occupant.startTime, "HH:mm");
+      const end = moment(occupant.endTime, "HH:mm");
+      return sum + Math.max(end.diff(start, "minutes"), 0);
+    }, 0);
+
+    weeklyOccupancy = ((totalMinutes || 0) / MAX_WEEKLY_MINUTES) * 100;
+  }
   const circumference = 2 * Math.PI * 28;
   const strokeDashoffset = circumference - (weeklyOccupancy / 100) * circumference;
 
-  const borderColor = roomInfo?.occupied === 0 ? "text-green-400" : totalMinutes >= MAX_WEEKLY_MINUTES * 0.8 ? "text-red-500" : "text-yellow-400";
+  const borderColor = weeklyOccupancy === 0 ? "text-green-400" : weeklyOccupancy >= 80 ? "text-red-500" : "text-yellow-400";
 
   return roomInfo ? (
     <>
@@ -513,7 +529,7 @@ function RoomPage() {
                       <button
                         className="mt-4 flex h-fit items-center rounded-md bg-[#F26722] px-4 py-2 text-xs text-white shadow-md transition-all hover:bg-[#a5705a] md:mt-0"
                         onClick={() => {
-                          if (isCabinWorkstationOrOffice(roomInfo.roomType)) {
+                          if (roomInfo.isSitting) {
                             setIsCabinWorkstationFormVisible(true);
                           } else {
                             setIsAllocationFormVisible(true);
@@ -525,7 +541,7 @@ function RoomPage() {
                     )}
                   </div>
 
-                  {isCabinWorkstationOrOffice(roomInfo.roomType) ? (
+                  {roomInfo.isSitting ? (
                     <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
                       <div className="px-6 py-4 border-b border-gray-200">
                         <h3 className="text-lg font-semibold text-gray-800">Occupant List</h3>
@@ -558,13 +574,30 @@ function RoomPage() {
                                       : "N/A"}
                                   </td>
                                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                    {occupant.isEditable === "true" && isManagedByThisUser ? (
-                                      <button className="text-[#F26722] hover:text-[#a5705a] transition-colors" onClick={() => handleEditOccupant(occupant)}>
-                                        Edit
-                                      </button>
-                                    ) : (
-                                      <span className="text-gray-400">Not editable</span>
-                                    )}
+                                    {(() => {
+                                      // For sitting rooms, check if end date is in the past
+                                      if (roomInfo.isSitting) {
+                                        const endDate = occupant.scheduledEndDate
+                                          ? moment(occupant.scheduledEndDate)
+                                          : occupant.scheduledDate
+                                          ? moment(occupant.scheduledDate)
+                                          : null;
+
+                                        const isEndDateInPast = endDate && endDate.isBefore(moment(), "day");
+
+                                        if (isEndDateInPast) {
+                                          return <span className="text-gray-400">Expired</span>;
+                                        }
+                                      }
+
+                                      return occupant.isEditable === "true" && isManagedByThisUser ? (
+                                        <button className="text-[#F26722] hover:text-[#a5705a] transition-colors" onClick={() => handleEditOccupant(occupant)}>
+                                          Edit
+                                        </button>
+                                      ) : (
+                                        <span className="text-gray-400">Not editable</span>
+                                      );
+                                    })()}
                                   </td>
                                 </tr>
                               ))
@@ -683,8 +716,8 @@ function RoomPage() {
                 <p className="text-xs text-gray-500 mt-1">End date must be after start date and not before today</p>
               </div>
 
-              {/* Only show time fields for non-cabin/workstation/office room types */}
-              {!isCabinWorkstationOrOffice(roomInfo?.roomType) && (
+              {/* Only show time fields for non-sitting room types */}
+              {!roomInfo?.isSitting && (
                 <>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Start Time</label>

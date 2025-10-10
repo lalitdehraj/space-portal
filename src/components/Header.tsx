@@ -21,6 +21,7 @@ import { encrypt } from "@/utils/encryption";
 import { signOut, useSession } from "next-auth/react";
 import { AdvancedSearch } from "./SearchBar";
 import { RootState } from "@/app/store";
+import ExtendSittingModal from "./ExtendSittingModal";
 
 export type AcademicYearResponse = {
   "Academic Year": AcademicYear[];
@@ -64,6 +65,9 @@ export default function Header() {
 
   // profile dropdown
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+
+  // extend sitting modal
+  const [isExtendSittingOpen, setIsExtendSittingOpen] = useState(false);
 
   // refs for outside click detection
   const filterRef = useRef<HTMLDivElement>(null);
@@ -527,6 +531,15 @@ export default function Header() {
               >
                 Profile
               </button>
+              <button
+                onClick={() => {
+                  setIsProfileOpen(false);
+                  setIsExtendSittingOpen(true);
+                }}
+                className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+              >
+                Extend Sitting
+              </button>
               <button onClick={() => signOut({ callbackUrl: "/login" })} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
                 Sign out
               </button>
@@ -534,6 +547,9 @@ export default function Header() {
           )}
         </div>
       </div>
+
+      {/* Extend Sitting Modal */}
+      {isExtendSittingOpen && <ExtendSittingModal onClose={() => setIsExtendSittingOpen(false)} />}
     </header>
   );
 }

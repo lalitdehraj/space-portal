@@ -60,7 +60,7 @@ export default function AllocationDetailsModal({ occupant, onClose, isManagedByT
             </div>
             {occupant.programCode && (
               <div>
-                <p className="text-gray-500">Program Code</p>
+                <p className="text-gray-500">Course</p>
                 <p className="font-medium text-gray-800">{occupant.programCode}</p>
               </div>
             )}

@@ -142,16 +142,38 @@ export default function RoomCard({ room, isExpanded = false, onClick, cachedSubr
                 return scheduled.isBetween(startDateMoment, endDateMoment, "day", "[]");
               }) || [];
 
-            const totalMinutes = weeklyOccupants.reduce((sum, occupant) => {
-              if (!occupant.startTime || !occupant.endTime) return sum;
-              const start = moment(occupant.startTime, "HH:mm");
-              const end = moment(occupant.endTime, "HH:mm");
-              return sum + Math.max(end.diff(start, "minutes"), 0);
-            }, 0);
+            // Calculate occupancy differently for sitting vs non-sitting rooms
+            let percent = 0;
 
-            const totalDays = endDateMoment.diff(startDateMoment, "days") + 1;
-            const maxMinutes = totalDays * WORK_HOURS_PER_DAY * 60;
-            const percent = maxMinutes > 0 ? (totalMinutes / maxMinutes) * 100 : 0;
+            if (roomData.isSitting) {
+              // For sitting rooms, calculate based on current active occupants
+              const today = moment();
+              const activeOccupants =
+                roomData.occupants?.filter((o) => {
+                  if (!o.scheduledDate) return false;
+                  const startDate = moment(o.scheduledDate);
+                  const endDate = o.scheduledEndDate ? moment(o.scheduledEndDate) : startDate;
+
+                  // Check if the occupant is currently active (today is between start and end date)
+                  return today.isBetween(startDate, endDate, "day", "[]");
+                }) || [];
+
+              // Calculate occupancy percentage based on room capacity
+              const capacity = roomData.capacity || 1; // Avoid division by zero
+              percent = Math.min((activeOccupants.length / capacity) * 100, 100);
+            } else {
+              // For non-sitting rooms, use time-based calculation
+              const totalMinutes = weeklyOccupants.reduce((sum, occupant) => {
+                if (!occupant.startTime || !occupant.endTime) return sum;
+                const start = moment(occupant.startTime, "HH:mm");
+                const end = moment(occupant.endTime, "HH:mm");
+                return sum + Math.max(end.diff(start, "minutes"), 0);
+              }, 0);
+
+              const totalDays = endDateMoment.diff(startDateMoment, "days") + 1;
+              const maxMinutes = totalDays * WORK_HOURS_PER_DAY * 60;
+              percent = maxMinutes > 0 ? (totalMinutes / maxMinutes) * 100 : 0;
+            }
 
             return { occupants, occupancyPercent: percent };
           }
@@ -190,6 +212,7 @@ export default function RoomCard({ room, isExpanded = false, onClick, cachedSubr
 
       if (response.success && response.data) {
         const roomData = response.data;
+        console.log("roomData", roomData);
 
         setTotalOccupants(response.data.occupants?.length || 0);
         // Determine date range
@@ -203,17 +226,38 @@ export default function RoomCard({ room, isExpanded = false, onClick, cachedSubr
             return scheduled.isBetween(startDateMoment, endDateMoment, "day", "[]");
           }) || [];
 
-        const totalMinutes = weeklyOccupants.reduce((sum, occupant) => {
-          if (!occupant.startTime || !occupant.endTime) return sum;
-          const start = moment(occupant.startTime, "HH:mm");
-          const end = moment(occupant.endTime, "HH:mm");
-          return sum + Math.max(end.diff(start, "minutes"), 0);
-        }, 0);
+        // Calculate occupancy differently for sitting vs non-sitting rooms
+        let percent = 0;
 
-        const totalDays = endDateMoment.diff(startDateMoment, "days") + 1;
-        const maxMinutes = totalDays * WORK_HOURS_PER_DAY * 60;
+        if (roomData.isSitting) {
+          // For sitting rooms, calculate based on current active occupants
+          const today = moment();
+          const activeOccupants =
+            roomData.occupants?.filter((o) => {
+              if (!o.scheduledDate) return false;
+              const startDate = moment(o.scheduledDate);
+              const endDate = o.scheduledEndDate ? moment(o.scheduledEndDate) : startDate;
 
-        const percent = maxMinutes > 0 ? (totalMinutes / maxMinutes) * 100 : 0;
+              // Check if the occupant is currently active (today is between start and end date)
+              return today.isBetween(startDate, endDate, "day", "[]");
+            }) || [];
+
+          // Calculate occupancy percentage based on room capacity
+          const capacity = roomData.capacity || 1; // Avoid division by zero
+          percent = Math.min((activeOccupants.length / capacity) * 100, 100);
+        } else {
+          // For non-sitting rooms, use time-based calculation
+          const totalMinutes = weeklyOccupants.reduce((sum, occupant) => {
+            if (!occupant.startTime || !occupant.endTime) return sum;
+            const start = moment(occupant.startTime, "HH:mm");
+            const end = moment(occupant.endTime, "HH:mm");
+            return sum + Math.max(end.diff(start, "minutes"), 0);
+          }, 0);
+
+          const totalDays = endDateMoment.diff(startDateMoment, "days") + 1;
+          const maxMinutes = totalDays * WORK_HOURS_PER_DAY * 60;
+          percent = maxMinutes > 0 ? (totalMinutes / maxMinutes) * 100 : 0;
+        }
         setOccupancyPercent(percent);
       }
     };
@@ -268,13 +312,25 @@ export default function RoomCard({ room, isExpanded = false, onClick, cachedSubr
             // Filter occupants for current date and time
             const currentOccupants =
               roomData.occupants?.filter((o) => {
-                if (!o.scheduledDate || !o.startTime || !o.endTime) return false;
-                const scheduledDate = moment(o.scheduledDate).format("YYYY-MM-DD");
-                const currentMoment = moment(currentTime, "HH:mm");
-                const startMoment = moment(o.startTime, "HH:mm");
-                const endMoment = moment(o.endTime, "HH:mm");
+                if (!o.scheduledDate) return false;
 
-                return scheduledDate === currentDate && currentMoment.isBetween(startMoment, endMoment, null, "[)");
+                if (roomData.isSitting) {
+                  // For sitting rooms, check if current date is within the occupant's date range
+                  const startDate = moment(o.scheduledDate);
+                  const endDate = o.scheduledEndDate ? moment(o.scheduledEndDate) : startDate;
+                  const today = moment(currentDate);
+
+                  return today.isBetween(startDate, endDate, "day", "[]");
+                } else {
+                  // For non-sitting rooms, check time slots
+                  if (!o.startTime || !o.endTime) return false;
+                  const scheduledDate = moment(o.scheduledDate).format("YYYY-MM-DD");
+                  const currentMoment = moment(currentTime, "HH:mm");
+                  const startMoment = moment(o.startTime, "HH:mm");
+                  const endMoment = moment(o.endTime, "HH:mm");
+
+                  return scheduledDate === currentDate && currentMoment.isBetween(startMoment, endMoment, null, "[)");
+                }
               }) || [];
 
             return currentOccupants;
@@ -315,13 +371,25 @@ export default function RoomCard({ room, isExpanded = false, onClick, cachedSubr
           // Filter occupants for current date and time
           const currentOccupants =
             roomData.occupants?.filter((o) => {
-              if (!o.scheduledDate || !o.startTime || !o.endTime) return false;
-              const scheduledDate = moment(o.scheduledDate).format("YYYY-MM-DD");
-              const currentMoment = moment(currentTime, "HH:mm");
-              const startMoment = moment(o.startTime, "HH:mm");
-              const endMoment = moment(o.endTime, "HH:mm");
+              if (!o.scheduledDate) return false;
 
-              return scheduledDate === currentDate && currentMoment.isBetween(startMoment, endMoment, null, "[)");
+              if (roomData.isSitting) {
+                // For sitting rooms, check if current date is within the occupant's date range
+                const startDate = moment(o.scheduledDate);
+                const endDate = o.scheduledEndDate ? moment(o.scheduledEndDate) : startDate;
+                const today = moment(currentDate);
+
+                return today.isBetween(startDate, endDate, "day", "[]");
+              } else {
+                // For non-sitting rooms, check time slots
+                if (!o.startTime || !o.endTime) return false;
+                const scheduledDate = moment(o.scheduledDate).format("YYYY-MM-DD");
+                const currentMoment = moment(currentTime, "HH:mm");
+                const startMoment = moment(o.startTime, "HH:mm");
+                const endMoment = moment(o.endTime, "HH:mm");
+
+                return scheduledDate === currentDate && currentMoment.isBetween(startMoment, endMoment, null, "[)");
+              }
             }) || [];
 
           setCurrentOccupants(currentOccupants);

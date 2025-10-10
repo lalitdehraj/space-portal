@@ -260,7 +260,7 @@ function WeeklyTimetable({
                               e.stopPropagation();
                               setSelectedOccupant(occupant);
                             }}
-                            className={`absolute left-1 right-1 ${bgColor} border ${borderColor} rounded-md px-2 py-1 text-xs cursor-pointer ${hoverColor} transition-colors shadow-sm`}
+                            className={`absolute left-1 right-1 ${bgColor} border opacity-75 ${borderColor} rounded-md px-2 py-1 text-xs cursor-pointer ${hoverColor} transition-colors shadow-sm`}
                             style={{ top, height }}
                           >
                             <div className={`font-medium ${textColor} truncate`}>{occupant.occupantName}</div>

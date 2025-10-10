@@ -396,7 +396,7 @@ async function createBigXLS(filePath: string, jsonObject: Record<string, unknown
 
       const roomInfoResponse = await callApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, reqBody);
       if (roomInfoResponse.success) {
-        if (roomInfoResponse.data && !roomInfoResponse.data?.roomType.toLowerCase().includes("faculty")) {
+        if (roomInfoResponse.data && !roomInfoResponse.data?.isSitting) {
           // Process parent room only - occupants already contain subroom data
           await handleRoom(roomInfoResponse.data);
         }
@@ -418,7 +418,7 @@ async function createBigXLS(filePath: string, jsonObject: Record<string, unknown
 
       const roomInfoResponse = await callApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, reqBody);
 
-      if (roomInfoResponse.success && roomInfoResponse.data?.roomType.toLowerCase().includes("faculty")) {
+      if (roomInfoResponse.success && roomInfoResponse.data?.isSitting) {
         // Process faculty room - occupants already contain subroom data
         const roomOccupants = roomInfoResponse.data?.occupants || [];
         const employeeIds = roomOccupants.map((o) => o.occupantId).filter((id) => id);
@@ -472,11 +472,9 @@ async function createBigXLS(filePath: string, jsonObject: Record<string, unknown
             return roomsList ?? [];
           }) ?? []
         )
-      )
-        .flat()
-        .filter((r) => r.roomType.toLowerCase().includes("faculty"));
+      ).flat();
 
-      // Process all faculty rooms - occupants already contain subroom data
+      // Process all rooms - fetch room info to check if they are sitting rooms
       const roomInfoPromises = allRooms.map(async (room) => {
         const reqBody = {
           roomID: room.roomId,
@@ -493,8 +491,8 @@ async function createBigXLS(filePath: string, jsonObject: Record<string, unknown
         }));
       });
 
-      // Run everything in parallel and flatten
-      const roomInfoResponses = (await Promise.all(roomInfoPromises)).flat().filter((r) => r && (r.occupants?.length || 0) > 0) as RoomInfo[];
+      // Run everything in parallel, flatten, and filter for sitting rooms with occupants
+      const roomInfoResponses = (await Promise.all(roomInfoPromises)).flat().filter((r) => r && r.isSitting && (r.occupants?.length || 0) > 0) as RoomInfo[];
 
       for (const emp of employees || []) {
         await handleFacultySeating(emp, roomInfoResponses);

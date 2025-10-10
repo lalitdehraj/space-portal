@@ -151,7 +151,7 @@ export default function CabinWorkstationAllocationForm({ roomInfo, onClose, onSu
           const occupantStartDate = moment(occupant.scheduledDate);
           const occupantEndDate = occupant.scheduledEndDate ? moment(occupant.scheduledEndDate) : occupantStartDate;
 
-          // For faculty sittings (cabin/workstation/office), check date range overlap
+          // For faculty sittings, check date range overlap
           // For other room types, check if dates overlap
           const hasOverlap = occupantEndDate.isAfter(allocationStart, "day") && occupantStartDate.isBefore(allocationEnd, "day");
 
@@ -180,10 +180,10 @@ export default function CabinWorkstationAllocationForm({ roomInfo, onClose, onSu
     }
   };
 
-  // Function to check all conflicts for cabins, workstations, and offices
+  // Function to check all conflicts for sitting rooms
   const checkAllConflicts = async () => {
-    // Only check conflicts for cabins, workstations, and offices
-    if (!roomInfo.roomType || !["cabin", "workstation", "office"].includes(roomInfo.roomType.toLowerCase())) {
+    // Only check conflicts for sitting rooms (cabins, workstations, offices)
+    if (!roomInfo.isSitting) {
       setHasConflicts(false);
       setConflictDetails([]);
       return;
@@ -234,7 +234,7 @@ export default function CabinWorkstationAllocationForm({ roomInfo, onClose, onSu
   }, [employeeId, startDate, endDate, purpose, remarks, allocationType, keysAssigned]);
 
   const createSpaceAllocations = (): SpaceAllocation[] => {
-    // Create single allocation entry for faculty sitting (cabin/workstation/office)
+    // Create single allocation entry for faculty sitting
     const allocation: SpaceAllocation = {
       allocationDate: startDate,
       allocatedEndDate: endDate,
@@ -315,8 +315,8 @@ export default function CabinWorkstationAllocationForm({ roomInfo, onClose, onSu
             </div>
           )}
 
-          {/* Conflict Warning - Only for cabins, workstations, and offices */}
-          {["cabin", "workstation", "office"].includes(roomInfo.roomType.toLowerCase()) && hasConflicts && (
+          {/* Conflict Warning - Only for sitting rooms */}
+          {roomInfo.isSitting && hasConflicts && (
             <div className="bg-red-100 border border-red-300 text-red-700 rounded p-3 mb-4">
               <div className="flex items-center mb-3">
                 <X size={16} className="mr-2" />
@@ -336,7 +336,7 @@ export default function CabinWorkstationAllocationForm({ roomInfo, onClose, onSu
           )}
 
           {/* Conflict Checking Indicator */}
-          {["cabin", "workstation", "office"].includes(roomInfo.roomType.toLowerCase()) && isCheckingConflicts && (
+          {roomInfo.isSitting && isCheckingConflicts && (
             <div className="bg-blue-100 border border-blue-300 text-blue-700 rounded p-3 mb-4">
               <div className="flex items-center">
                 <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mr-2"></div>
@@ -377,7 +377,6 @@ export default function CabinWorkstationAllocationForm({ roomInfo, onClose, onSu
                 <input
                   type="date"
                   min={moment().format("YYYY-MM-DD")}
-                  max={academicSessionEndDate}
                   className="block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-[#F26722]"
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
@@ -388,7 +387,6 @@ export default function CabinWorkstationAllocationForm({ roomInfo, onClose, onSu
                 <input
                   type="date"
                   min={startDate}
-                  max={academicSessionEndDate}
                   className="block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-[#F26722]"
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
