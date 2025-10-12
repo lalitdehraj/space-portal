@@ -80,6 +80,7 @@ export interface RoomInfo {
   roomName: string;
   capacity: number;
   isSitting: boolean;
+  isSittingActive?: boolean;
   occupied: number;
   occupants?: Occupant[];
   occupiedBy: string | null;

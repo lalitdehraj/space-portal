@@ -17,7 +17,12 @@ export type ApiResponse<T> = {
   error?: string;
 };
 
-export const callApi = async <T>(url: string, requestBody?: unknown, config?: false | Partial<CacheProperties<unknown, string>>): Promise<ApiResponse<T>> => {
+export const callApi = async <T>(
+  url: string,
+  requestBody?: unknown,
+  config?: false | Partial<CacheProperties<unknown, string>>,
+  abortSignal?: AbortSignal
+): Promise<ApiResponse<T>> => {
   try {
     const response = await api.post(url, JSON.stringify(requestBody || {}), {
       headers: {
@@ -25,10 +30,17 @@ export const callApi = async <T>(url: string, requestBody?: unknown, config?: fa
         Authorization: `Basic ${credentials}`,
       },
       cache: config,
+      signal: abortSignal,
     });
     return { success: true, data: JSON.parse((response.data as { value: string }).value) };
   } catch (err) {
     const error = err as AxiosError;
+
+    // Check if it's an abort error
+    if (axios.isCancel(error) || error.name === "CanceledError") {
+      return { success: false, error: "Request cancelled" };
+    }
+
     //@ts-expect-error - error.response.data.message is not typed
     const errorMessage = error.response?.data?.message || error.message || "An unknown error occurred";
     return { success: false, error: errorMessage };
