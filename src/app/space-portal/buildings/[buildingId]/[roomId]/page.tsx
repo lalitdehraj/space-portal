@@ -258,6 +258,7 @@ function RoomPage() {
         startTime: editingOccupant.startTime ? moment(editingOccupant.startTime, "HH:mm").format("HH:mm:ss") : "",
         endTime: editingOccupant.endTime ? moment(editingOccupant.endTime, "HH:mm").format("HH:mm:ss") : "",
         remarks: "",
+        isSittingActive: false,
         scheduledDate: editingOccupant.scheduledDate ? moment(editingOccupant.scheduledDate).format("YYYY-MM-DD") : "",
         allocatedEndDate: editFormData.endDate,
       });

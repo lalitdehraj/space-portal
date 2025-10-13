@@ -41,6 +41,7 @@ export interface Occupant {
   Id: string;
   keyNo: string;
   roomId?: string;
+  isSittingActive?: boolean;
   programCode?: string;
   subroomId?: string;
   department?: string;
@@ -80,7 +81,6 @@ export interface RoomInfo {
   roomName: string;
   capacity: number;
   isSitting: boolean;
-  isSittingActive?: boolean;
   occupied: number;
   occupants?: Occupant[];
   occupiedBy: string | null;
