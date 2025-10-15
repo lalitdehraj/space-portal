@@ -719,16 +719,24 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
       // which existing occupants overlap with our maintenance slot
       const conflictingOccupants =
         selectedRoomInfo.occupants?.filter((occupant) => {
-          const occupantDate = moment(occupant.scheduledDate).format("YYYY-MM-DD");
+          const occupantStartDate = moment(occupant.scheduledDate).format("YYYY-MM-DD");
+          const occupantEndDate = moment(occupant.scheduledEndDate).format("YYYY-MM-DD");
 
-          // Only check occupants on the same date
-          if (occupantDate !== maintenanceDate) return false;
+          // Check if the maintenance date falls within the occupant's date range
+          const maintenanceDateMoment = moment(maintenanceDate);
+          const occupantStartMoment = moment(occupantStartDate);
+          const occupantEndMoment = moment(occupantEndDate);
+
+          // Only check occupants whose date range includes the maintenance date
+          if (!maintenanceDateMoment.isBetween(occupantStartMoment, occupantEndMoment, "day", "[]")) {
+            return false;
+          }
 
           // Check for time overlap using the same logic as checkSlotConflicts
           const maintenanceStart = moment(`${maintenanceDate} ${startTime}`, "YYYY-MM-DD HH:mm");
           const maintenanceEnd = moment(`${maintenanceDate} ${endTime}`, "YYYY-MM-DD HH:mm");
-          const occupantStart = moment(`${occupantDate} ${occupant.startTime}`, "YYYY-MM-DD HH:mm");
-          const occupantEnd = moment(`${occupantDate} ${occupant.endTime}`, "YYYY-MM-DD HH:mm");
+          const occupantStart = moment(`${maintenanceDate} ${occupant.startTime}`, "YYYY-MM-DD HH:mm");
+          const occupantEnd = moment(`${maintenanceDate} ${occupant.endTime}`, "YYYY-MM-DD HH:mm");
 
           const overlaps = maintenanceStart.isBefore(occupantEnd) && maintenanceEnd.isAfter(occupantStart);
 
@@ -736,11 +744,10 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
         }) || [];
 
       const conflictInfo: ConflictInfo[] = conflictingOccupants.map((occupant) => {
-        const occupantDate = moment(occupant.scheduledDate).format("YYYY-MM-DD");
         const maintenanceStart = moment(`${maintenanceDate} ${startTime}`, "YYYY-MM-DD HH:mm");
         const maintenanceEnd = moment(`${maintenanceDate} ${endTime}`, "YYYY-MM-DD HH:mm");
-        const occupantStart = moment(`${occupantDate} ${occupant.startTime}`, "YYYY-MM-DD HH:mm");
-        const occupantEnd = moment(`${occupantDate} ${occupant.endTime}`, "YYYY-MM-DD HH:mm");
+        const occupantStart = moment(`${maintenanceDate} ${occupant.startTime}`, "YYYY-MM-DD HH:mm");
+        const occupantEnd = moment(`${maintenanceDate} ${occupant.endTime}`, "YYYY-MM-DD HH:mm");
 
         // Determine conflict type
         const isFullConflict = maintenanceStart.isSameOrBefore(occupantStart) && maintenanceEnd.isSameOrAfter(occupantEnd);
@@ -837,10 +844,9 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
         const selectedConflict = conflicts.find((c) => c.occupant.Id === occupantId);
         if (selectedConflict) {
           const occupant = selectedConflict.occupant;
-          const occupantDate = moment(occupant.scheduledDate).format("YYYY-MM-DD");
 
-          // Auto-fill the conflict-specific details
-          setConflictDates((prev) => ({ ...prev, [occupantId]: occupantDate }));
+          // Auto-fill the conflict-specific details using the maintenance date
+          setConflictDates((prev) => ({ ...prev, [occupantId]: maintenanceDate }));
           setConflictStartTimes((prev) => ({ ...prev, [occupantId]: normalizeTimeForInput(occupant.startTime) }));
           setConflictEndTimes((prev) => ({ ...prev, [occupantId]: normalizeTimeForInput(occupant.endTime) }));
         }
@@ -1236,11 +1242,13 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
               const updateData = {
                 allocationEntNo: conflictId,
                 isAllocationActive: true,
+                allocatedEndDate: moment(newDate).format("YYYY-MM-DD"),
+                isSittingActive: true,
                 startTime: moment(newStartTime, "HH:mm").format("HH:mm:ss"),
                 endTime: moment(newEndTime, "HH:mm").format("HH:mm:ss"),
                 scheduledDate: moment(newDate).format("YYYY-MM-DD"),
                 roomID: isSubroom ? parentRoomId : newRoomId, // Use parent room ID if it's a subroom
-                subRoomID: isSubroom ? newRoomId : undefined, // Use subroom ID if it's a subroom
+                subRoomID: isSubroom ? newRoomId : "", // Use subroom ID if it's a subroom
                 remarks: "Updated for maintenance conflict resolution",
               };
 

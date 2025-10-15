@@ -66,9 +66,10 @@ export default function RoomCard({ room, isExpanded = false, onClick, cachedSubr
         const endDate = isActiveSession ? moment().endOf("isoWeek").format("YYYY-MM-DD") : moment(academicSessionEndDate).format("YYYY-MM-DD");
 
         if (room.hasSubroom) {
-          // Handle parent room with subrooms
-          await fetchParentRoomOccupancy(startDate, endDate);
-          await fetchParentRoomCurrentOccupancy();
+          // Skip API calls for rooms with subrooms as per user request
+          setTotalOccupants(0);
+          setOccupancyPercent(0);
+          setCurrentOccupants([]);
         } else {
           // Handle regular room or subroom
           await fetchRegularRoomOccupancy(startDate, endDate);
@@ -79,122 +80,6 @@ export default function RoomCard({ room, isExpanded = false, onClick, cachedSubr
         setOccupancyPercent(0);
       } finally {
         setLoading(false);
-      }
-    };
-
-    const fetchParentRoomOccupancy = async (startDate: string, endDate: string) => {
-      try {
-        let subrooms: Room[] = [];
-
-        // Use cached subrooms if available, otherwise fetch them
-        if (cachedSubrooms && cachedSubrooms.length > 0) {
-          subrooms = cachedSubrooms.filter((subroom) => subroom.parentId === room.roomId);
-        } else {
-          // Fallback to individual API call if no cached subrooms
-          const subroomsResponse = await callApi<Room[]>(process.env.NEXT_PUBLIC_GET_SUBROOMS_LIST || URL_NOT_FOUND, {
-            roomID: room.roomId,
-            buildingNo: room.buildingId,
-            acadSess: acadmeicSession,
-            acadYr: acadmeicYear,
-          });
-
-          if (!subroomsResponse.success || !subroomsResponse.data || subroomsResponse.data.length === 0) {
-            setTotalOccupants(0);
-            setOccupancyPercent(0);
-            return;
-          }
-          subrooms = subroomsResponse.data;
-        }
-
-        if (subrooms.length === 0) {
-          setTotalOccupants(0);
-          setOccupancyPercent(0);
-          return;
-        }
-        let totalSubroomOccupants = 0;
-        let totalSubroomOccupancyPercent = 0;
-
-        // Fetch occupancy for each subroom
-        const subroomPromises = subrooms.map(async (subroom) => {
-          const requestBody = {
-            roomID: room.roomId, // parent room ID
-            subroomID: subroom.roomId, // subroom ID
-            academicYr: acadmeicYear,
-            acadSess: acadmeicSession,
-            startDate,
-            endDate,
-          };
-
-          const response = await callApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, requestBody);
-
-          if (response.success && response.data) {
-            const roomData = response.data;
-            const occupants = roomData.occupants?.length || 0;
-
-            // Calculate occupancy percentage for this subroom
-            const startDateMoment = isActiveSession ? moment().startOf("isoWeek") : moment(academicSessionStartDate);
-            const endDateMoment = isActiveSession ? moment().endOf("isoWeek") : moment(academicSessionEndDate);
-
-            const weeklyOccupants: Occupant[] =
-              roomData.occupants?.filter((o) => {
-                if (!o.scheduledDate) return false;
-                const scheduled = moment(o.scheduledDate);
-                return scheduled.isBetween(startDateMoment, endDateMoment, "day", "[]");
-              }) || [];
-
-            // Calculate occupancy differently for sitting vs non-sitting rooms
-            let percent = 0;
-
-            if (roomData.isSitting) {
-              // For sitting rooms, calculate based on current active occupants
-              const today = moment();
-              const activeOccupants =
-                roomData.occupants?.filter((o) => {
-                  if (!o.scheduledDate) return false;
-                  const startDate = moment(o.scheduledDate);
-                  const endDate = o.scheduledEndDate ? moment(o.scheduledEndDate) : startDate;
-
-                  // Check if the occupant is currently active (today is between start and end date)
-                  return today.isBetween(startDate, endDate, "day", "[]");
-                }) || [];
-
-              // Calculate occupancy percentage based on room capacity
-              const capacity = roomData.capacity || 1; // Avoid division by zero
-              percent = Math.min((activeOccupants.length / capacity) * 100, 100);
-            } else {
-              // For non-sitting rooms, use time-based calculation
-              const totalMinutes = weeklyOccupants.reduce((sum, occupant) => {
-                if (!occupant.startTime || !occupant.endTime) return sum;
-                const start = moment(occupant.startTime, "HH:mm");
-                const end = moment(occupant.endTime, "HH:mm");
-                return sum + Math.max(end.diff(start, "minutes"), 0);
-              }, 0);
-
-              const totalDays = endDateMoment.diff(startDateMoment, "days") + 1;
-              const maxMinutes = totalDays * WORK_HOURS_PER_DAY * 60;
-              percent = maxMinutes > 0 ? (totalMinutes / maxMinutes) * 100 : 0;
-            }
-
-            return { occupants, occupancyPercent: percent };
-          }
-          return { occupants: 0, occupancyPercent: 0 };
-        });
-
-        const subroomResults = await Promise.all(subroomPromises);
-
-        // Calculate totals
-        totalSubroomOccupants = subroomResults.reduce((sum, result) => sum + result.occupants, 0);
-        totalSubroomOccupancyPercent = subroomResults.reduce((sum, result) => sum + result.occupancyPercent, 0);
-
-        // Average occupancy percentage across all subrooms
-        const averageOccupancyPercent = subrooms.length > 0 ? totalSubroomOccupancyPercent / subrooms.length : 0;
-
-        setTotalOccupants(totalSubroomOccupants);
-        setOccupancyPercent(averageOccupancyPercent);
-      } catch (error) {
-        console.error("Error fetching parent room occupancy:", error);
-        setTotalOccupants(0);
-        setOccupancyPercent(0);
       }
     };
 
@@ -262,93 +147,6 @@ export default function RoomCard({ room, isExpanded = false, onClick, cachedSubr
       }
     };
 
-    const fetchParentRoomCurrentOccupancy = async () => {
-      try {
-        const currentDate = moment().format("YYYY-MM-DD");
-        const currentTime = moment().format("HH:mm");
-
-        let subrooms: Room[] = [];
-
-        // Use cached subrooms if available, otherwise fetch them
-        if (cachedSubrooms && cachedSubrooms.length > 0) {
-          subrooms = cachedSubrooms.filter((subroom) => subroom.parentId === room.roomId);
-        } else {
-          // Fallback to individual API call if no cached subrooms
-          const subroomsResponse = await callApi<Room[]>(process.env.NEXT_PUBLIC_GET_SUBROOMS_LIST || URL_NOT_FOUND, {
-            roomID: room.roomId,
-            buildingNo: room.buildingId,
-            acadSess: acadmeicSession,
-            acadYr: acadmeicYear,
-          });
-
-          if (!subroomsResponse.success || !subroomsResponse.data || subroomsResponse.data.length === 0) {
-            setCurrentOccupants([]);
-            return;
-          }
-          subrooms = subroomsResponse.data;
-        }
-
-        if (subrooms.length === 0) {
-          setCurrentOccupants([]);
-          return;
-        }
-
-        // Fetch current occupancy for each subroom
-        const subroomPromises = subrooms.map(async (subroom) => {
-          const requestBody = {
-            roomID: room.roomId, // parent room ID
-            subroomID: subroom.roomId, // subroom ID
-            academicYr: acadmeicYear,
-            acadSess: acadmeicSession,
-            startDate: currentDate,
-            endDate: currentDate,
-          };
-
-          const response = await callApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, requestBody);
-
-          if (response.success && response.data) {
-            const roomData = response.data;
-
-            // Filter occupants for current date and time
-            const currentOccupants =
-              roomData.occupants?.filter((o) => {
-                if (!o.scheduledDate) return false;
-
-                if (roomData.isSitting) {
-                  // For sitting rooms, check if current date is within the occupant's date range
-                  const startDate = moment(o.scheduledDate);
-                  const endDate = o.scheduledEndDate ? moment(o.scheduledEndDate) : startDate;
-                  const today = moment(currentDate);
-
-                  return today.isBetween(startDate, endDate, "day", "[]");
-                } else {
-                  // For non-sitting rooms, check time slots
-                  if (!o.startTime || !o.endTime) return false;
-                  const scheduledDate = moment(o.scheduledDate).format("YYYY-MM-DD");
-                  const currentMoment = moment(currentTime, "HH:mm");
-                  const startMoment = moment(o.startTime, "HH:mm");
-                  const endMoment = moment(o.endTime, "HH:mm");
-
-                  return scheduledDate === currentDate && currentMoment.isBetween(startMoment, endMoment, null, "[)");
-                }
-              }) || [];
-
-            return currentOccupants;
-          }
-          return [];
-        });
-
-        const subroomResults = await Promise.all(subroomPromises);
-
-        // Flatten all current occupants from all subrooms
-        const allCurrentOccupants = subroomResults.flat();
-        setCurrentOccupants(allCurrentOccupants);
-      } catch (error) {
-        console.error("Error fetching parent room current occupancy:", error);
-        setCurrentOccupants([]);
-      }
-    };
-
     const fetchRegularRoomCurrentOccupancy = async () => {
       try {
         const currentDate = moment().format("YYYY-MM-DD");
@@ -409,40 +207,59 @@ export default function RoomCard({ room, isExpanded = false, onClick, cachedSubr
     <div className="">
       <div
         onClick={() => onClick && onClick(room)}
-        className={`hover:shadow-lg transition-shadow duration-300 rounded-lg border-t border-r border-b border-l-4 shadow-sm py-4 px-3 ${
+        className={`hover:shadow-lg transition-shadow duration-300 rounded-lg border-t border-r border-b border-l-4 shadow-sm py-4 px-3 min-h-[140px] flex flex-col justify-between ${
           currentOccupants.length > 0 ? "border-l-red-500" : "border-l-green-600"
-        } ${isExpanded ? "ring-2 ring-orange-500 " : "none"}`}
+        } ${isExpanded ? "ring-2 ring-orange-500 " : "none"} ${room.hasSubroom ? "cursor-pointer hover:bg-gray-50" : ""}`}
       >
-        <button className="flex w-full items-start justify-between" title={`View details for ${room.roomName}`}>
+        <div className="flex w-full items-start justify-between">
           <div className="flex flex-col items-start text-left">
-            <p className="text-sm font-[540] text-gray-800 text-ellipsis">{room.roomName}</p>
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-[540] text-gray-800 text-ellipsis">{room.roomName}</p>
+            </div>
             <p className="text-[10px] text-gray-500">Building ID: {room.buildingId}</p>
             <p className="text-[10px] text-gray-500">Capacity: {room.roomCapactiy}</p>
-            {currentOccupants.length > 0 ? (
-              <p className="text-[10px] text-gray-500">
-                Current: {currentOccupants.map((occupant) => `${occupant.occupantName || occupant.Id} (${occupant.Id})`).join(", ")}
-              </p>
-            ) : (
-              <p className="text-[10px] text-gray-500">Currently Available</p>
-            )}
+            {!room.hasSubroom &&
+              (currentOccupants.length > 0 ? (
+                <p className="text-[10px] text-gray-500">
+                  Current: {currentOccupants.map((occupant) => `${occupant.occupantName || occupant.Id} (${occupant.Id})`).join(", ")}
+                </p>
+              ) : (
+                <p className="text-[10px] text-gray-500">Currently Available</p>
+              ))}
           </div>
-          <div
-            className={` inline-flex h-fit items-center rounded-md px-3 py-2 text-sm font-semibold ${
-              currentOccupants.length > 0 ? "text-red-500 bg-red-500/10" : "text-green-600 bg-green-600/10"
-            }`}
-          >
-            {`${occupancyPercent.toFixed(1)}%`}
-          </div>
-        </button>
-
-        <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-gray-200">
-          <div
-            className={`h-full rounded-full ${currentOccupants.length > 0 ? "bg-red-500" : "bg-green-600"}`}
-            style={{
-              width: `${occupancyPercent}%`,
-            }}
-          />
+          {!room.hasSubroom && (
+            <div
+              className={` inline-flex h-fit items-center rounded-md px-3 py-2 text-sm font-semibold ${
+                currentOccupants.length > 0 ? "text-red-500 bg-red-500/10" : "text-green-600 bg-green-600/10"
+              }`}
+            >
+              {`${occupancyPercent.toFixed(1)}%`}
+            </div>
+          )}
         </div>
+
+        {!room.hasSubroom && (
+          <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-gray-200">
+            <div
+              className={`h-full rounded-full ${currentOccupants.length > 0 ? "bg-red-500" : "bg-green-600"}`}
+              style={{
+                width: `${occupancyPercent}%`,
+              }}
+            />
+          </div>
+        )}
+
+        {/* Expandable indicator positioned at same location as progress bar */}
+        {room.hasSubroom && (
+          <div className="mt-4 w-full">
+            <div className="flex items-center justify-center gap-1 bg-blue-100 text-blue-600 px-3 py-1 rounded-full text-xs font-medium w-full">
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+              Expandable
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
