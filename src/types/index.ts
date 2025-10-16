@@ -234,6 +234,7 @@ export interface Maintenance {
   buildingId: string;
   roomid: string;
   maintanceDate: string;
+  maintanceEndDate: string;
   startTime: string;
   endTime: string;
   maintainenceType: string;

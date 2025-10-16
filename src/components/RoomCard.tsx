@@ -5,6 +5,7 @@ import moment from "moment";
 import { useEffect, useState } from "react";
 import { useSelector } from "react-redux";
 import { RootState } from "@/app/store";
+import MaintenanceCardModal from "./MaintenanceCardModal";
 
 interface RoomCardProps {
   room: Room;
@@ -23,6 +24,9 @@ const getOccupancyStatus = (room: Room): "low" | "medium" | "high" => {
 
 export default function RoomCard({ room, isExpanded = false, onClick, cachedSubrooms }: RoomCardProps) {
   const occupancyStatus = getOccupancyStatus(room);
+
+  // Debug log to check room properties
+  console.log(`Room ${room.roomName}: IsSitting=${room.IsSitting}, hasSubroom=${room.hasSubroom}`);
 
   const statusClasses = {
     low: {
@@ -55,6 +59,7 @@ export default function RoomCard({ room, isExpanded = false, onClick, cachedSubr
   const [occupancyPercent, setOccupancyPercent] = useState<number>(0);
   const [currentOccupants, setCurrentOccupants] = useState<Occupant[]>([]);
   const [, setLoading] = useState<boolean>(true);
+  const [showMaintenanceModal, setShowMaintenanceModal] = useState<boolean>(false);
 
   useEffect(() => {
     const fetchRoomInfo = async () => {
@@ -227,15 +232,59 @@ export default function RoomCard({ room, isExpanded = false, onClick, cachedSubr
                 <p className="text-[10px] text-gray-500">Currently Available</p>
               ))}
           </div>
-          {!room.hasSubroom && (
-            <div
-              className={` inline-flex h-fit items-center rounded-md px-3 py-2 text-sm font-semibold ${
-                currentOccupants.length > 0 ? "text-red-500 bg-red-500/10" : "text-green-600 bg-green-600/10"
-              }`}
-            >
-              {`${occupancyPercent.toFixed(1)}%`}
-            </div>
-          )}
+          <div className="flex items-center gap-2">
+            {!room.hasSubroom && (
+              <div className="flex items-center gap-2">
+                <div
+                  className={` inline-flex h-fit items-center rounded-md px-3 py-2 text-sm font-semibold ${
+                    currentOccupants.length > 0 ? "text-red-500 bg-red-500/10" : "text-green-600 bg-green-600/10"
+                  }`}
+                >
+                  {`${occupancyPercent.toFixed(1)}%`}
+                </div>
+                {room.IsSitting === true && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowMaintenanceModal(true);
+                    }}
+                    className="inline-flex h-fit items-center justify-center rounded-md px-2 py-2 text-sm font-semibold text-blue-600 bg-blue-600/10 hover:bg-blue-600/20 transition-colors"
+                    title="Maintenance"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+                      />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+            )}
+            {room.hasSubroom && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowMaintenanceModal(true);
+                }}
+                className="inline-flex h-fit items-center justify-center rounded-md px-3 py-2 text-sm font-semibold text-blue-600 bg-blue-600/10 hover:bg-blue-600/20 transition-colors"
+                title="Maintenance"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+                  />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              </button>
+            )}
+          </div>
         </div>
 
         {!room.hasSubroom && (
@@ -261,6 +310,9 @@ export default function RoomCard({ room, isExpanded = false, onClick, cachedSubr
           </div>
         )}
       </div>
+
+      {/* Maintenance Modal */}
+      {showMaintenanceModal && <MaintenanceCardModal room={room} onClose={() => setShowMaintenanceModal(false)} />}
     </div>
   );
 }
