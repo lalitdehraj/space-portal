@@ -63,8 +63,8 @@ export default function ExtendSittingModal({ onClose }: ExtendSittingModalProps)
 
   // Helper function to process promises in batches to avoid overwhelming the server
   const processBatch = useCallback(
-    async <T,>(items: T[], batchSize: number, processor: (item: T) => Promise<any>, abortSignal?: AbortSignal): Promise<any[]> => {
-      const results: any[] = [];
+    async <T,>(items: T[], batchSize: number, processor: (item: T) => Promise<unknown>, abortSignal?: AbortSignal): Promise<unknown[]> => {
+      const results: unknown[] = [];
       for (let i = 0; i < items.length; i += batchSize) {
         // Check if requests should be cancelled
         if (abortSignal?.aborted) {
@@ -164,7 +164,11 @@ export default function ExtendSittingModal({ onClose }: ExtendSittingModalProps)
       }
 
       // Step 3: Collect all room processing tasks
-      const allRoomTasks = buildingsWithRooms.flatMap(({ building, rooms }) => rooms.map((room: Room) => ({ building, room })));
+      const allRoomTasks = buildingsWithRooms.flatMap((item) => {
+        if (!item) return [];
+        const { building, rooms } = item as { building: Building; rooms: Room[] };
+        return rooms.map((room: Room) => ({ building, room }));
+      });
 
       // Step 4: Process rooms in batches
       const allRoomInfoResults = await processBatch(

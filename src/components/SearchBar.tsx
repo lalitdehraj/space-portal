@@ -441,7 +441,7 @@ export function AdvancedSearch({ onClose }: { onClose: () => void }) {
 
     try {
       // Call the sitting data API with employee ID
-      const response = await callApi<any[]>(process.env.NEXT_PUBLIC_SEARCH_SITTING_DATA || URL_NOT_FOUND, {
+      const response = await callApi<unknown[]>(process.env.NEXT_PUBLIC_SEARCH_SITTING_DATA || URL_NOT_FOUND, {
         employeeNo: occupantSearchEmployeeId,
       });
 
@@ -453,13 +453,19 @@ export function AdvancedSearch({ onClose }: { onClose: () => void }) {
         const currentTime = moment().format("HH:mm");
 
         const activeAllocations = allocations.filter((allocation) => {
+          const alloc = allocation as {
+            allocationStartDate: string;
+            allocationEndDate: string;
+            StartTime: string;
+            endTime: string;
+          };
           // Parse allocation dates
-          const startDate = moment(allocation.allocationStartDate);
-          const endDate = moment(allocation.allocationEndDate);
+          const startDate = moment(alloc.allocationStartDate);
+          const endDate = moment(alloc.allocationEndDate);
 
           // Parse allocation times (extract time from ISO format)
-          const startTime = allocation.StartTime.split("T")[1]?.split("Z")[0]?.substring(0, 5) || "00:00";
-          const endTime = allocation.endTime.split("T")[1]?.split("Z")[0]?.substring(0, 5) || "00:00";
+          const startTime = alloc.StartTime.split("T")[1]?.split("Z")[0]?.substring(0, 5) || "00:00";
+          const endTime = alloc.endTime.split("T")[1]?.split("Z")[0]?.substring(0, 5) || "00:00";
 
           // Check if current date is within allocation date range
           const isDateActive = currentDate.isBetween(startDate, endDate, "day", "[]");
@@ -475,26 +481,37 @@ export function AdvancedSearch({ onClose }: { onClose: () => void }) {
         });
 
         // Convert allocations to Occupant format for display
-        const occupantResults: (Occupant & { buildingId?: string })[] = activeAllocations.map((allocation) => ({
-          occupantId: allocation.allocatedSubRoomNo || allocation.allocatedRoomId,
-          occupantName: occupantSearchName || "Unknown", // Use search name if provided
-          type: "Sitting",
-          isExtendable: false,
-          Id: occupantSearchEmployeeId,
-          keyNo: "",
-          roomId: allocation.allocatedRoomId,
-          isSittingActive: true,
-          programCode: "",
-          subroomId: allocation.allocatedSubRoomNo,
-          department: "",
-          facultyCode: "",
-          startTime: allocation.StartTime.split("T")[1]?.split("Z")[0]?.substring(0, 5) || "00:00",
-          scheduledDate: new Date(allocation.allocationStartDate),
-          scheduledEndDate: new Date(allocation.allocationEndDate),
-          endTime: allocation.endTime.split("T")[1]?.split("Z")[0]?.substring(0, 5) || "00:00",
-          isEditable: "true",
-          buildingId: allocation.buildingId, // Add building ID for navigation
-        }));
+        const occupantResults: (Occupant & { buildingId?: string })[] = activeAllocations.map((allocation) => {
+          const alloc = allocation as {
+            allocatedSubRoomNo?: string;
+            allocatedRoomId: string;
+            StartTime: string;
+            allocationStartDate: string;
+            allocationEndDate: string;
+            endTime: string;
+            buildingId?: string;
+          };
+          return {
+            occupantId: alloc.allocatedSubRoomNo || alloc.allocatedRoomId,
+            occupantName: occupantSearchName || "Unknown", // Use search name if provided
+            type: "Sitting",
+            isExtendable: false,
+            Id: occupantSearchEmployeeId,
+            keyNo: "",
+            roomId: alloc.allocatedRoomId,
+            isSittingActive: true,
+            programCode: "",
+            subroomId: alloc.allocatedSubRoomNo,
+            department: "",
+            facultyCode: "",
+            startTime: alloc.StartTime.split("T")[1]?.split("Z")[0]?.substring(0, 5) || "00:00",
+            scheduledDate: new Date(alloc.allocationStartDate),
+            scheduledEndDate: new Date(alloc.allocationEndDate),
+            endTime: alloc.endTime.split("T")[1]?.split("Z")[0]?.substring(0, 5) || "00:00",
+            isEditable: "true",
+            buildingId: alloc.buildingId, // Add building ID for navigation
+          };
+        });
 
         setSearchOccupants(occupantResults);
       } else {

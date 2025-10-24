@@ -37,7 +37,7 @@ export const callApi = async <T>(
     const error = err as AxiosError;
 
     // Check if it's an abort error
-    if (axios.isCancel(error) || error.name === "CanceledError") {
+    if (axios.isCancel(error) || (error as Error).name === "CanceledError") {
       return { success: false, error: "Request cancelled" };
     }
 
