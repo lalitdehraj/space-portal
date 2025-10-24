@@ -24,7 +24,7 @@ export interface Room {
   occupied: number;
   occupiedBy: string;
   hasSubroom: boolean;
-  IsSitting: boolean;
+  isSitting: boolean;
   roomType: string;
   floorId: string;
   status: string;

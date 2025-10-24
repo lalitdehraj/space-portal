@@ -301,7 +301,7 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
     const roomDisplayText = `${building?.name} ${floor?.name ? `- ${floor?.name}` : ""} - ${room.roomName} ${
       room?.roomType ? `(${room.roomType})` : ""
     }`.toLowerCase();
-    return roomDisplayText.includes(roomSearchInput.toLowerCase()) && !room.IsSitting;
+    return roomDisplayText.includes(roomSearchInput.toLowerCase()) && !room.isSitting;
   });
 
   // Filter conflict rooms based on search input
@@ -341,7 +341,7 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
         roomDisplayText = `${building?.name} - ${room.roomId}${capacity ? ` - ${capacity}` : ""}`;
       }
 
-      return roomDisplayText.toLowerCase().includes(searchInput.toLowerCase()) && !room.IsSitting;
+      return roomDisplayText.toLowerCase().includes(searchInput.toLowerCase()) && !room.isSitting;
     });
   };
 
@@ -623,9 +623,17 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
         // Check if maintenance is for the same room
         if (roomId && maintenance.roomid !== roomId) return false;
 
-        // Check if maintenance is on the same date
-        const maintenanceDate = moment(maintenance.maintanceDate).format("YYYY-MM-DD");
-        return maintenanceDate === date;
+        // Check if maintenance date range includes the current date
+        const maintenanceStartDate = moment(maintenance.maintanceDate);
+        const maintenanceEndDate =
+          maintenance.maintanceEndDate && maintenance.maintanceEndDate !== "0001-01-01T00:00:00" ? moment(maintenance.maintanceEndDate) : maintenanceStartDate;
+
+        const currentDate = moment(date);
+        return (
+          currentDate.isBetween(maintenanceStartDate, maintenanceEndDate, "day", "[]") ||
+          currentDate.isSame(maintenanceStartDate, "day") ||
+          currentDate.isSame(maintenanceEndDate, "day")
+        );
       })
       .map((maintenance) => {
         // Parse maintenance times - handle both formats
@@ -765,10 +773,20 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
           return false;
         }
 
-        const existingMaintenanceDate = moment(maintenance.maintanceDate).format("YYYY-MM-DD");
+        const existingMaintenanceStartDate = moment(maintenance.maintanceDate);
+        const existingMaintenanceEndDate =
+          maintenance.maintanceEndDate && maintenance.maintanceEndDate !== "0001-01-01T00:00:00"
+            ? moment(maintenance.maintanceEndDate)
+            : existingMaintenanceStartDate;
 
-        // Only check maintenance on the same date
-        if (existingMaintenanceDate !== maintenanceDate) {
+        // Check if maintenance date range overlaps with the selected date
+        const selectedDate = moment(maintenanceDate);
+        const dateOverlaps =
+          selectedDate.isBetween(existingMaintenanceStartDate, existingMaintenanceEndDate, "day", "[]") ||
+          selectedDate.isSame(existingMaintenanceStartDate, "day") ||
+          selectedDate.isSame(existingMaintenanceEndDate, "day");
+
+        if (!dateOverlaps) {
           return false;
         }
 
@@ -999,9 +1017,19 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
         // Check if maintenance is for the same room
         if (maintenance.roomid !== roomId) return false;
 
-        // Check if maintenance is on the same date
-        const maintenanceDate = moment(maintenance.maintanceDate).format("YYYY-MM-DD");
-        if (maintenanceDate !== date) return false;
+        // Check if maintenance date range includes the current date
+        const maintenanceStartDate = moment(maintenance.maintanceDate);
+        const maintenanceEndDate =
+          maintenance.maintanceEndDate && maintenance.maintanceEndDate !== "0001-01-01T00:00:00" ? moment(maintenance.maintanceEndDate) : maintenanceStartDate;
+
+        const currentDate = moment(date);
+        if (
+          !currentDate.isBetween(maintenanceStartDate, maintenanceEndDate, "day", "[]") &&
+          !currentDate.isSame(maintenanceStartDate, "day") &&
+          !currentDate.isSame(maintenanceEndDate, "day")
+        ) {
+          return false;
+        }
 
         // Parse maintenance times - handle both formats
         const startTime = maintenance.startTime.includes("T") ? maintenance.startTime.split("T")[1]?.split(":").slice(0, 2).join(":") : maintenance.startTime;
@@ -1172,6 +1200,7 @@ const MaintenanceModal: React.FC<MaintenanceModalProps> = ({ allBuildingsData, o
         buildingId: selectedRoomInfo.building,
         roomid: selectedRoom?.parentId || selectedRoomInfo.id, // Use parentId if it's a subroom, otherwise use the room info id
         maintanceDate: maintenanceDate,
+        maintanceEndDate: maintenanceDate,
         startTime: `${startTime}:00`,
         endTime: `${endTime}:00`,
         maintainenceType: maintenanceType,

@@ -118,16 +118,26 @@ export function AdvancedSearch({ onClose }: { onClose: () => void }) {
         .filter((rec) => {
           if (!rec.isMainteneceActive) return false;
 
-          // Parse maintenance date (ISO format: 2025-09-23T00:00:00Z)
-          const maintenanceDate = moment(rec.maintanceDate).format("YYYY-MM-DD");
+          // Parse maintenance date range
+          const maintenanceStartDate = moment(rec.maintanceDate);
+          const maintenanceEndDate =
+            rec.maintanceEndDate && rec.maintanceEndDate !== "0001-01-01T00:00:00" ? moment(rec.maintanceEndDate) : maintenanceStartDate;
+
+          // Check if search date falls within maintenance date range
+          const searchDateMoment = moment(searchDate);
+          const isDateInRange = maintenanceEndDate.isSame(maintenanceStartDate, "day")
+            ? searchDateMoment.isSame(maintenanceStartDate, "day")
+            : searchDateMoment.isBetween(maintenanceStartDate, maintenanceEndDate, "day", "[]");
+
+          if (!isDateInRange) return false;
 
           // Parse maintenance times correctly from ISO format
           // The time format is "0001-01-02T09:00:00Z" - extract time part manually
           const maintenanceStartTime = rec.startTime.split("T")[1]?.split("Z")[0]?.substring(0, 5) || "00:00";
           const maintenanceEndTime = rec.endTime.split("T")[1]?.split("Z")[0]?.substring(0, 5) || "00:00";
 
-          const recStart = moment(`${maintenanceDate} ${maintenanceStartTime}`);
-          const recEnd = moment(`${maintenanceDate} ${maintenanceEndTime}`);
+          const recStart = moment(`${searchDate} ${maintenanceStartTime}`);
+          const recEnd = moment(`${searchDate} ${maintenanceEndTime}`);
 
           return recEnd.isAfter(filterStart) && recStart.isBefore(filterEnd);
         })

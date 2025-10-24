@@ -60,9 +60,39 @@ const MaintenancePage = () => {
 
           if (record.isMainteneceActive) {
             const maintenanceDate = moment(record.maintanceDate);
+            const maintenanceEndDate =
+              record.maintanceEndDate && record.maintanceEndDate !== "0001-01-01T00:00:00" ? moment(record.maintanceEndDate) : maintenanceDate;
             const currentDate = moment();
+            const currentTime = moment().format("HH:mm");
 
-            if (maintenanceDate.isAfter(currentDate)) {
+            // Check if maintenance is currently ongoing (same date and within time range)
+            const isCurrentlyOngoing = () => {
+              // Check if current date is within maintenance date range
+              const isDateInRange = maintenanceEndDate.isSame(maintenanceDate, "day")
+                ? currentDate.isSame(maintenanceDate, "day")
+                : currentDate.isBetween(maintenanceDate, maintenanceEndDate, "day", "[]");
+
+              if (!isDateInRange) return false;
+
+              // Parse maintenance times
+              const maintenanceStartTime = record.startTime.includes("T")
+                ? record.startTime.split("T")[1]?.split(":").slice(0, 2).join(":")
+                : record.startTime.split(":").slice(0, 2).join(":");
+              const maintenanceEndTime = record.endTime.includes("T")
+                ? record.endTime.split("T")[1]?.split(":").slice(0, 2).join(":")
+                : record.endTime.split(":").slice(0, 2).join(":");
+
+              // Check if current time is within maintenance time range
+              const currentMoment = moment(currentTime, "HH:mm");
+              const startMoment = moment(maintenanceStartTime, "HH:mm");
+              const endMoment = moment(maintenanceEndTime, "HH:mm");
+
+              return currentMoment.isBetween(startMoment, endMoment, null, "[)");
+            };
+
+            if (isCurrentlyOngoing()) {
+              status = "ongoing"; // Currently happening maintenance
+            } else if (maintenanceDate.isAfter(currentDate)) {
               status = "active"; // Future maintenance
             } else {
               status = "completed"; // Past maintenance that was active
@@ -236,6 +266,8 @@ const MaintenancePage = () => {
                           className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                             record.status === "active"
                               ? "bg-green-100 text-green-800"
+                              : record.status === "ongoing"
+                              ? "bg-yellow-100 text-yellow-800"
                               : record.status === "completed"
                               ? "bg-blue-100 text-blue-800"
                               : record.status === "cancelled"
@@ -244,9 +276,10 @@ const MaintenancePage = () => {
                           }`}
                         >
                           {record.status === "active" && "Active"}
+                          {record.status === "ongoing" && "Ongoing"}
                           {record.status === "completed" && "Completed"}
                           {record.status === "cancelled" && "Cancelled"}
-                          {!["active", "completed", "cancelled"].includes(record.status || "") && "Unknown"}
+                          {!["active", "ongoing", "completed", "cancelled"].includes(record.status || "") && "Unknown"}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{record.createdBy}</td>

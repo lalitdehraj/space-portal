@@ -1,5 +1,5 @@
 import { URL_NOT_FOUND } from "@/constants";
-import { Occupant, Room, RoomInfo } from "@/types";
+import { Occupant, Room, RoomInfo, Maintenance } from "@/types";
 import { callApi } from "@/utils/apiIntercepter";
 import moment from "moment";
 import { useEffect, useState } from "react";
@@ -24,9 +24,6 @@ const getOccupancyStatus = (room: Room): "low" | "medium" | "high" => {
 
 export default function RoomCard({ room, isExpanded = false, onClick, cachedSubrooms }: RoomCardProps) {
   const occupancyStatus = getOccupancyStatus(room);
-
-  // Debug log to check room properties
-  console.log(`Room ${room.roomName}: IsSitting=${room.IsSitting}, hasSubroom=${room.hasSubroom}`);
 
   const statusClasses = {
     low: {
@@ -60,6 +57,7 @@ export default function RoomCard({ room, isExpanded = false, onClick, cachedSubr
   const [currentOccupants, setCurrentOccupants] = useState<Occupant[]>([]);
   const [, setLoading] = useState<boolean>(true);
   const [showMaintenanceModal, setShowMaintenanceModal] = useState<boolean>(false);
+  const [hasActiveMaintenance, setHasActiveMaintenance] = useState<boolean>(false);
 
   useEffect(() => {
     const fetchRoomInfo = async () => {
@@ -102,7 +100,6 @@ export default function RoomCard({ room, isExpanded = false, onClick, cachedSubr
 
       if (response.success && response.data) {
         const roomData = response.data;
-        console.log("roomData", roomData);
 
         setTotalOccupants(response.data.occupants?.length || 0);
         // Determine date range
@@ -205,7 +202,67 @@ export default function RoomCard({ room, isExpanded = false, onClick, cachedSubr
       }
     };
 
+    const checkActiveMaintenance = async () => {
+      try {
+        const response = await callApi<Maintenance[]>(process.env.NEXT_PUBLIC_GET_MAINTENANCE_DATA || URL_NOT_FOUND);
+
+        if (response.success && response.data) {
+          const currentDate = moment();
+          const currentTime = moment().format("HH:mm");
+
+          // Check if there's any active maintenance for this room at the current time
+          const activeMaintenance = response.data.some((maintenance) => {
+            // Check if maintenance is for this room (considering parent/subroom relationship)
+            const matchesRoom =
+              maintenance.roomid === room.roomId || maintenance.roomid === room.parentId || (room.parentId && maintenance.roomid === room.parentId);
+
+            if (!maintenance.isMainteneceActive || !matchesRoom) {
+              return false;
+            }
+
+            // Check if current date matches the maintenance date
+            const maintenanceStartDate = moment(maintenance.maintanceDate);
+            const maintenanceEndDate =
+              maintenance.maintanceEndDate && maintenance.maintanceEndDate !== "0001-01-01T00:00:00"
+                ? moment(maintenance.maintanceEndDate)
+                : maintenanceStartDate;
+
+            // For single-day maintenance, check if current date matches maintenance date
+            // For multi-day maintenance, check if current date is within the range
+            const isDateInRange = maintenanceEndDate.isSame(maintenanceStartDate, "day")
+              ? currentDate.isSame(maintenanceStartDate, "day")
+              : currentDate.isBetween(maintenanceStartDate, maintenanceEndDate, "day", "[]");
+
+            if (!isDateInRange) {
+              return false;
+            }
+
+            // Parse maintenance times
+            const maintenanceStartTime = maintenance.startTime.includes("T")
+              ? maintenance.startTime.split("T")[1]?.split(":").slice(0, 2).join(":")
+              : maintenance.startTime.split(":").slice(0, 2).join(":");
+            const maintenanceEndTime = maintenance.endTime.includes("T")
+              ? maintenance.endTime.split("T")[1]?.split(":").slice(0, 2).join(":")
+              : maintenance.endTime.split(":").slice(0, 2).join(":");
+
+            // Check if current time is within maintenance time range
+            const currentMoment = moment(currentTime, "HH:mm");
+            const startMoment = moment(maintenanceStartTime, "HH:mm");
+            const endMoment = moment(maintenanceEndTime, "HH:mm");
+
+            return currentMoment.isBetween(startMoment, endMoment, null, "[)");
+          });
+
+          setHasActiveMaintenance(activeMaintenance);
+        }
+      } catch (error) {
+        console.error("Error checking active maintenance:", error);
+        setHasActiveMaintenance(false);
+      }
+    };
+
     fetchRoomInfo();
+    checkActiveMaintenance();
   }, [academicSessionStartDate, academicSessionEndDate, isActiveSession, room.roomId, room.hasSubroom, room.buildingId]);
 
   return (
@@ -214,7 +271,9 @@ export default function RoomCard({ room, isExpanded = false, onClick, cachedSubr
         onClick={() => onClick && onClick(room)}
         className={`hover:shadow-lg transition-shadow duration-300 rounded-lg border-t border-r border-b border-l-4 shadow-sm py-4 px-3 min-h-[140px] flex flex-col justify-between ${
           currentOccupants.length > 0 ? "border-l-red-500" : "border-l-green-600"
-        } ${isExpanded ? "ring-2 ring-orange-500 " : "none"} ${room.hasSubroom ? "cursor-pointer hover:bg-gray-50" : ""}`}
+        } ${isExpanded ? "ring-2 ring-orange-500 " : "none"} ${room.hasSubroom ? "cursor-pointer hover:bg-gray-50" : ""} ${
+          hasActiveMaintenance ? "bg-purple-100" : room.status === "1" ? "bg-purple-100" : "bg-white"
+        }`}
       >
         <div className="flex w-full items-start justify-between">
           <div className="flex flex-col items-start text-left">
@@ -228,6 +287,8 @@ export default function RoomCard({ room, isExpanded = false, onClick, cachedSubr
                 <p className="text-[10px] text-gray-500">
                   Current: {currentOccupants.map((occupant) => `${occupant.occupantName || occupant.Id} (${occupant.Id})`).join(", ")}
                 </p>
+              ) : hasActiveMaintenance ? (
+                <p className="text-[10px] text-purple-600 font-medium">Under Maintenance</p>
               ) : (
                 <p className="text-[10px] text-gray-500">Currently Available</p>
               ))}
@@ -242,7 +303,7 @@ export default function RoomCard({ room, isExpanded = false, onClick, cachedSubr
                 >
                   {`${occupancyPercent.toFixed(1)}%`}
                 </div>
-                {room.IsSitting === true && (
+                {room.isSitting === true && (
                   <button
                     onClick={(e) => {
                       e.stopPropagation();

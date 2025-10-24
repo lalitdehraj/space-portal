@@ -274,8 +274,14 @@ function WeeklyTimetable({
                     {/* Maintenance slots floating */}
                     {maintenanceData
                       .filter((maintenance) => {
-                        const maintenanceDate = new Date(maintenance.maintanceDate);
-                        const isDateMatch = maintenanceDate.toDateString() === date.toDateString();
+                        const maintenanceStartDate = new Date(maintenance.maintanceDate);
+                        const maintenanceEndDate =
+                          maintenance.maintanceEndDate && maintenance.maintanceEndDate !== "0001-01-01T00:00:00"
+                            ? new Date(maintenance.maintanceEndDate)
+                            : maintenanceStartDate;
+
+                        // Check if the current date falls within the maintenance date range
+                        const isDateMatch = date >= maintenanceStartDate && date <= maintenanceEndDate;
                         const isActive = maintenance.isMainteneceActive;
 
                         // Check if maintenance is for this room or its parent room
