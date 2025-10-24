@@ -35,6 +35,14 @@ export function AdvancedSearch({ onClose }: { onClose: () => void }) {
   const [searchDate, setSearchDate] = useState(moment().format("YYYY-MM-DD"));
   const [startTime, setStartTime] = useState(moment().format("HH:mm"));
   const [endTime, setEndTime] = useState(moment().format("HH:mm"));
+  const [isFiltersExpanded, setIsFiltersExpanded] = useState(true);
+
+  // Occupant search state
+  const [isOccupantSearchExpanded, setIsOccupantSearchExpanded] = useState(false);
+  const [occupantSearchName, setOccupantSearchName] = useState("");
+  const [occupantSearchEmployeeId, setOccupantSearchEmployeeId] = useState("");
+  const [searchOccupants, setSearchOccupants] = useState<(Occupant & { buildingId?: string })[]>([]);
+  const [occupantSearchLoading, setOccupantSearchLoading] = useState(false);
 
   // Fetch maintenance records
   const fetchMaintenanceRecords = async () => {
@@ -361,6 +369,7 @@ export function AdvancedSearch({ onClose }: { onClose: () => void }) {
     }
 
     setLoading(true);
+    setSearchOccupants([]); // Clear occupant results when searching rooms
 
     try {
       if (status && status.toLowerCase() === "maintenance") {
@@ -418,6 +427,100 @@ export function AdvancedSearch({ onClose }: { onClose: () => void }) {
     onClose();
   };
 
+  /**
+   * Handle occupant search functionality using NEXT_PUBLIC_SEARCH_SITTING_DATA API
+   */
+  const handleOccupantSearch = async () => {
+    if (!occupantSearchEmployeeId) {
+      return;
+    }
+
+    setOccupantSearchLoading(true);
+    setSearchOccupants([]);
+    setFilteredRooms([]); // Clear room results when searching occupants
+
+    try {
+      // Call the sitting data API with employee ID
+      const response = await callApi<any[]>(process.env.NEXT_PUBLIC_SEARCH_SITTING_DATA || URL_NOT_FOUND, {
+        employeeNo: occupantSearchEmployeeId,
+      });
+
+      if (response.success && response.data) {
+        const allocations = response.data;
+
+        // Check if allocations are currently active
+        const currentDate = moment();
+        const currentTime = moment().format("HH:mm");
+
+        const activeAllocations = allocations.filter((allocation) => {
+          // Parse allocation dates
+          const startDate = moment(allocation.allocationStartDate);
+          const endDate = moment(allocation.allocationEndDate);
+
+          // Parse allocation times (extract time from ISO format)
+          const startTime = allocation.StartTime.split("T")[1]?.split("Z")[0]?.substring(0, 5) || "00:00";
+          const endTime = allocation.endTime.split("T")[1]?.split("Z")[0]?.substring(0, 5) || "00:00";
+
+          // Check if current date is within allocation date range
+          const isDateActive = currentDate.isBetween(startDate, endDate, "day", "[]");
+
+          // Check if current time is within allocation time range
+          const currentTimeMoment = moment(currentTime, "HH:mm");
+          const startTimeMoment = moment(startTime, "HH:mm");
+          const endTimeMoment = moment(endTime, "HH:mm");
+
+          const isTimeActive = currentTimeMoment.isBetween(startTimeMoment, endTimeMoment, "minute", "[]");
+
+          return isDateActive && isTimeActive;
+        });
+
+        // Convert allocations to Occupant format for display
+        const occupantResults: (Occupant & { buildingId?: string })[] = activeAllocations.map((allocation) => ({
+          occupantId: allocation.allocatedSubRoomNo || allocation.allocatedRoomId,
+          occupantName: occupantSearchName || "Unknown", // Use search name if provided
+          type: "Sitting",
+          isExtendable: false,
+          Id: occupantSearchEmployeeId,
+          keyNo: "",
+          roomId: allocation.allocatedRoomId,
+          isSittingActive: true,
+          programCode: "",
+          subroomId: allocation.allocatedSubRoomNo,
+          department: "",
+          facultyCode: "",
+          startTime: allocation.StartTime.split("T")[1]?.split("Z")[0]?.substring(0, 5) || "00:00",
+          scheduledDate: new Date(allocation.allocationStartDate),
+          scheduledEndDate: new Date(allocation.allocationEndDate),
+          endTime: allocation.endTime.split("T")[1]?.split("Z")[0]?.substring(0, 5) || "00:00",
+          isEditable: "true",
+          buildingId: allocation.buildingId, // Add building ID for navigation
+        }));
+
+        setSearchOccupants(occupantResults);
+      } else {
+        setSearchOccupants([]);
+      }
+    } catch (error) {
+      console.error("Error searching occupants:", error);
+      setSearchOccupants([]);
+    } finally {
+      setOccupantSearchLoading(false);
+    }
+  };
+
+  /**
+   * Handle occupant click - navigate to room details
+   */
+  const handleOccupantClick = (occupant: Occupant & { buildingId?: string }) => {
+    // Navigate to the room where this occupant is allocated
+    if (occupant.roomId) {
+      // Use the building ID from the allocation data if available, otherwise use selected building
+      const buildingId = occupant.buildingId || selectedBuilding;
+      router.push(`/space-portal/buildings/${encrypt(buildingId)}/${encrypt(`${occupant.roomId}|${occupant.subroomId}`)}`);
+      onClose();
+    }
+  };
+
   const today = moment().format("YYYY-MM-DD");
   const nowTime = moment().format("HH:mm");
 
@@ -444,114 +547,202 @@ export function AdvancedSearch({ onClose }: { onClose: () => void }) {
           <div className="w-full md:w-80 border-r border-gray-200 bg-gray-50 flex flex-col">
             <div className="p-6 flex flex-col space-y-6 overflow-y-auto">
               <div>
-                <h3 className="text-sm font-semibold text-gray-700 mb-4 uppercase tracking-wide">Search Filters</h3>
-
-                {/* Building Filter */}
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700">Select Building</label>
-                  <select
-                    value={selectedBuilding}
-                    onChange={(e) => setSelectedBuilding(e.target.value)}
-                    className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                  >
-                    <option value="">Select a building</option>
-                    {buildings.map((building) => (
-                      <option key={building.id} value={building.id}>
-                        {building.name}
-                      </option>
-                    ))}
-                  </select>
+                {/* Collapsible Header */}
+                <div
+                  className="flex items-center justify-between cursor-pointer mb-4"
+                  onClick={() => {
+                    setIsFiltersExpanded(!isFiltersExpanded);
+                    if (!isFiltersExpanded) {
+                      setIsOccupantSearchExpanded(false);
+                    }
+                  }}
+                >
+                  <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Search Filters</h3>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-xs text-gray-500">{isFiltersExpanded ? "Hide" : "Show"}</span>
+                    <svg
+                      className={`w-4 h-4 text-gray-500 transition-transform duration-200 ${isFiltersExpanded ? "rotate-180" : "rotate-0"}`}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
                 </div>
 
-                {/* Capacity Filter */}
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700">Minimum Capacity</label>
-                  <input
-                    type="number"
-                    value={capacity}
-                    onChange={(e) => setCapacity(e.target.value)}
-                    placeholder="Enter capacity"
-                    className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                  />
-                </div>
+                {/* Collapsible Content */}
+                <div
+                  className={`transition-all duration-300 ease-in-out ${isFiltersExpanded ? "max-h-screen opacity-100" : "max-h-0 opacity-0 overflow-hidden"}`}
+                >
+                  <div className="space-y-6">
+                    {/* Building Filter */}
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-gray-700">Select Building</label>
+                      <select
+                        value={selectedBuilding}
+                        onChange={(e) => setSelectedBuilding(e.target.value)}
+                        className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                      >
+                        <option value="">Select a building</option>
+                        {buildings.map((building) => (
+                          <option key={building.id} value={building.id}>
+                            {building.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
 
-                {/* Status Filter */}
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700">Room Status</label>
-                  <select
-                    value={status}
-                    onChange={(e) => setStatus(e.target.value)}
-                    className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                  >
-                    <option value="">All Rooms</option>
-                    <option value="maintenance">Under maintenance</option>
-                    <option value="available">Available</option>
-                  </select>
-                </div>
+                    {/* Capacity Filter */}
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-gray-700">Minimum Capacity</label>
+                      <input
+                        type="number"
+                        value={capacity}
+                        onChange={(e) => setCapacity(e.target.value)}
+                        placeholder="Enter capacity"
+                        className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                      />
+                    </div>
 
-                {/* Room Type Filter */}
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700">Room Type</label>
-                  <select
-                    value={roomType}
-                    onChange={(e) => setRoomType(e.target.value)}
-                    className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                  >
-                    <option value="">All Types</option>
-                    {[...new Set(allRooms.filter((r) => r.roomType !== "").map((r) => r.roomType))].map((type) => (
-                      <option key={type} value={type}>
-                        {type}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                    {/* Status Filter */}
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-gray-700">Room Status</label>
+                      <select
+                        value={status}
+                        onChange={(e) => setStatus(e.target.value)}
+                        className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                      >
+                        <option value="">All Rooms</option>
+                        <option value="maintenance">Under maintenance</option>
+                        <option value="available">Available</option>
+                      </select>
+                    </div>
 
-                {/* Date Filter */}
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700">Search Date</label>
-                  <input
-                    type="date"
-                    value={searchDate}
-                    min={today}
-                    onChange={(e) => setSearchDate(e.target.value)}
-                    className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                  />
-                </div>
+                    {/* Room Type Filter */}
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-gray-700">Room Type</label>
+                      <select
+                        value={roomType}
+                        onChange={(e) => setRoomType(e.target.value)}
+                        className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                      >
+                        <option value="">All Types</option>
+                        {[...new Set(allRooms.filter((r) => r.roomType !== "").map((r) => r.roomType))].map((type) => (
+                          <option key={type} value={type}>
+                            {type}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
 
-                {/* Time Range Filter */}
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700">Time Range</label>
-                  <div className="flex space-x-2">
-                    <input
-                      type="time"
-                      value={startTime}
-                      min={searchDate === today ? nowTime : "00:00"}
-                      onChange={(e) => setStartTime(e.target.value)}
-                      className="flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                    />
-                    <input
-                      type="time"
-                      value={endTime}
-                      min={startTime}
-                      onChange={(e) => setEndTime(e.target.value)}
-                      className="flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                    />
+                    {/* Date Filter */}
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-gray-700">Search Date</label>
+                      <input
+                        type="date"
+                        value={searchDate}
+                        min={today}
+                        onChange={(e) => setSearchDate(e.target.value)}
+                        className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                      />
+                    </div>
+
+                    {/* Time Range Filter */}
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-gray-700">Time Range</label>
+                      <div className="flex space-x-2">
+                        <input
+                          type="time"
+                          value={startTime}
+                          min={searchDate === today ? nowTime : "00:00"}
+                          onChange={(e) => setStartTime(e.target.value)}
+                          className="flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                        />
+                        <input
+                          type="time"
+                          value={endTime}
+                          min={startTime}
+                          onChange={(e) => setEndTime(e.target.value)}
+                          className="flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Search Rooms Button */}
+                    <button
+                      onClick={handleSearch}
+                      disabled={!selectedBuilding}
+                      className={`w-full py-3 rounded-lg text-sm font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 ${
+                        selectedBuilding ? "bg-orange-500 text-white hover:bg-orange-600" : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                      }`}
+                    >
+                      {selectedBuilding ? "Search Rooms" : "Select a building first"}
+                    </button>
                   </div>
                 </div>
               </div>
-            </div>
 
-            {/* Search Button */}
-            <div className="p-6 border-t border-gray-200 bg-white">
-              <button
-                onClick={handleSearch}
-                disabled={!selectedBuilding}
-                className={`w-full py-3 rounded-lg text-sm font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 ${
-                  selectedBuilding ? "bg-orange-500 text-white hover:bg-orange-600" : "bg-gray-300 text-gray-500 cursor-not-allowed"
-                }`}
-              >
-                {selectedBuilding ? "Search Rooms" : "Select a building first"}
-              </button>
+              {/* Occupant Search Section */}
+              <div>
+                {/* Collapsible Header */}
+                <div
+                  className="flex items-center justify-between cursor-pointer mb-4"
+                  onClick={() => {
+                    setIsOccupantSearchExpanded(!isOccupantSearchExpanded);
+                    if (!isOccupantSearchExpanded) {
+                      setIsFiltersExpanded(false);
+                    }
+                  }}
+                >
+                  <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Search Occupants</h3>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-xs text-gray-500">{isOccupantSearchExpanded ? "Hide" : "Show"}</span>
+                    <svg
+                      className={`w-4 h-4 text-gray-500 transition-transform duration-200 ${isOccupantSearchExpanded ? "rotate-180" : "rotate-0"}`}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                </div>
+
+                {/* Collapsible Content */}
+                <div
+                  className={`transition-all duration-300 ease-in-out ${
+                    isOccupantSearchExpanded ? "max-h-screen opacity-100" : "max-h-0 opacity-0 overflow-hidden"
+                  }`}
+                >
+                  <div className="space-y-6">
+                    {/* Employee ID Search */}
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-gray-700">Search by Employee ID</label>
+                      <input
+                        type="text"
+                        value={occupantSearchEmployeeId}
+                        onChange={(e) => setOccupantSearchEmployeeId(e.target.value)}
+                        placeholder="Enter employee ID"
+                        className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                      />
+                    </div>
+
+                    {/* Search Occupants Button */}
+                    <button
+                      onClick={handleOccupantSearch}
+                      disabled={!occupantSearchEmployeeId}
+                      className={`w-full py-2 rounded-lg text-sm font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 ${
+                        occupantSearchEmployeeId ? "bg-blue-500 text-white hover:bg-blue-600" : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                      }`}
+                    >
+                      {occupantSearchLoading ? "Searching..." : "Search Occupants"}
+                    </button>
+
+                    {/* Occupant Search Results - Removed from sidebar, now shown on right side */}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -559,16 +750,62 @@ export function AdvancedSearch({ onClose }: { onClose: () => void }) {
           <div className="flex-1 bg-white">
             <div className="p-6">
               <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-semibold text-gray-800">Search Results</h3>
-                {filteredRooms.length > 0 && (
+                <h3 className="text-lg font-semibold text-gray-800">{searchOccupants.length > 0 ? "Occupant Search Results" : "Room Search Results"}</h3>
+                {(filteredRooms.length > 0 || searchOccupants.length > 0) && (
                   <span className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
-                    {filteredRooms.length} room{filteredRooms.length !== 1 ? "s" : ""} found
+                    {searchOccupants.length > 0
+                      ? `${searchOccupants.length} occupant${searchOccupants.length !== 1 ? "s" : ""} found`
+                      : `${filteredRooms.length} room${filteredRooms.length !== 1 ? "s" : ""} found`}
                   </span>
                 )}
               </div>
 
               <div className="overflow-y-auto" style={{ maxHeight: "calc(100vh - 280px)" }}>
-                {!selectedBuilding ? (
+                {/* Show occupant search results if available */}
+                {searchOccupants.length > 0 ? (
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                    {searchOccupants.map((occupant, index) => (
+                      <div
+                        key={`${occupant.Id}-${index}`}
+                        className="bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden relative cursor-pointer"
+                        onClick={() => handleOccupantClick(occupant)}
+                      >
+                        <div className="p-4">
+                          <div className="flex items-start justify-between mb-3">
+                            <div className="flex-1">
+                              <h4 className="font-semibold text-gray-800 text-sm mb-1 truncate">{occupant.occupantName}</h4>
+                              <p className="text-xs text-gray-500 mb-1">Employee ID: {occupant.Id}</p>
+                              <p className="text-xs text-gray-500 mb-1">Room: {occupant.roomId}</p>
+                              {occupant.subroomId && <p className="text-xs text-blue-600 mb-1">Subroom: {occupant.subroomId}</p>}
+                            </div>
+                            <div className="text-right">
+                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">Active</span>
+                            </div>
+                          </div>
+
+                          <div className="space-y-2">
+                            <div className="flex justify-between text-xs">
+                              <span className="text-gray-500">Allocation Period:</span>
+                              <span className="font-medium text-gray-700">
+                                {moment(occupant.scheduledDate).format("MMM DD")} - {moment(occupant.scheduledEndDate).format("MMM DD")}
+                              </span>
+                            </div>
+                            <div className="flex justify-between text-xs">
+                              <span className="text-gray-500">Time:</span>
+                              <span className="font-medium text-gray-700">
+                                {occupant.startTime} - {occupant.endTime}
+                              </span>
+                            </div>
+                            <div className="flex justify-between text-xs">
+                              <span className="text-gray-500">Type:</span>
+                              <span className="font-medium text-gray-700">{occupant.type}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : !selectedBuilding ? (
                   <div className="flex flex-col items-center justify-center py-12 text-gray-500">
                     <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
                       <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">

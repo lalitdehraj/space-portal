@@ -158,13 +158,13 @@ function AllocationPage() {
       );
     });
   }, [allocations, courses, searchQuery]);
-  // filteredAllocations.forEach((alloc) => {
-  //   console.log(
-  //     alloc.program,
-  //     courses,
-  //     courses.find((c) => c.code === alloc.program)
-  //   );
-  // });
+  filteredAllocations.forEach((alloc) => {
+    console.log(
+      alloc.program,
+      courses,
+      courses.find((c) => c.code === alloc.program)
+    );
+  });
 
   return (
     <div>
@@ -289,7 +289,7 @@ function AllocationPage() {
                   ))}
                 </select>
               </div>
-              {/* <div className="mb-4">
+              <div className="mb-4">
                 <label className="block text-sm text-gray-700 mb-1">Program Code</label>
                 <select
                   className="block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
@@ -304,7 +304,7 @@ function AllocationPage() {
                     </option>
                   ))}
                 </select>
-              </div> */}
+              </div>
               <div className="flex justify-end space-x-2 mt-6">
                 <button
                   type="button"
