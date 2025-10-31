@@ -2,10 +2,13 @@
 import { useSession } from "next-auth/react";
 import { useRouter, usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { callApi } from "@/utils/apiIntercepter";
+import { callApi, getBearerToken } from "@/utils/apiIntercepter";
 import { URL_NOT_FOUND } from "@/constants";
 import { UserProfile } from "@/types";
 import { checkRouteAccess, extractUserRoles } from "@/utils/roleBasedAccess";
+import { useDispatch, useSelector } from "react-redux";
+import { setBearerToken } from "@/app/feature/dataSlice";
+import { RootState } from "@/app/store";
 
 interface AuthGuardProps {
   children: React.ReactNode;
@@ -15,14 +18,39 @@ export default function AuthGuard({ children }: AuthGuardProps) {
   const { data: session, status } = useSession();
   const router = useRouter();
   const pathname = usePathname();
+  const dispatch = useDispatch();
+  const bearerToken = useSelector((state: RootState) => state.dataState.bearerToken);
+  const bearerTokenExpiry = useSelector((state: RootState) => state.dataState.bearerTokenExpiry);
   const [userRoles, setUserRoles] = useState<string[]>([]);
   const [isLoadingRoles, setIsLoadingRoles] = useState(true);
   const [isAuthorized, setIsAuthorized] = useState(false);
 
+  // Check and refresh bearer token
+  useEffect(() => {
+    const checkAndRefreshBearerToken = async () => {
+      if (status === "loading" || !session) return;
+
+      const isTokenExpired = !bearerToken || bearerTokenExpiry <= Date.now();
+
+      if (isTokenExpired) {
+        console.log("Bearer token expired or missing, generating new token...");
+        const tokenData = await getBearerToken();
+        if (tokenData) {
+          dispatch(setBearerToken({ token: tokenData.token, expiry: tokenData.expiry }));
+          console.log("Bearer token refreshed successfully");
+        } else {
+          console.error("Failed to generate bearer token");
+        }
+      }
+    };
+
+    checkAndRefreshBearerToken();
+  }, [session, status, bearerToken, bearerTokenExpiry, dispatch]);
+
   // Fetch user roles
   useEffect(() => {
     const fetchUserRoles = async () => {
-      if (status === "loading" || !session) return;
+      if (status === "loading" || !session || !bearerToken) return;
 
       try {
         const response = await callApi<UserProfile[]>(process.env.NEXT_PUBLIC_GET_USER || URL_NOT_FOUND);
@@ -41,7 +69,7 @@ export default function AuthGuard({ children }: AuthGuardProps) {
     };
 
     fetchUserRoles();
-  }, [session, status]);
+  }, [session, status, bearerToken]);
 
   // Check authorization
   useEffect(() => {

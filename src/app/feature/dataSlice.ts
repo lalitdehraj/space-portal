@@ -12,8 +12,10 @@ export interface DataState {
   selectedAcademicSessionEndDate: string;
   headerText: string;
   userRole: string;
-  user: UserProfile|null;
+  user: UserProfile | null;
   isActiveSession: false;
+  bearerToken: string | null;
+  bearerTokenExpiry: number;
 }
 const initialState: DataState = {
   selectedAcademicYear: "",
@@ -28,6 +30,8 @@ const initialState: DataState = {
   headerText: "",
   userRole: "",
   user: null,
+  bearerToken: null,
+  bearerTokenExpiry: 0,
 };
 
 export const dataSlice = createSlice({
@@ -70,6 +74,10 @@ export const dataSlice = createSlice({
     setUser: (state, action) => {
       state.user = action.payload;
     },
+    setBearerToken: (state, action) => {
+      state.bearerToken = action.payload.token;
+      state.bearerTokenExpiry = action.payload.expiry;
+    },
   },
 });
 
@@ -86,6 +94,7 @@ export const {
   setSelectedRoomId,
   setUserRoleId,
   setUser,
+  setBearerToken,
 } = dataSlice.actions;
 
 export default dataSlice.reducer;
