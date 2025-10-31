@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import Image from "next/image";
-import { callApi } from "@/utils/apiIntercepter";
+import { callApi, getBearerToken } from "@/utils/apiIntercepter";
 import moment from "moment";
 import { SearchResult, AcademicSession, AcademicYear, SearchResults, UserProfile, Building, Room } from "@/types";
 import { URL_NOT_FOUND } from "@/constants";
@@ -15,6 +15,7 @@ import {
   setIsActiveSession,
   setUser,
   setUserRoleId,
+  setBearerToken,
 } from "@/app/feature/dataSlice";
 import { useRouter } from "next/navigation";
 import { encrypt } from "@/utils/encryption";
@@ -38,6 +39,8 @@ export default function Header() {
   // redux values
   const academicYear = useSelector((state: RootState) => state.dataState.selectedAcademicYear);
   const acadSession = useSelector((state: RootState) => state.dataState.selectedAcademicSession);
+  const bearerToken = useSelector((state: RootState) => state.dataState.bearerToken);
+  const bearerTokenExpiry = useSelector((state: RootState) => state.dataState.bearerTokenExpiry);
 
   // Local state
   const [academicYearsList, setAcademicYearsList] = useState<AcademicYear[] | undefined>();
@@ -73,9 +76,31 @@ export default function Header() {
   const filterRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
 
+  // Check and refresh bearer token
+  useEffect(() => {
+    const checkAndRefreshBearerToken = async () => {
+      if (!data?.user?.email) return;
+
+      const isTokenExpired = !bearerToken || bearerTokenExpiry <= Date.now();
+
+      if (isTokenExpired) {
+        console.log("Bearer token expired or missing, generating new token...");
+        const tokenData = await getBearerToken();
+        if (tokenData) {
+          dispatcher(setBearerToken({ token: tokenData.token, expiry: tokenData.expiry }));
+          console.log("Bearer token refreshed successfully");
+        } else {
+          console.error("Failed to generate bearer token");
+        }
+      }
+    };
+
+    checkAndRefreshBearerToken();
+  }, [data?.user?.email, bearerToken, bearerTokenExpiry, dispatcher]);
+
   useEffect(() => {
     const fetchUserRoles = async () => {
-      if (!data?.user?.email) return;
+      if (!data?.user?.email || !bearerToken) return;
       try {
         const response = await callApi<UserProfile[]>(process.env.NEXT_PUBLIC_GET_USER || URL_NOT_FOUND);
         if (response.success) {
@@ -94,7 +119,7 @@ export default function Header() {
       }
     };
     fetchUserRoles();
-  }, [data?.user?.email]);
+  }, [data?.user?.email, bearerToken]);
 
   useEffect(() => {
     const getAcadmicCalender = async () => {

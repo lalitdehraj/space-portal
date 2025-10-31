@@ -5,7 +5,7 @@ import useSideNavState from "@/hooks/useSideNavState";
 import Header from "@/components/Header";
 import { Menu } from "lucide-react";
 import { useSelector } from "react-redux";
-import AuthGuard from "@/components/AuthGuard";
+// import AuthGuard from "@/components/AuthGuard";
 import { RootState } from "../store";
 
 interface ChildProps {

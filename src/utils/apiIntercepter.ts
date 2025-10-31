@@ -43,21 +43,32 @@ export type BearerTokenResponse = {
 export const getBearerToken = async (): Promise<{ token: string; expiry: number } | null> => {
   try {
     const params = new URLSearchParams();
-    params.append("client_id", process.env.CLIENT_ID || "");
-    params.append("client_secret", process.env.CLIENT_SECRET || "");
-    params.append("scope", process.env.SCOPE || "");
-    params.append("grant_type", process.env.GRANT_TYPE || "client_credentials");
-    params.append("token_name", process.env.TOKEN_NAME || "");
+    params.append("client_id", process.env.NEXT_PUBLIC_CLIENT_ID || "");
+    params.append("client_secret", process.env.NEXT_PUBLIC_CLIENT_SECRET || "");
+    params.append("scope", process.env.NEXT_PUBLIC_SCOPE || "");
+    params.append("grant_type", process.env.NEXT_PUBLIC_GRANT_TYPE || "client_credentials");
+    params.append("token_name", process.env.NEXT_PUBLIC_TOKEN_NAME || "");
 
-    const tenantId = process.env.TENANT_ID;
+    const tenantId = process.env.NEXT_PUBLIC_TENANT_ID;
     const tokenUrl = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`;
 
-    const response = await axios.post<BearerTokenResponse>(tokenUrl, params, {
+    console.log("Bearer token request URL:", tokenUrl);
+    console.log("Environment variables check:", {
+      hasClientId: !!process.env.NEXT_PUBLIC_CLIENT_ID,
+      hasClientSecret: !!process.env.NEXT_PUBLIC_CLIENT_SECRET,
+      hasScope: !!process.env.NEXT_PUBLIC_SCOPE,
+      hasTenantId: !!tenantId,
+    });
+
+    const response = (await axios({
+      method: "GET",
+      url: tokenUrl,
+      data: params,
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
       },
-    });
-
+    })) as { data: BearerTokenResponse };
+    console.log("Access_token in response:", response.data);
     if (response.data.access_token) {
       const expiryTime = Date.now() + response.data.expires_in * 1000 - 2 * 60 * 1000; // Subtract 2 minutes
       return {
@@ -68,6 +79,10 @@ export const getBearerToken = async (): Promise<{ token: string; expiry: number 
     return null;
   } catch (error) {
     console.error("Error generating bearer token:", error);
+    if (axios.isAxiosError(error)) {
+      console.error("Response data:", error.response?.data);
+      console.error("Response status:", error.response?.status);
+    }
     return null;
   }
 };
