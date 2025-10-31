@@ -2,11 +2,93 @@ import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
 import ExcelJS from "exceljs";
-import { callApi } from "@/utils/apiIntercepter";
-import { Building, Program, Occupant, Room, RoomInfo, Allocation, Department, Faculty, Employee } from "@/types";
+import { Building, Program, Occupant, Room, RoomInfo, Allocation, Employee } from "@/types";
 import { URL_NOT_FOUND } from "@/constants";
 import { getRoomOccupancyByWeekday, getVacantSlotsByWeekday } from "./helperFunction";
 import moment from "moment";
+import axios from "axios";
+
+// Store bearer token for server-side API calls
+let serverBearerToken: string | null = null;
+let serverBearerTokenExpiry: number = 0;
+
+// Function to get bearer token for server-side API calls
+async function getServerBearerToken(): Promise<string | null> {
+  // Check if token exists and is not expired (with 2 minute buffer)
+  const isTokenValid = serverBearerToken && serverBearerTokenExpiry > Date.now();
+
+  if (isTokenValid) {
+    return serverBearerToken;
+  }
+
+  // Token is missing or expired, fetch a new one
+  console.log("Server-side bearer token expired or missing, refreshing...");
+
+  try {
+    const params = new URLSearchParams();
+    params.append("client_id", process.env.NEXT_PUBLIC_CLIENT_ID || "");
+    params.append("client_secret", process.env.NEXT_PUBLIC_CLIENT_SECRET || "");
+    params.append("scope", process.env.NEXT_PUBLIC_SCOPE || "");
+    params.append("grant_type", process.env.NEXT_PUBLIC_GRANT_TYPE || "client_credentials");
+    params.append("token_name", process.env.NEXT_PUBLIC_TOKEN_NAME || "");
+
+    const tenantId = process.env.NEXT_PUBLIC_TENANT_ID;
+    const tokenUrl = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`;
+
+    const response = await fetch(tokenUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: params.toString(),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.text();
+      console.error("Error response from token endpoint:", errorData);
+      return null;
+    }
+
+    const data = await response.json();
+    console.log("Server-side access_token fetched successfully");
+
+    if (data.access_token) {
+      const expiryTime = Date.now() + data.expires_in * 1000 - 2 * 60 * 1000; // Subtract 2 minutes
+      serverBearerToken = data.access_token;
+      serverBearerTokenExpiry = expiryTime;
+      return serverBearerToken;
+    }
+
+    return null;
+  } catch (error) {
+    console.error("Error generating server-side bearer token:", error);
+    return null;
+  }
+}
+
+// Server-side API call wrapper with bearer token
+async function serverCallApi<T>(url: string, requestBody?: unknown): Promise<{ success: boolean; data?: T; error?: string }> {
+  try {
+    const bearerToken = await getServerBearerToken();
+    if (!bearerToken) {
+      return { success: false, error: "Failed to obtain bearer token" };
+    }
+
+    const response = await axios.post(url, JSON.stringify(requestBody || {}), {
+      baseURL: process.env.NEXT_PUBLIC_BASE_URL,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${bearerToken}`,
+      },
+    });
+
+    return { success: true, data: JSON.parse((response.data as { value: string }).value) };
+  } catch (err) {
+    const error = err as { response?: { data?: { message?: string } }; message?: string };
+    const errorMessage = error.response?.data?.message || error.message || "An unknown error occurred";
+    return { success: false, error: errorMessage };
+  }
+}
 
 export async function POST(req: NextRequest) {
   const jsonObject = await req.json();
@@ -228,12 +310,12 @@ async function createBigXLS(filePath: string, jsonObject: Record<string, unknown
       },
     ];
 
-    const { data: programs } = await callApi<{ programCode: Program[] }>(process.env.NEXT_PUBLIC_GET_PROGRAM || URL_NOT_FOUND);
-    const { data: employees } = await callApi<Employee[]>(process.env.NEXT_PUBLIC_GET_EMPLOYEES || URL_NOT_FOUND, {
+    const { data: programs } = await serverCallApi<{ programCode: Program[] }>(process.env.NEXT_PUBLIC_GET_PROGRAM || URL_NOT_FOUND);
+    const { data: employees } = await serverCallApi<Employee[]>(process.env.NEXT_PUBLIC_GET_EMPLOYEES || URL_NOT_FOUND, {
       employeeCode: "",
     });
 
-    const { data: roomAllocation } = await callApi<Allocation[]>(process.env.NEXT_PUBLIC_GET_ROOM_ALLOCATIONS || URL_NOT_FOUND, {
+    const { data: roomAllocation } = await serverCallApi<Allocation[]>(process.env.NEXT_PUBLIC_GET_ROOM_ALLOCATIONS || URL_NOT_FOUND, {
       acadSession: jsonObject.acadSess,
       acadYear: jsonObject.academicYr,
     });
@@ -394,7 +476,7 @@ async function createBigXLS(filePath: string, jsonObject: Record<string, unknown
         endDate: object.endDate,
       };
 
-      const roomInfoResponse = await callApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, reqBody);
+      const roomInfoResponse = await serverCallApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, reqBody);
       if (roomInfoResponse.success) {
         if (roomInfoResponse.data && !roomInfoResponse.data?.isSitting) {
           // Process parent room only - occupants already contain subroom data
@@ -416,7 +498,7 @@ async function createBigXLS(filePath: string, jsonObject: Record<string, unknown
         endDate: jsonObject.endDate,
       };
 
-      const roomInfoResponse = await callApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, reqBody);
+      const roomInfoResponse = await serverCallApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, reqBody);
 
       if (roomInfoResponse.success && roomInfoResponse.data?.isSitting) {
         // Process faculty room - occupants already contain subroom data
@@ -440,7 +522,7 @@ async function createBigXLS(filePath: string, jsonObject: Record<string, unknown
     }
 
     if (jsonObject.reportType === "building") {
-      let { data: buildings } = await callApi<Building[]>(process.env.NEXT_PUBLIC_GET_BUILDING_LIST || URL_NOT_FOUND, {
+      let { data: buildings } = await serverCallApi<Building[]>(process.env.NEXT_PUBLIC_GET_BUILDING_LIST || URL_NOT_FOUND, {
         acadSession: jsonObject.acadSess,
         acadYear: jsonObject.academicYr,
       });
@@ -450,7 +532,7 @@ async function createBigXLS(filePath: string, jsonObject: Record<string, unknown
       }
 
       for (const b of buildings || []) {
-        const { data: roomsList } = await callApi<Room[]>(process.env.NEXT_PUBLIC_GET_ROOMS_LIST || URL_NOT_FOUND, {
+        const { data: roomsList } = await serverCallApi<Room[]>(process.env.NEXT_PUBLIC_GET_ROOMS_LIST || URL_NOT_FOUND, {
           buildingNo: b.id,
           floorID: ``,
           curreentTime: moment().format("HH:mm"),
@@ -464,7 +546,7 @@ async function createBigXLS(filePath: string, jsonObject: Record<string, unknown
       const allRooms: Room[] = (
         await Promise.all(
           buildings?.map(async (b) => {
-            const { data: roomsList } = await callApi<Room[]>(process.env.NEXT_PUBLIC_GET_ROOMS_LIST || URL_NOT_FOUND, {
+            const { data: roomsList } = await serverCallApi<Room[]>(process.env.NEXT_PUBLIC_GET_ROOMS_LIST || URL_NOT_FOUND, {
               buildingNo: b.id,
               floorID: ``,
               curreentTime: moment().format("HH:mm"),
@@ -485,7 +567,7 @@ async function createBigXLS(filePath: string, jsonObject: Record<string, unknown
           endDate: jsonObject.endDate,
         };
 
-        return callApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, reqBody).then((res) => ({
+        return serverCallApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, reqBody).then((res) => ({
           ...res.data,
           isRoom: true,
         }));
@@ -505,7 +587,7 @@ async function createBigXLS(filePath: string, jsonObject: Record<string, unknown
     }
 
     if (jsonObject.reportType === "department") {
-      let { data: buildings } = await callApi<Building[]>(process.env.NEXT_PUBLIC_GET_BUILDING_LIST || URL_NOT_FOUND, {
+      let { data: buildings } = await serverCallApi<Building[]>(process.env.NEXT_PUBLIC_GET_BUILDING_LIST || URL_NOT_FOUND, {
         acadSession: jsonObject.acadSess,
         acadYear: jsonObject.academicYr,
       });
@@ -515,7 +597,7 @@ async function createBigXLS(filePath: string, jsonObject: Record<string, unknown
       }
 
       for (const b of buildings || []) {
-        const { data: roomsList } = await callApi<Room[]>(process.env.NEXT_PUBLIC_GET_ROOMS_LIST || URL_NOT_FOUND, {
+        const { data: roomsList } = await serverCallApi<Room[]>(process.env.NEXT_PUBLIC_GET_ROOMS_LIST || URL_NOT_FOUND, {
           buildingNo: b.id,
           floorID: ``,
           curreentTime: moment().format("HH:mm"),
@@ -529,7 +611,7 @@ async function createBigXLS(filePath: string, jsonObject: Record<string, unknown
       const allRooms: Room[] = (
         await Promise.all(
           buildings?.map(async (b) => {
-            const { data: roomsList } = await callApi<Room[]>(process.env.NEXT_PUBLIC_GET_ROOMS_LIST || URL_NOT_FOUND, {
+            const { data: roomsList } = await serverCallApi<Room[]>(process.env.NEXT_PUBLIC_GET_ROOMS_LIST || URL_NOT_FOUND, {
               buildingNo: b.id,
               floorID: ``,
               curreentTime: moment().format("HH:mm"),
@@ -550,7 +632,7 @@ async function createBigXLS(filePath: string, jsonObject: Record<string, unknown
           endDate: jsonObject.endDate,
         };
 
-        return callApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, reqBody).then((res) => ({
+        return serverCallApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, reqBody).then((res) => ({
           ...res.data,
           isRoom: true,
         }));
@@ -575,7 +657,7 @@ async function createBigXLS(filePath: string, jsonObject: Record<string, unknown
     }
 
     if (jsonObject.reportType === "faculty") {
-      let { data: buildings } = await callApi<Building[]>(process.env.NEXT_PUBLIC_GET_BUILDING_LIST || URL_NOT_FOUND, {
+      let { data: buildings } = await serverCallApi<Building[]>(process.env.NEXT_PUBLIC_GET_BUILDING_LIST || URL_NOT_FOUND, {
         acadSession: jsonObject.acadSess,
         acadYear: jsonObject.academicYr,
       });
@@ -585,7 +667,7 @@ async function createBigXLS(filePath: string, jsonObject: Record<string, unknown
       }
 
       for (const b of buildings || []) {
-        const { data: roomsList } = await callApi<Room[]>(process.env.NEXT_PUBLIC_GET_ROOMS_LIST || URL_NOT_FOUND, {
+        const { data: roomsList } = await serverCallApi<Room[]>(process.env.NEXT_PUBLIC_GET_ROOMS_LIST || URL_NOT_FOUND, {
           buildingNo: b.id,
           floorID: ``,
           curreentTime: moment().format("HH:mm"),
@@ -599,7 +681,7 @@ async function createBigXLS(filePath: string, jsonObject: Record<string, unknown
       const allRooms: Room[] = (
         await Promise.all(
           buildings?.map(async (b) => {
-            const { data: roomsList } = await callApi<Room[]>(process.env.NEXT_PUBLIC_GET_ROOMS_LIST || URL_NOT_FOUND, {
+            const { data: roomsList } = await serverCallApi<Room[]>(process.env.NEXT_PUBLIC_GET_ROOMS_LIST || URL_NOT_FOUND, {
               buildingNo: b.id,
               floorID: ``,
               curreentTime: moment().format("HH:mm"),
@@ -620,7 +702,7 @@ async function createBigXLS(filePath: string, jsonObject: Record<string, unknown
           endDate: jsonObject.endDate,
         };
 
-        return callApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, reqBody).then((res) => ({
+        return serverCallApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, reqBody).then((res) => ({
           ...res.data,
           isRoom: true,
         }));
@@ -670,7 +752,7 @@ async function insertFileInfo(filePath: string, jsonObject: Record<string, unkno
 
     console.log("Inserting file info:", insertData);
 
-    const response = await callApi(process.env.NEXT_PUBLIC_INSERT_ALLOCATION_UTILIZATION_REPORT_API || URL_NOT_FOUND, insertData);
+    const response = await serverCallApi(process.env.NEXT_PUBLIC_INSERT_ALLOCATION_UTILIZATION_REPORT_API || URL_NOT_FOUND, insertData);
 
     if (response.success) {
       console.log("File information inserted successfully");

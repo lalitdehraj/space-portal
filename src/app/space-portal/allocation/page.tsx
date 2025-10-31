@@ -14,6 +14,7 @@ function AllocationPage() {
 
   const [allocations, setAllocations] = useState<Allocation[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
+  const [loading, setLoading] = useState(false);
 
   // Use custom hook for buildings data
   const { buildings } = useBuildingsData();
@@ -47,11 +48,13 @@ function AllocationPage() {
   // Fetch allocations for selected session/year
   useEffect(() => {
     const fetchAllocations = async () => {
+      setLoading(true);
       const res = await callApi<Allocation[]>(process.env.NEXT_PUBLIC_GET_ROOM_ALLOCATIONS || URL_NOT_FOUND, {
         acadSession: selectedAcademicSession,
         acadYear: selectedAcademicYear,
       });
       if (res.success) setAllocations(res.data || []);
+      setLoading(false);
     };
     if (selectedAcademicSession && selectedAcademicYear) fetchAllocations();
   }, [selectedAcademicSession, selectedAcademicYear]);
@@ -62,7 +65,6 @@ function AllocationPage() {
       const res = await callApi<{ programCode: Program[] }>(process.env.NEXT_PUBLIC_GET_PROGRAM || URL_NOT_FOUND);
       if (res.success) {
         const programCodes = res?.data?.programCode || [];
-        console.log("  ", programCodes);
         setCourses(programCodes);
       }
     };
@@ -158,13 +160,6 @@ function AllocationPage() {
       );
     });
   }, [allocations, courses, searchQuery]);
-  filteredAllocations.forEach((alloc) => {
-    console.log(
-      alloc.program,
-      courses,
-      courses.find((c) => c.code === alloc.program)
-    );
-  });
 
   return (
     <div>
@@ -201,9 +196,18 @@ function AllocationPage() {
             </tr>
           </thead>
           <tbody className="text-[13px]">
-            {filteredAllocations.length === 0 ? (
+            {loading ? (
               <tr>
-                <td colSpan={6} className="text-center py-4">
+                <td colSpan={isActiveSession && isManagedByUser ? 6 : 5} className="text-center py-8">
+                  <div className="flex items-center justify-center space-x-2">
+                    <div className="w-5 h-5 border-2 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
+                    <span className="text-gray-600">Loading allocations...</span>
+                  </div>
+                </td>
+              </tr>
+            ) : filteredAllocations.length === 0 ? (
+              <tr>
+                <td colSpan={isActiveSession && isManagedByUser ? 6 : 5} className="text-center py-4">
                   No allocations found.
                 </td>
               </tr>
