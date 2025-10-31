@@ -123,6 +123,11 @@ export default function Header() {
 
   useEffect(() => {
     const getAcadmicCalender = async () => {
+      // Wait for bearer token before making API calls
+      if (!bearerToken) {
+        return;
+      }
+
       try {
         const responseYear = await callApi<AcademicYearResponse>(process.env.NEXT_PUBLIC_GET_ACADMIC_YEARS || URL_NOT_FOUND);
         if (responseYear.success) {
@@ -139,7 +144,7 @@ export default function Header() {
       }
     };
     getAcadmicCalender();
-  }, []);
+  }, [bearerToken]);
 
   // build sessionsPerYear based on selected academicYear
   useEffect(() => {
