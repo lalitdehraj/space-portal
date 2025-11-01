@@ -57,7 +57,7 @@ const ensureBearerToken = async (): Promise<string | null> => {
   }
 
   const state = reduxStore.getState();
-  let bearerToken = state.dataState.bearerToken;
+  const bearerToken = state.dataState.bearerToken;
   const bearerTokenExpiry = state.dataState.bearerTokenExpiry;
 
   // Check if token exists and is not expired (with 2 minute buffer)
