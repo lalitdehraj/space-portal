@@ -36,20 +36,19 @@ function ProfilePage() {
     };
     fetchUser(userEmail || null);
   }, []);
-
   return (
     <div className="w-full p-8 bg-white rounded-xl shadow-lg border border-gray-200">
       {/* Profile Header Section */}
       <div className="flex flex-col md:flex-row items-center md:items-start space-y-6 md:space-y-0 md:space-x-8 pb-8 border-b border-gray-200 mb-8">
         <div className="relative w-40 h-40 rounded-full overflow-hidden border-4 border-white shadow-md">
           <img
-            src={user?.userImage ? `data:image/png;base64,${user?.userImage}` : `https://placehold.co/150x150/E2E8F0/A0AEC0?text=Munipal`}
-            alt={`${data?.user?.name}'s profile`}
+            src={user?.userImage ? `data:image/png;base64,${user?.userImage}` : `https://placehold.co/150x150/E2E8F0/A0AEC0?text=Manipal`}
+            alt={`${user?.userName}'s profile`}
             className="w-full h-full object-cover"
           />
         </div>
         <div className="flex flex-col items-center md:items-start text-center md:text-left space-y-2">
-          <h1 className="text-3xl font-bold text-gray-800">{data?.user?.name}</h1>
+          <h1 className="text-3xl font-bold text-gray-800">{user?.userName}</h1>
           {isLoadingUser ? (
             <div className="h-6 bg-gray-200 rounded w-32 animate-pulse"></div>
           ) : (
@@ -58,7 +57,7 @@ function ProfilePage() {
           <div className="flex flex-col space-y-2 pt-4 text-sm text-gray-600">
             <div className="flex items-center space-x-2">
               <Mail size={16} className="text-gray-500" />
-              <span>{data?.user?.email}</span>
+              <span>{user?.userEmail}</span>
             </div>
             {isLoadingUser ? (
               <>
