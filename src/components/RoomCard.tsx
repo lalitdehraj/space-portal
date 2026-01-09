@@ -141,8 +141,38 @@ export default function RoomCard({ room, isExpanded = false, onClick, cachedSubr
             return sum + Math.max(end.diff(start, "minutes"), 0);
           }, 0);
 
-          const totalDays = endDateMoment.diff(startDateMoment, "days") + 1;
-          const maxMinutes = totalDays * WORK_HOURS_PER_DAY * 60;
+          // Get unique days that have bookings
+          const daysWithBookings = new Set<number>();
+          weeklyOccupants.forEach((occupant) => {
+            if (occupant.scheduledDate) {
+              const scheduledDay = moment(occupant.scheduledDate).day(); // 0 = Sunday, 6 = Saturday
+              daysWithBookings.add(scheduledDay);
+            }
+          });
+
+          // Calculate maxMinutes: always include Mon-Fri, but only include Sat-Sun if they have bookings
+          let daysToCount = 0;
+          const startDay = startDateMoment.day(); // Day of week for start date
+          const endDay = endDateMoment.day(); // Day of week for end date
+
+          // Iterate through each day in the date range
+          const currentDate = startDateMoment.clone();
+          while (currentDate.isSameOrBefore(endDateMoment, "day")) {
+            const dayOfWeek = currentDate.day(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+
+            // Monday to Friday (1-5) are always counted
+            if (dayOfWeek >= 1 && dayOfWeek <= 5) {
+              daysToCount++;
+            }
+            // Saturday (6) and Sunday (0) are only counted if they have bookings
+            else if ((dayOfWeek === 0 || dayOfWeek === 6) && daysWithBookings.has(dayOfWeek)) {
+              daysToCount++;
+            }
+
+            currentDate.add(1, "day");
+          }
+
+          const maxMinutes = daysToCount * WORK_HOURS_PER_DAY * 60;
           percent = maxMinutes > 0 ? (totalMinutes / maxMinutes) * 100 : 0;
         }
         setOccupancyPercent(percent);
