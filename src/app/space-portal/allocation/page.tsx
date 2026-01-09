@@ -39,12 +39,14 @@ function AllocationPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    console.log("userRole", userRole);
     if (!userRole) return;
     userRole.split("|").forEach((role: string) => {
-      if (role === "ADMIN") {
+      const trimmedRole = role.trim();
+      if (trimmedRole === "ADMIN") {
         setIsManagedByUser(true);
       }
-      if (role === "ACADEMICS") {
+      if (trimmedRole === "ACADEMICS") {
         setIsManagedByUser(true);
       }
     });

@@ -48,7 +48,7 @@ function ProfilePage() {
           />
         </div>
         <div className="flex flex-col items-center md:items-start text-center md:text-left space-y-2">
-          <h1 className="text-3xl font-bold text-gray-800">{user?.userName}</h1>
+          <h1 className="text-3xl font-bold text-gray-800">{user?.userName || data?.user?.name || "User"}</h1>
           {isLoadingUser ? (
             <div className="h-6 bg-gray-200 rounded w-32 animate-pulse"></div>
           ) : (
