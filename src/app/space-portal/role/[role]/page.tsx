@@ -360,19 +360,26 @@ export default function Buildings() {
                         <hr className="my-2" />
                         <div>
                           <h4 className="text-sm font-semibold mb-2 text-gray-500">Floor</h4>
-                          {buildings?.flatMap((building) =>
-                            building.floors.map((floor) => (
-                              <label key={`${building.id}-${floor.id}`} className="flex items-center text-gray-700 text-xs">
-                                <input
-                                  type="checkbox"
-                                  checked={appliedFilters.floor?.includes(floor.id) || false}
-                                  onChange={() => handleFilterChange("floor", floor.id)}
-                                  className="mr-2 rounded text-orange-600"
-                                />
-                                {building.name} - {floor.name}
-                              </label>
-                            ))
-                          )}
+                          {buildings
+                            ?.filter((building) => {
+                              // If no building is selected, show all buildings' floors
+                              if (appliedFilters.building.length === 0) return true;
+                              // If buildings are selected, only show floors from selected buildings
+                              return appliedFilters.building.includes(building.id);
+                            })
+                            .flatMap((building) =>
+                              building.floors.map((floor) => (
+                                <label key={`${building.id}-${floor.id}`} className="flex items-center text-gray-700 text-xs">
+                                  <input
+                                    type="checkbox"
+                                    checked={appliedFilters.floor?.includes(floor.id) || false}
+                                    onChange={() => handleFilterChange("floor", floor.id)}
+                                    className="mr-2 rounded text-orange-600"
+                                  />
+                                  {building.name} - {floor.name}
+                                </label>
+                              ))
+                            )}
                         </div>
                       </div>
                     </div>
