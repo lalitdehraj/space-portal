@@ -116,7 +116,7 @@ export async function POST(req: NextRequest) {
       });
     }
   }
-
+  
   createBigXLS(filePath, jsonObject).catch(console.error);
 
   return NextResponse.json({
@@ -475,6 +475,7 @@ async function createBigXLS(filePath: string, jsonObject: Record<string, unknown
         startDate: object.startDate,
         endDate: object.endDate,
       };
+      console.log(`[Data Manipulation] Processing roomID: ${JSON.stringify(reqBody)}`);
 
       const roomInfoResponse = await serverCallApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, reqBody);
       if (roomInfoResponse.success) {

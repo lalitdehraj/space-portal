@@ -507,7 +507,7 @@ function GenerateReportForm({ onClosePressed, setJobId, setReady, setPolling }: 
       setCustomStartDate("");
       setCustomEndDate("");
     }
-  }, [timePeriod]);
+  }, [timePeriod, selectedSession]);
 
   useEffect(() => {
     let isValid = true;
@@ -583,17 +583,6 @@ function GenerateReportForm({ onClosePressed, setJobId, setReady, setPolling }: 
       let startDate = customStartDate;
       let endDate = customEndDate;
 
-      if (timePeriod === "thisWeek") {
-        startDate = moment().startOf("isoWeek").format("YYYY-MM-DD"); // Monday
-        endDate = moment().endOf("isoWeek").format("YYYY-MM-DD"); // Sunday
-      } else if (timePeriod === "thisMonth") {
-        startDate = moment().startOf("month").format("YYYY-MM-DD");
-        endDate = moment().endOf("month").format("YYYY-MM-DD");
-      } else if (timePeriod === "active" || timePeriod === "year" || timePeriod === "session") {
-        startDate = "";
-        endDate = "";
-      }
-
       let fileName = "";
       if (reportType === "room") {
         fileName = `room_${selectedRoomId}_${acadmeicYear}_${acadmeicSession}`;
@@ -608,7 +597,7 @@ function GenerateReportForm({ onClosePressed, setJobId, setReady, setPolling }: 
       if (timePeriod === "active" || timePeriod === "thisWeek" || timePeriod === "thisMonth") {
         isNeededToGenrate = true;
       }
-
+      
       const response = await fetch("/api/start-job", {
         method: "POST",
         headers: {
