@@ -116,7 +116,7 @@ export async function POST(req: NextRequest) {
       });
     }
   }
-  
+
   createBigXLS(filePath, jsonObject).catch(console.error);
 
   return NextResponse.json({
@@ -320,6 +320,42 @@ async function createBigXLS(filePath: string, jsonObject: Record<string, unknown
       acadYear: jsonObject.academicYr,
     });
 
+    // Helper function to calculate weekday counts in date range
+    const calculateWeekdayCounts = (startDate: string, endDate: string): Record<string, number> => {
+      const counts: Record<string, number> = {
+        Monday: 0,
+        Tuesday: 0,
+        Wednesday: 0,
+        Thursday: 0,
+        Friday: 0,
+        Saturday: 0,
+        Sunday: 0,
+      };
+
+      if (!startDate || !endDate) {
+        // Default to 1 if no range provided
+        Object.keys(counts).forEach((key) => (counts[key] = 1));
+        return counts;
+      }
+
+      const start = moment(startDate, "YYYY-MM-DD");
+      const end = moment(endDate, "YYYY-MM-DD");
+
+      if (!start.isValid() || !end.isValid() || end.isBefore(start)) {
+        Object.keys(counts).forEach((key) => (counts[key] = 1));
+        return counts;
+      }
+
+      let current = start.clone();
+      while (current.isSameOrBefore(end)) {
+        const weekday = current.format("dddd");
+        counts[weekday]++;
+        current.add(1, "day");
+      }
+
+      return counts;
+    };
+
     const handleRoom = async (roomData: RoomInfo) => {
       const allocations = roomAllocation?.filter((a) => a.roomNo === roomData.id);
 
@@ -327,10 +363,27 @@ async function createBigXLS(filePath: string, jsonObject: Record<string, unknown
       if (jsonObject.reportType === "department") occupants = occupants.filter((o: Occupant) => o.department === jsonObject.departmentId);
       if (jsonObject.reportType === "faculty") occupants = occupants.filter((o: Occupant) => o.department === jsonObject.facultyId);
 
-      const week = getRoomOccupancyByWeekday(occupants);
-      const vacant = getVacantSlotsByWeekday(occupants);
+      const startDate = (jsonObject.startDate as string) || "";
+      const endDate = (jsonObject.endDate as string) || "";
+
+      const week = getRoomOccupancyByWeekday(occupants, startDate, endDate);
+      const vacant = getVacantSlotsByWeekday(occupants, startDate, endDate);
       const programsCode: string[] = allocations?.map((a) => a.program) ?? [];
       const startRow = worksheet.rowCount + 1;
+
+      // Calculate weekday counts for percentage calculation
+      const weekdayCounts = calculateWeekdayCounts(startDate, endDate);
+
+      // Helper function to calculate occupancy percentage
+      const getOccupancyPercentage = (weekdayMinutes: number, weekday: string): number => {
+        const count = weekdayCounts[weekday] || 1;
+        const totalPossibleMinutes = count * 540; // 540 minutes = 9 hours (9:00-18:00)
+        return totalPossibleMinutes > 0 ? Number(((weekdayMinutes * 100) / totalPossibleMinutes).toFixed(2)) : 0;
+      };
+
+      // Calculate weekly percentage
+      const totalWeekdays = Object.values(weekdayCounts).reduce((a, b) => a + b, 0);
+      const weeklyPercentage = totalWeekdays > 0 ? Number(((week.Weekly * 100) / (totalWeekdays * 540)).toFixed(2)) : 0;
 
       // Check if there are no programs.
       if (programsCode.length === 0) {
@@ -341,21 +394,21 @@ async function createBigXLS(filePath: string, jsonObject: Record<string, unknown
           roomCapacity: Number(roomData?.capacity ?? ""),
           programCode: "",
           programName: "",
-          occupancyMon: Number((((week.Monday ?? 0) * 100) / 540).toFixed(2)),
-          occupancyTue: Number((((week.Tuesday ?? 0) * 100) / 540).toFixed(2)),
-          occupancyWed: Number((((week.Wednesday ?? 0) * 100) / 540).toFixed(2)),
-          occupancyThu: Number((((week.Thursday ?? 0) * 100) / 540).toFixed(2)),
-          occupancyFri: Number((((week.Friday ?? 0) * 100) / 540).toFixed(2)),
-          occupancySat: Number((((week.Saturday ?? 0) * 100) / 540).toFixed(2)),
-          occupancySun: Number((((week.Sunday ?? 0) * 100) / 540).toFixed(2)),
-          occupancyWeekly: Number((((week.Weekly ?? 0) * 100) / (540 * 7)).toFixed(2)),
-          vacantMon: String(vacant.Monday.toString()),
-          vacantTue: String(vacant.Tuesday.toString()),
-          vacantWed: String(vacant.Wednesday.toString()),
-          vacantThu: String(vacant.Thursday.toString()),
-          vacantFri: String(vacant.Friday.toString()),
-          vacantSat: String(vacant.Saturday.toString()),
-          vacantSun: String(vacant.Sunday.toString()),
+          occupancyMon: getOccupancyPercentage(week.Monday, "Monday"),
+          occupancyTue: getOccupancyPercentage(week.Tuesday, "Tuesday"),
+          occupancyWed: getOccupancyPercentage(week.Wednesday, "Wednesday"),
+          occupancyThu: getOccupancyPercentage(week.Thursday, "Thursday"),
+          occupancyFri: getOccupancyPercentage(week.Friday, "Friday"),
+          occupancySat: getOccupancyPercentage(week.Saturday, "Saturday"),
+          occupancySun: getOccupancyPercentage(week.Sunday, "Sunday"),
+          occupancyWeekly: weeklyPercentage,
+          vacantMon: String(vacant.Monday.join(", ")),
+          vacantTue: String(vacant.Tuesday.join(", ")),
+          vacantWed: String(vacant.Wednesday.join(", ")),
+          vacantThu: String(vacant.Thursday.join(", ")),
+          vacantFri: String(vacant.Friday.join(", ")),
+          vacantSat: String(vacant.Saturday.join(", ")),
+          vacantSun: String(vacant.Sunday.join(", ")),
         };
         worksheet.addRow(rowEntry);
       } else {
@@ -369,21 +422,21 @@ async function createBigXLS(filePath: string, jsonObject: Record<string, unknown
             roomCapacity: Number(roomData?.capacity ?? ""),
             programCode: code,
             programName: program ? program.description : "",
-            occupancyMon: Number((((week.Monday ?? 0) * 100) / 540).toFixed(2)),
-            occupancyTue: Number((((week.Tuesday ?? 0) * 100) / 540).toFixed(2)),
-            occupancyWed: Number((((week.Wednesday ?? 0) * 100) / 540).toFixed(2)),
-            occupancyThu: Number((((week.Thursday ?? 0) * 100) / 540).toFixed(2)),
-            occupancyFri: Number((((week.Friday ?? 0) * 100) / 540).toFixed(2)),
-            occupancySat: Number((((week.Saturday ?? 0) * 100) / 540).toFixed(2)),
-            occupancySun: Number((((week.Sunday ?? 0) * 100) / 540).toFixed(2)),
-            occupancyWeekly: Number((((week.Weekly ?? 0) * 100) / (540 * 7)).toFixed(2)),
-            vacantMon: String(vacant.Monday.toString()),
-            vacantTue: String(vacant.Tuesday.toString()),
-            vacantWed: String(vacant.Wednesday.toString()),
-            vacantThu: String(vacant.Thursday.toString()),
-            vacantFri: String(vacant.Friday.toString()),
-            vacantSat: String(vacant.Saturday.toString()),
-            vacantSun: String(vacant.Sunday.toString()),
+            occupancyMon: getOccupancyPercentage(week.Monday, "Monday"),
+            occupancyTue: getOccupancyPercentage(week.Tuesday, "Tuesday"),
+            occupancyWed: getOccupancyPercentage(week.Wednesday, "Wednesday"),
+            occupancyThu: getOccupancyPercentage(week.Thursday, "Thursday"),
+            occupancyFri: getOccupancyPercentage(week.Friday, "Friday"),
+            occupancySat: getOccupancyPercentage(week.Saturday, "Saturday"),
+            occupancySun: getOccupancyPercentage(week.Sunday, "Sunday"),
+            occupancyWeekly: weeklyPercentage,
+            vacantMon: String(vacant.Monday.join(", ")),
+            vacantTue: String(vacant.Tuesday.join(", ")),
+            vacantWed: String(vacant.Wednesday.join(", ")),
+            vacantThu: String(vacant.Thursday.join(", ")),
+            vacantFri: String(vacant.Friday.join(", ")),
+            vacantSat: String(vacant.Saturday.join(", ")),
+            vacantSun: String(vacant.Sunday.join(", ")),
           };
           worksheet.addRow(rowEntry);
         });
