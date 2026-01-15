@@ -382,9 +382,10 @@ async function createBigXLS(filePath: string, jsonObject: Record<string, unknown
       };
 
       // Calculate weekly percentage
-      const totalWeekdays = Object.values(weekdayCounts).reduce((a, b) => a + b, 0);
-      const weeklyPercentage = totalWeekdays > 0 ? Number(((week.Weekly * 100) / (totalWeekdays * 540)).toFixed(2)) : 0;
-
+      const weekdaysOnly = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
+      const totalWeekdays = weekdaysOnly.reduce((sum, day) => sum + (weekdayCounts[day] || 0), 0);
+      const weeklyOccupiedMinutes = weekdaysOnly.reduce((sum, day) => sum + (week[day as keyof typeof week] || 0), 0);
+      const weeklyPercentage = totalWeekdays > 0 ? Number(((weeklyOccupiedMinutes * 100) / (totalWeekdays * 540)).toFixed(2)) : 0;
       // Check if there are no programs.
       if (programsCode.length === 0) {
         const rowEntry: ReportData = {
