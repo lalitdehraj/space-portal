@@ -148,8 +148,11 @@ export default function Buildings() {
   let roomCategories = ["All Rooms"];
   roomCategories = [...roomCategories, ...allRoomsCategories];
   useEffect(() => {
-    if (!roomCategories.some((category) => category === selectedRoomType)) dispatcher(setSeletedRoomTypeId("All Rooms"));
-  }, [roomCategories]);
+    // Only reset filter if rooms have been loaded and the selected type is not available
+    if (!isLoadingRooms && roomsList.length > 0 && !roomCategories.some((category) => category === selectedRoomType)) {
+      dispatcher(setSeletedRoomTypeId("All Rooms"));
+    }
+  }, [roomCategories, isLoadingRooms, roomsList.length, selectedRoomType, dispatcher]);
 
   // Reset pagination when filters change
   useEffect(() => {
