@@ -57,6 +57,9 @@ export default function CabinWorkstationAllocationForm({ roomInfo, onClose, onSu
   const academicSessionEndDate = useSelector((state: RootState) => state.dataState.selectedAcademicSessionEndDate);
 
   const [employeeId, setEmployeeId] = useState("");
+  const [employeeSearchQuery, setEmployeeSearchQuery] = useState("");
+  const [selectedEmployeeName, setSelectedEmployeeName] = useState("");
+  const [isEmployeeDropdownOpen, setIsEmployeeDropdownOpen] = useState(false);
   const [startDate, setStartDate] = useState(moment().format("YYYY-MM-DD"));
   const [endDate, setEndDate] = useState(academicSessionEndDate);
   const [purpose, setPurpose] = useState("");
@@ -80,6 +83,26 @@ export default function CabinWorkstationAllocationForm({ roomInfo, onClose, onSu
     };
     fetchEmployees();
   }, []);
+  // Filter employees based on search query
+const filteredEmployees = employeesList.filter((employee) => {
+  const searchLower = employeeSearchQuery.toLowerCase();
+  return (
+    employee.employeeName.toLowerCase().includes(searchLower) ||
+    employee.employeeCode.toLowerCase().includes(searchLower)
+  );
+});
+// Close dropdown when clicking outside
+useEffect(() => {
+  const handleClickOutside = (event: MouseEvent) => {
+    const target = event.target as HTMLElement;
+    if (!target.closest('.employee-autocomplete-container')) {
+      setIsEmployeeDropdownOpen(false);
+    }
+  };
+  
+  document.addEventListener('mousedown', handleClickOutside);
+  return () => document.removeEventListener('mousedown', handleClickOutside);
+}, []);
 
   // Function to check maintenance conflicts for the specific room
   const checkMaintenanceConflicts = async (): Promise<string[]> => {
@@ -349,26 +372,60 @@ export default function CabinWorkstationAllocationForm({ roomInfo, onClose, onSu
         <div className="flex-1 overflow-y-auto">
           <form className="space-y-4">
             {/* Employee Selection */}
-            <div>
-              <label htmlFor="employee" className="block text-sm font-medium text-gray-700 mb-1">
-                Select Employee
-              </label>
-              <select
-                id="employee"
-                className="block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-[#F26722]"
-                value={employeeId}
-                onChange={(e) => setEmployeeId(e.target.value)}
-              >
-                <option value="" disabled>
-                  Select an employee
-                </option>
-                {employeesList.map((employee: Employee) => (
-                  <option value={employee.employeeCode} key={employee.employeeCode}>
-                    {`${employee.employeeName} (${employee.employeeCode})`}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {/* Employee Selection - Autocomplete */}
+<div className="relative employee-autocomplete-container">
+  <label htmlFor="employee" className="block text-sm font-medium text-gray-700 mb-1">
+    Select Employee
+  </label>
+  
+  {/* Input Field */}
+  <input
+    id="employee"
+    type="text"
+    className="block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-[#F26722]"
+    placeholder="Type to search employee..."
+    value={employeeSearchQuery}
+    onChange={(e) => {
+      setEmployeeSearchQuery(e.target.value);
+      setIsEmployeeDropdownOpen(true);
+      // Clear selection if user modifies input
+      if (employeeId) {
+        setEmployeeId("");
+        setSelectedEmployeeName("");
+      }
+    }}
+    onFocus={() => setIsEmployeeDropdownOpen(true)}
+    autoComplete="off"
+  />
+ 
+  
+  {/* Dropdown List */}
+  {isEmployeeDropdownOpen && employeeSearchQuery && (
+    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
+      {filteredEmployees.length > 0 ? (
+        filteredEmployees.map((employee: Employee) => (
+          <div
+            key={employee.employeeCode}
+            className="px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm"
+            onClick={() => {
+              setEmployeeId(employee.employeeCode);
+              setSelectedEmployeeName(`${employee.employeeName} (${employee.employeeCode})`);
+              setEmployeeSearchQuery(employee.employeeName);
+              setIsEmployeeDropdownOpen(false);
+            }}
+          >
+            <div className="font-medium text-gray-900">{employee.employeeName}</div>
+            <div className="text-xs text-gray-500">{employee.employeeCode}</div>
+          </div>
+        ))
+      ) : (
+        <div className="px-3 py-2 text-sm text-gray-500">
+          No employees found
+        </div>
+      )}
+    </div>
+  )}
+</div>
 
             {/* Date Range */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

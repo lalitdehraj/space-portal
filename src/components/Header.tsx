@@ -420,7 +420,7 @@ export default function Header() {
   };
 
   return (
-    <header className="flex w-full items-center justify-between bg-white px-4 py-2 shadow-sm md:px-6">
+    <header className="flex w-full items-center justify-between bg-gray-50/60 px-4 py-2 shadow-sm md:px-6">
       <div className="relative mr-4 flex-1 max-w-md" ref={filterRef}>
         <input
           type="text"

@@ -148,7 +148,7 @@ function WeeklyTimetable({
   };
 
   return (
-    <div className="flex flex-col items-center min-h-screen font-sans antialiased">
+    <div className="flex flex-col items-center  font-sans antialiased">
       <div className="w-full max-w-7xl rounded-lg shadow-lg bg-white overflow-hidden">
         {/* Header */}
         <div className="flex justify-between items-center px-4 py-3 bg-gray-50 border-b border-gray-200">

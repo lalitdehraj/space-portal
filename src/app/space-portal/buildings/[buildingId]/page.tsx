@@ -174,7 +174,6 @@ export default function Buildings() {
           key={`${room.buildingId}-${room.roomId}`}
           isExpanded={selectedRoom ? selectedRoom.roomId === room.roomId && selectedRoom.buildingId === room.buildingId : false}
           onClick={(room) => handleRoomClick(room)}
-          cachedSubrooms={allBuildingSubrooms}
         />
       );
       const currentRowIndex = Math.floor(index / cardsPerRow);
@@ -215,7 +214,6 @@ export default function Buildings() {
                     key={`${room.buildingId}-${room.parentId}-${room.roomId}`}
                     onClick={handleRoomClick}
                     room={room}
-                    cachedSubrooms={allBuildingSubrooms}
                   />
                 ))}
             </div>
@@ -265,7 +263,7 @@ export default function Buildings() {
             <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
               {kpiCards.map((card) =>
                 card.value ? (
-                  <div key={card.title} className="rounded-lg bg-white p-4 pl-6 shadow-sm">
+                  <div key={card.title} className="rounded-lg bg-[#FFCC29]/80 p-4 pl-6 shadow-sm">
                     <Image src={card.iconSrc} alt={card.alt} height={24} width={24} className="mb-2 h-6 w-6" />
                     <h3 className="text-xs text-black">{card.title}</h3>
                     <h5 className="text-xl font-semibold text-black">{card.value}</h5>

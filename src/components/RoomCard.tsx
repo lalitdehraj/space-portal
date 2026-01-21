@@ -11,40 +11,10 @@ interface RoomCardProps {
   room: Room;
   isExpanded?: boolean;
   onClick?: (room: Room) => void;
-  cachedSubrooms?: Room[]; // Optional prop for cached subrooms
 }
 const WORK_HOURS_PER_DAY = 9;
 
-const getOccupancyStatus = (room: Room): "low" | "medium" | "high" => {
-  const occupancyRate = room.occupied / room.roomCapactiy;
-  if (occupancyRate <= 0.1) return "low";
-  if (occupancyRate > 0.8) return "high";
-  return "medium";
-};
-
-export default function RoomCard({ room, isExpanded = false, onClick, cachedSubrooms }: RoomCardProps) {
-  const occupancyStatus = getOccupancyStatus(room);
-
-  const statusClasses = {
-    low: {
-      leftBorderColor: "border-l-green-600",
-      text: "text-green-600",
-      background: "bg-green-600/10",
-      progressBar: "bg-green-600",
-    },
-    high: {
-      leftBorderColor: "border-l-red-500",
-      text: "text-red-500",
-      background: "bg-red-500/10",
-      progressBar: "bg-red-500",
-    },
-    medium: {
-      leftBorderColor: "border-l-yellow-500",
-      text: "text-yellow-500",
-      background: "bg-yellow-500/10",
-      progressBar: "bg-yellow-500",
-    },
-  };
+export default function RoomCard({ room, isExpanded = false, onClick }: RoomCardProps) {
 
   const isActiveSession = useSelector((state: RootState) => state.dataState.isActiveSession);
   const academicSessionStartDate = useSelector((state: RootState) => state.dataState.selectedAcademicSessionStartDate);
@@ -152,9 +122,6 @@ export default function RoomCard({ room, isExpanded = false, onClick, cachedSubr
 
           // Calculate maxMinutes: always include Mon-Fri, but only include Sat-Sun if they have bookings
           let daysToCount = 0;
-          const startDay = startDateMoment.day(); // Day of week for start date
-          const endDay = endDateMoment.day(); // Day of week for end date
-
           // Iterate through each day in the date range
           const currentDate = startDateMoment.clone();
           while (currentDate.isSameOrBefore(endDateMoment, "day")) {
@@ -302,16 +269,16 @@ export default function RoomCard({ room, isExpanded = false, onClick, cachedSubr
         className={`hover:shadow-lg transition-shadow duration-300 rounded-lg border-t border-r border-b border-l-4 shadow-sm py-4 px-3 min-h-[140px] flex flex-col justify-between ${
           currentOccupants.length > 0 ? "border-l-red-500" : "border-l-green-600"
         } ${isExpanded ? "ring-2 ring-orange-500 " : "none"} ${room.hasSubroom ? "cursor-pointer hover:bg-gray-50" : ""} ${
-          hasActiveMaintenance ? "bg-purple-100" : room.status === "1" ? "bg-purple-100" : "bg-white"
+          hasActiveMaintenance ? "bg-purple-100" : room.status === "1" ? "bg-purple-100" : "bg-[#FBE9DE]"
         }`}
       >
         <div className="flex w-full items-start justify-between">
           <div className="flex flex-col items-start text-left">
             <div className="flex items-center gap-2">
-              <p className="text-sm font-[540] text-gray-800 text-ellipsis">{room.roomName}</p>
+              <p className="text-md font-[640] text-gray-800 text-ellipsis">{room.roomName}</p>
             </div>
-            <p className="text-[10px] text-gray-500">Building ID: {room.buildingId}</p>
-            <p className="text-[10px] text-gray-500">Capacity: {room.roomCapactiy}</p>
+            <p className="text-[12px] text-gray-700">Building ID: {room.buildingId}</p>
+            <p className="text-[12px] text-gray-700">Capacity: {room.roomCapactiy}</p>
             {!room.hasSubroom &&
               (currentOccupants.length > 0 ? (
                 <p className="text-[10px] text-gray-500">

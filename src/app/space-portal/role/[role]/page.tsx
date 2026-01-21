@@ -10,7 +10,7 @@ import { removeSpaces } from "@/utils";
 import { callApi } from "@/utils/apiIntercepter";
 import { URL_NOT_FOUND } from "@/constants";
 import { encrypt } from "@/utils/encryption";
-import { setSeletedRoomTypeId } from "@/app/feature/dataSlice";
+import { setSeletedRoomTypeId, setAppliedFilters } from "@/app/feature/dataSlice";
 import { RootState } from "@/app/store";
 export default function Buildings() {
   const router = useRouter();
@@ -29,10 +29,7 @@ export default function Buildings() {
   const [initialLoad] = useState(8);
   const [searchQuery, setSearchQuery] = useState("");
   const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
-  const [appliedFilters, setAppliedFilters] = useState<{ [key: string]: string[] }>({
-    building: [],
-    floor: [],
-  });
+  const appliedFilters = useSelector((state: RootState) => state.dataState.appliedFilters);
   const filterRef = useRef<HTMLDivElement>(null);
   const acadmeicYear = useSelector((state: RootState) => state.dataState.selectedAcademicYear);
   const acadmeicSession = useSelector((state: RootState) => state.dataState.selectedAcademicSession);
@@ -180,22 +177,21 @@ export default function Buildings() {
 
   // Filter handler functions
   const handleFilterChange = (filterType: string, value: string) => {
-    setAppliedFilters((prevFilters) => {
-      const currentOptions = prevFilters[filterType] || [];
-      const newOptions = currentOptions.includes(value) ? currentOptions.filter((item) => item !== value) : [...currentOptions, value];
-      return {
-        ...prevFilters,
-        [filterType]: newOptions,
-      };
-    });
+    const currentOptions = appliedFilters[filterType as keyof typeof appliedFilters] || [];
+    const newOptions = currentOptions.includes(value) 
+      ? currentOptions.filter((item) => item !== value) 
+      : [...currentOptions, value];
+    
+    dispatcher(setAppliedFilters({
+      ...appliedFilters,
+      [filterType]: newOptions,
+    }));
   };
 
   const handleRemoveFilter = (filterType: string, value: string) => {
-    setAppliedFilters((prevFilters) => {
-      const newFilters = { ...prevFilters };
-      newFilters[filterType] = newFilters[filterType].filter((item) => item !== value);
-      return newFilters;
-    });
+    const newFilters = { ...appliedFilters };
+    newFilters[filterType as keyof typeof appliedFilters] = newFilters[filterType as keyof typeof appliedFilters].filter((item) => item !== value);
+    dispatcher(setAppliedFilters(newFilters));
   };
 
   // Apply search filter and building/floor filters
@@ -257,7 +253,6 @@ export default function Buildings() {
             key={`${room.buildingId}-${room.roomId}`}
             isExpanded={selectedRoom ? selectedRoom.roomId === room.roomId && selectedRoom.buildingId === room.buildingId : false}
             onClick={(room) => handleRoomClick(room)}
-            cachedSubrooms={allBuildingSubrooms}
           />
         );
         const currentRowIndex = Math.floor(index / cardsPerRow);
@@ -291,7 +286,7 @@ export default function Buildings() {
               <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3">
                 {subRooms &&
                   subRooms.map((room) => (
-                    <RoomCard key={`${room.buildingId}-${room.roomId}`} onClick={handleRoomClick} room={room} cachedSubrooms={allBuildingSubrooms} />
+                    <RoomCard key={`${room.buildingId}-${room.roomId}`} onClick={handleRoomClick} room={room} />
                   ))}
               </div>
             </div>
@@ -424,7 +419,7 @@ export default function Buildings() {
                     </div>
                   ))
                 : kpiCards.map((card) => (
-                    <div key={card.title} className="rounded-lg bg-white p-4 pl-6 shadow-sm">
+                    <div key={card.title} className="rounded-lg bg-[#FFCC29]/80 p-4 pl-6 shadow-sm">
                       <Image src={card.iconSrc} alt={card.alt} height={24} width={24} className="mb-2 h-6 w-6" />
                       <h3 className="text-xs text-black">{card.title}</h3>
                       <h5 className="text-xl font-semibold text-black">{card.value}</h5>

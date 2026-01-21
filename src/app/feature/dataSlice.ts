@@ -14,6 +14,7 @@ export interface DataState {
   userRole: string;
   user: UserProfile | null;
   isActiveSession: false;
+  appliedFilters: { building: string[]; floor: string[] };
   bearerToken: string | null;
   bearerTokenExpiry: number;
 }
@@ -22,6 +23,7 @@ const initialState: DataState = {
   selectedAcademicSession: "",
   selectedAcademicSessionStartDate: "",
   selectedAcademicSessionEndDate: "",
+  appliedFilters: { building: [], floor: [] },
   selectedBuildingId: "",
   isActiveSession: false,
   selectedFloorId: "",
@@ -78,6 +80,9 @@ export const dataSlice = createSlice({
       state.bearerToken = action.payload.token;
       state.bearerTokenExpiry = action.payload.expiry;
     },
+    setAppliedFilters: (state, action) => {
+      state.appliedFilters = action.payload;
+    },
   },
 });
 
@@ -95,6 +100,7 @@ export const {
   setUserRoleId,
   setUser,
   setBearerToken,
+  setAppliedFilters,
 } = dataSlice.actions;
 
 export default dataSlice.reducer;

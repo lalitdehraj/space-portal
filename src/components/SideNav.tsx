@@ -107,7 +107,7 @@ const SideNav: FC<SideNavProps> = ({ onClose }) => {
     fetchUserRoles();
   }, []);
   return (
-    <aside className="flex h-full w-full md:w-64 flex-col bg-gray-50 shadow-lg ">
+    <aside className="flex h-full w-full md:w-64 flex-col bg-gray-50/90 shadow-lg ">
       <div className="flex items-center justify-between p-4 md:justify-center ">
         <img
           onClick={() => {

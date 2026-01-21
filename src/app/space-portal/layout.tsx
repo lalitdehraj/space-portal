@@ -17,27 +17,32 @@ const DashboardLayout = ({ children }: ChildProps) => {
   const { isSideNavOpen, toggleSideNav } = useSideNavState();
 
   return (
-    // <AuthGuard>
-    <div className="flex min-h-screen flex-col bg-gray-500 font-sans md:grid md:grid-cols-[256px_1fr] ">
+    <div className="relative">
+    <img 
+      src="/images/main-building.jpg" 
+      alt="Background" 
+      className="fixed inset-0 w-full h-full object-cover -z-10" 
+    />
+    <div className="flex min-h-screen flex-col font-sans md:grid md:grid-cols-[256px_1fr] relative">
       <div
-        className={`fixed inset-y-0 left-0 z-50 w-full transform bg-gray-500 transition-transform duration-300 ease-in-out md:static md:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 w-full transform bg-transparent transition-transform duration-300 ease-in-out md:static md:translate-x-0 ${
           isSideNavOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
         <SideNav onClose={toggleSideNav} />
       </div>
-
+  
       {isSideNavOpen && <div className="fixed inset-0 z-40 bg-black bg-opacity-50 md:hidden" onClick={toggleSideNav} />}
-
-      <div className="flex flex-1 flex-col bg-white">
-        <div className="sticky top-0 z-30 flex w-full items-center justify-between border-b  p-4 shadow-sm md:hidden bg-white">
+  
+      <div className="flex flex-1 flex-col bg-white/60">
+        <div className="sticky top-0 z-30 flex w-full items-center justify-between border-b p-4 shadow-sm md:hidden bg-white/80 backdrop-blur-sm">
           <button onClick={toggleSideNav} className="text-gray-900">
             <Menu size={24} />
           </button>
           <h1 className="text-xl font-bold text-gray-800 ">{headertext}</h1>
           <div className="w-6" />
         </div>
-
+  
         <div className="hidden md:block">
           <Header />
         </div>
@@ -46,7 +51,7 @@ const DashboardLayout = ({ children }: ChildProps) => {
         </main>
       </div>
     </div>
-    // </AuthGuard>
+  </div>
   );
 };
 
