@@ -275,19 +275,19 @@ export default function RoomCard({ room, isExpanded = false, onClick }: RoomCard
         <div className="flex w-full items-start justify-between">
           <div className="flex flex-col items-start text-left">
             <div className="flex items-center gap-2">
-              <p className="text-md font-[640] text-gray-800 text-ellipsis">{room.roomName}</p>
+              <p className="text-xl font-[640] text-gray-800 text-ellipsis">{room.roomName}</p>
             </div>
-            <p className="text-[12px] text-gray-700">Building ID: {room.buildingId}</p>
-            <p className="text-[12px] text-gray-700">Capacity: {room.roomCapactiy}</p>
+            <p className="text-[14px] text-gray-700 font-bold"> {room.buildingId}</p>
+            <p className="text-[14px] text-gray-700">Capacity: {room.roomCapactiy}</p>
             {!room.hasSubroom &&
               (currentOccupants.length > 0 ? (
-                <p className="text-[10px] text-gray-500">
-                  Current: {currentOccupants.map((occupant) => `${occupant.occupantName || occupant.Id} (${occupant.Id})`).join(", ")}
+                <p className="text-[14px] text-gray-500">
+                  Current: {currentOccupants.map((occupant) => `${occupant.occupantName}`).join(", ")}
                 </p>
               ) : hasActiveMaintenance ? (
-                <p className="text-[10px] text-purple-600 font-medium">Under Maintenance</p>
+                <p className="text-[12px] text-purple-600 font-medium">Under Maintenance</p>
               ) : (
-                <p className="text-[10px] text-gray-500">Currently Available</p>
+                <p className="text-[12px] text-gray-500">Currently Available</p>
               ))}
           </div>
           <div className="flex items-center gap-2">

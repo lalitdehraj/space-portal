@@ -98,11 +98,13 @@ export default function Dashboard() {
     {
       title: "Average Occupancy",
       value:
-        Math.ceil(
-          (data?.graphDataPoints?.reduce((sum, g) => {
-            return sum + parseFloat(g.OccupancyRate);
-          }, 0) || 0) * 100
-        ) / 100,
+  data?.graphDataPoints && data.graphDataPoints.length > 0
+    ? Math.ceil(
+        ((data.graphDataPoints.reduce((sum, g) => {
+          return sum + parseFloat(g.OccupancyRate);
+        }, 0) / data.graphDataPoints.length) || 0) * 100
+      ) / 100
+    : 0,
       iconSrc: "/images/seat-outline.svg",
       alt: "Seat icon",
       extraContent: isActiveSession && (

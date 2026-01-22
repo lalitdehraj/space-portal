@@ -1,6 +1,5 @@
-import Image from "next/image";
 import { Building } from "@/types";
-import React, { SVGProps } from "react";
+import React, { SVGProps ,useState} from "react";
 
 type BuildingCardProps = {
   building: Building;
@@ -23,16 +22,62 @@ const RoomIcon = (props: SVGProps<SVGSVGElement>) => (
 );
 
 const BuildingCard = ({ building, onClick }: BuildingCardProps) => {
+  const [imageError, setImageError] = useState(false);
   const occupancyRate = Math.ceil((building.occupied / building.totalOccupancy) * 100) || 0;
   const occupancyBgClass = occupancyRate <= 10 ? "bg-green-700/50" : occupancyRate >= 80 ? "bg-red-700/50" : "bg-yellow-500/50";
+  const getFallbackImage = () => {
+    if (building.id === "1AB") {
+      return "/images/ab1.jpg";
+    }
+    if (building.id === "2AB") {
+      return "/images/ab2.jpg";
+    }
+    if (building.id === "3AB") {
+      return "/images/ab3.jpg";
+    }
+    if (building.id === "AW") {
+      return "/images/automobile.jpg";
+    }
+    if (building.id === "MW") {
+      return "/images/workshop.jpg";
+    }
+    if (building.id === "LHC") {
+      return "/images/lhc.jpg";
+    }
+    if (building.id === "1C") {
+      return "/images/admin.jpg";
+    }
+    return "/images/main-building2.png";
+  };
+
+  const getImageSrc = () => {
+    if (imageError) {
+      return getFallbackImage();
+    }
+
+    if (!building.image) {
+      return getFallbackImage();
+    }
+
+    if (building.image.startsWith("data:") || building.image.startsWith("http://") || building.image.startsWith("https://") || building.image.startsWith("/")) {
+      return building.image;
+    }
+
+    return `data:image/png;base64,${building.image}`;
+  };
 
   return (
     <button
       onClick={() => onClick && onClick(building)}
       className="relative rounded-lg shadow-md overflow-hidden transition-transform transform hover:scale-[1.02] cursor-pointer"
     >
-      <Image src={building.image || "/images/main-building.jpg"} alt={building.name} width={400} height={200} className="h-48 w-full object-cover" />
-      <div className="absolute bottom-0 left-0 right-0 p-4 text-white">
+<img
+        src={getImageSrc()}
+        alt={building.name}
+        onError={() => setImageError(true)}
+        className="h-48 w-full object-cover"
+      />
+            <div className="absolute bottom-0 left-0 right-0 p-4 text-white">
         <div className={`flex items-center justify-between gap-4 rounded-md p-2 ${occupancyBgClass}`}>
           {/* Building name and stats */}
           <div className="flex flex-col">
