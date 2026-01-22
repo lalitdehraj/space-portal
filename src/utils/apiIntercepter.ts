@@ -2,14 +2,93 @@
 // It uses Axios to make API requests and provides a standardized wrapper function with caching.
 
 import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
-import { CacheProperties, setupCache } from "axios-cache-interceptor";
+import { CacheProperties, setupCache, buildKeyGenerator } from "axios-cache-interceptor";
 import { reduxStore } from "@/app/store";
 import { setBearerToken } from "@/app/feature/dataSlice";
+
+/**
+ * Normalizes a request body to create a consistent cache key
+ * Sorts object keys and handles nested objects/arrays
+ */
+const normalizeRequestBody = (body: unknown): string => {
+  if (!body) return "";
+
+  try {
+    // If it's already a string (JSON stringified), parse it first
+    let parsedBody: unknown = body;
+    if (typeof body === "string") {
+      parsedBody = JSON.parse(body);
+    }
+
+    // Recursively sort object keys for consistent ordering
+    const sortKeys = (obj: unknown): unknown => {
+      if (obj === null || obj === undefined) {
+        return obj;
+      }
+
+      if (Array.isArray(obj)) {
+        return obj.map(sortKeys);
+      }
+
+      if (typeof obj === "object") {
+        const sorted: Record<string, unknown> = {};
+        const keys = Object.keys(obj).sort();
+        for (const key of keys) {
+          sorted[key] = sortKeys((obj as Record<string, unknown>)[key]);
+        }
+        return sorted;
+      }
+
+      return obj;
+    };
+
+    const normalized = sortKeys(parsedBody);
+    return JSON.stringify(normalized);
+  } catch (error) {
+    // If parsing fails, return stringified version
+    return typeof body === "string" ? body : JSON.stringify(body);
+  }
+};
+
+/**
+ * Custom cache key generator that normalizes request bodies
+ * Uses buildKeyGenerator to create a deterministic cache key
+ */
+const customKeyGenerator = buildKeyGenerator((request) => {
+  const url = request.url || "";
+  
+  // Extract request body from request.data
+  // request.data might be a string (JSON stringified) or an object
+  let requestBody: unknown = request.data;
+  
+  // If data is a string, try to parse it
+  if (typeof request.data === "string") {
+    try {
+      requestBody = JSON.parse(request.data);
+    } catch {
+      // If parsing fails, use the string as-is
+      requestBody = request.data;
+    }
+  }
+  
+  const normalizedBody = normalizeRequestBody(requestBody);
+  
+  // Return an object that will be used to generate the cache key
+  // The library will hash this to create a unique key
+  return {
+    method: request.method || "POST",
+    url: url,
+    normalizedBody: normalizedBody,
+  };
+});
 
 export const api = setupCache(
   axios.create({
     baseURL: process.env.NEXT_PUBLIC_BASE_URL,
-  })
+  }),
+  {
+    generateKey: customKeyGenerator,
+  }
 );
 
 // Token refresh promise to prevent multiple simultaneous token refreshes
@@ -228,6 +307,91 @@ export const getBearerToken = async (): Promise<{ token: string; expiry: number 
   }
 };
 
+/**
+ * Smart cache configuration based on endpoint type
+ * Automatically determines cache TTL based on endpoint patterns
+ * Note: generateKey is set globally in setupCache, so it applies to all requests
+ */
+const getSmartCacheConfig = (
+  url: string,
+  customConfig?: false | Partial<CacheProperties<unknown, string>>
+): false | Partial<CacheProperties<unknown, string>> => {
+  // If explicitly disabled, return false
+  if (customConfig === false) {
+    return false;
+  }
+
+  // If custom config provided, use it
+  if (customConfig && typeof customConfig === "object") {
+    return customConfig;
+  }
+
+  // Write operations - no cache
+  const writeOperations = [
+    "UPDATE",
+    "INSERT",
+    "DELETE",
+    "UPDATE_SPACE_ALLOCATION_ENTRY",
+    "INSERT_SPACE_ALLOCATION_ENTRY",
+  ];
+  if (writeOperations.some((op) => url.includes(op))) {
+    return false;
+  }
+
+  // Static/Reference data - longer cache (5-10 minutes)
+  const staticDataEndpoints = [
+    "GET_BUILDING_LIST",
+    "GET_EMPLOYEES",
+    "GET_FACULTY_OR_DEPARTMENT",
+    "GET_SUBROOMS_LIST", // Subrooms don't change often
+  ];
+  if (staticDataEndpoints.some((endpoint) => url.includes(endpoint))) {
+    return {
+      ttl: 5 * 60 * 1000, // 5 minutes
+      methods: ["post"],
+      interpretHeader: false,
+    };
+  }
+
+  // Room info - medium cache (2 minutes)
+  if (url.includes("GET_ROOM_INFO")) {
+    return {
+      ttl: 3 * 60 * 1000, // 2 minutes
+      methods: ["post"],
+      interpretHeader: false,
+    };
+  }
+
+  // Room lists - medium cache (2 minutes)
+  if (url.includes("GET_ROOMS_LIST")) {
+    return {
+      ttl: 2 * 60 * 1000, // 2 minutes
+      methods: ["post"],
+      interpretHeader: false,
+    };
+  }
+
+  // Real-time/Current data - shorter cache (30 seconds - 1 minute)
+  const realTimeEndpoints = [
+    "GET_MAINTENANCE_DATA",
+    "GET_TOTAL_AVAILABLE_ROOMS_SITTING",
+  ];
+  if (realTimeEndpoints.some((endpoint) => url.includes(endpoint))) {
+    return {
+      ttl: 60 * 1000, // 1 minute
+      methods: ["post"],
+      interpretHeader: false,
+    };
+  }
+
+  // Default cache for all other GET-like operations (2 minutes)
+  return {
+    ttl: 2 * 60 * 1000, // 2 minutes default
+    methods: ["post"],
+    interpretHeader: false,
+  };
+};
+
 export const callApi = async <T>(
   url: string,
   requestBody?: unknown,
@@ -235,11 +399,20 @@ export const callApi = async <T>(
   abortSignal?: AbortSignal
 ): Promise<ApiResponse<T>> => {
   try {
+    // Get smart cache config (automatically applied unless explicitly disabled)
+    // The cache key generator will extract request body from the config automatically
+    const cacheConfig = getSmartCacheConfig(url, config);
+
     const response = await api.post(url, JSON.stringify(requestBody || {}), {
       headers: {
         "Content-Type": "application/json",
       },
-      cache: config,
+      cache: cacheConfig,
+      // cache: {
+      //   ttl: 20 * 60 * 1000, // 2 minutes
+      //   methods: ["post"],
+      //   interpretHeader: false,
+      // },
       signal: abortSignal,
     });
     return { success: true, data: JSON.parse((response.data as { value: string }).value) };

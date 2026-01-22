@@ -108,8 +108,8 @@ export default function Header() {
           if (user && user.length > 0) {
             dispatcher(setUserRoleId(user[0].userRole));
             dispatcher(setUser(user[0]));
-            dispatcher(setAcademicYearId(user[0].activeYear));
-            dispatcher(setAcademicSessionId(user[0].activeSession));
+            if(user[0].activeYear) dispatcher(setAcademicYearId(user[0].activeYear));
+            if(user[0].activeSession) dispatcher(setAcademicSessionId(user[0].activeSession));
           } else {
             router.push("/login");
           }
@@ -146,6 +146,34 @@ export default function Header() {
     getAcadmicCalender();
   }, [bearerToken]);
 
+  useEffect(() => {
+    // Only run if academic calendar data is loaded
+    if (!academicYearsList || academicYearsList.length === 0 || !academicSessionsList || academicSessionsList.length === 0) {
+      return;
+    }
+
+    // If no year is selected, set to first year (index 0, which is the latest year after reverse)
+    if (!academicYear || academicYear === "") {
+      const firstYear = academicYearsList[0];
+      if (firstYear?.Code) {
+        dispatcher(setAcademicYearId(firstYear.Code));
+        // Session will be auto-selected by the effect below
+      }
+    }
+    
+    // If year exists but no session is selected, set to first session (index 0) for that year
+    if (academicYear && (!acadSession || acadSession === "")) {
+      const sessionsForYear = academicSessionsList.filter((s) => s["Academic Year"] === academicYear);
+      if (sessionsForYear.length > 0) {
+        const firstSession = sessionsForYear[0];
+        if (firstSession?.Code) {
+          dispatcher(setAcademicSessionId(firstSession.Code));
+        }
+      }
+    }
+  }, [academicYearsList, academicSessionsList, academicYear, acadSession, dispatcher]);
+
+
   // build sessionsPerYear based on selected academicYear
   useEffect(() => {
     if (!academicYear || !academicSessionsList || !academicYearsList) return;
@@ -164,9 +192,14 @@ export default function Header() {
 
   // when academicYear changes set a default session (preserve original behavior)
   useEffect(() => {
-    if (!academicYearsList) return;
+    if (!academicYearsList || !academicSessionsList) return;
+    // Only set session if it's not already set
+    if (acadSession && acadSession !== "") return;
+    
     const currentSession = academicSessionsList?.filter((s) => s["Academic Year"] === academicYear)?.[0];
-    dispatcher(setAcademicSessionId(currentSession?.Code));
+    if (currentSession?.Code) {
+      dispatcher(setAcademicSessionId(currentSession.Code));
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [academicYear, academicSessionsList, academicYearsList]);
 

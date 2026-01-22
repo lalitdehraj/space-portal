@@ -241,3 +241,8 @@ export interface Maintenance {
   description: string;
   isMainteneceActive: boolean;
 }
+export interface TotalAvailableRoomsResponse {
+  totalRoom: number;
+  consumedRoom: number;
+  availableRoom: number;
+}

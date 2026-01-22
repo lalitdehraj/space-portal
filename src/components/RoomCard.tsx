@@ -2,7 +2,7 @@ import { URL_NOT_FOUND } from "@/constants";
 import { Occupant, Room, RoomInfo, Maintenance } from "@/types";
 import { callApi } from "@/utils/apiIntercepter";
 import moment from "moment";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useSelector } from "react-redux";
 import { RootState } from "@/app/store";
 import MaintenanceCardModal from "./MaintenanceCardModal";
@@ -11,10 +11,11 @@ interface RoomCardProps {
   room: Room;
   isExpanded?: boolean;
   onClick?: (room: Room) => void;
+  onStatusChange?: (roomId: string, status: { isAvailable: boolean; isOccupied: boolean; occupancyPercent: number }) => void;
 }
 const WORK_HOURS_PER_DAY = 9;
 
-export default function RoomCard({ room, isExpanded = false, onClick }: RoomCardProps) {
+export default function RoomCard({ room, isExpanded = false, onClick ,onStatusChange}: RoomCardProps) {
 
   const isActiveSession = useSelector((state: RootState) => state.dataState.isActiveSession);
   const academicSessionStartDate = useSelector((state: RootState) => state.dataState.selectedAcademicSessionStartDate);
@@ -22,17 +23,24 @@ export default function RoomCard({ room, isExpanded = false, onClick }: RoomCard
   const acadmeicYear = useSelector((state: RootState) => state.dataState.selectedAcademicYear);
   const acadmeicSession = useSelector((state: RootState) => state.dataState.selectedAcademicSession);
 
-  const [totalOccupants, setTotalOccupants] = useState<number>(0);
   const [occupancyPercent, setOccupancyPercent] = useState<number>(0);
   const [currentOccupants, setCurrentOccupants] = useState<Occupant[]>([]);
-  const [, setLoading] = useState<boolean>(true);
   const [showMaintenanceModal, setShowMaintenanceModal] = useState<boolean>(false);
   const [hasActiveMaintenance, setHasActiveMaintenance] = useState<boolean>(false);
+  
+  // Use refs to track previous values and prevent unnecessary onStatusChange calls
+  const prevStatusRef = useRef<{ isAvailable: boolean; isOccupied: boolean; occupancyPercent: number } | null>(null);
+  const onStatusChangeRef = useRef(onStatusChange);
+  const prevCurrentOccupantsRef = useRef<Occupant[]>([]);
+  const isFetchingRef = useRef<boolean>(false);
 
   useEffect(() => {
+    // Prevent concurrent fetches
+    if (isFetchingRef.current) return;
+    
     const fetchRoomInfo = async () => {
       try {
-        setLoading(true);
+        isFetchingRef.current = true;
         // Determine start/end dates depending on session
         const startDate = isActiveSession ? moment().startOf("isoWeek").format("YYYY-MM-DD") : moment(academicSessionStartDate).format("YYYY-MM-DD");
 
@@ -40,9 +48,11 @@ export default function RoomCard({ room, isExpanded = false, onClick }: RoomCard
 
         if (room.hasSubroom) {
           // Skip API calls for rooms with subrooms as per user request
-          setTotalOccupants(0);
           setOccupancyPercent(0);
-          setCurrentOccupants([]);
+          if (prevCurrentOccupantsRef.current.length > 0) {
+            prevCurrentOccupantsRef.current = [];
+            setCurrentOccupants([]);
+          }
         } else {
           // Handle regular room or subroom
           await fetchRegularRoomOccupancy(startDate, endDate);
@@ -52,7 +62,7 @@ export default function RoomCard({ room, isExpanded = false, onClick }: RoomCard
         console.error("Error fetching room occupancy:", error);
         setOccupancyPercent(0);
       } finally {
-        setLoading(false);
+        isFetchingRef.current = false;
       }
     };
 
@@ -71,7 +81,6 @@ export default function RoomCard({ room, isExpanded = false, onClick }: RoomCard
       if (response.success && response.data) {
         const roomData = response.data;
 
-        setTotalOccupants(response.data.occupants?.length || 0);
         // Determine date range
         const startDateMoment = isActiveSession ? moment().startOf("isoWeek") : moment(academicSessionStartDate);
         const endDateMoment = isActiveSession ? moment().endOf("isoWeek") : moment(academicSessionEndDate);
@@ -189,16 +198,47 @@ export default function RoomCard({ room, isExpanded = false, onClick }: RoomCard
               }
             }) || [];
 
-          setCurrentOccupants(currentOccupants);
+          // Only update if the occupants actually changed (compare by creating a simple key)
+          const currentKey = JSON.stringify(currentOccupants.map(o => ({
+            name: o.occupantName,
+            date: o.scheduledDate,
+            start: o.startTime,
+            end: o.endTime
+          })));
+          const prevKey = JSON.stringify(prevCurrentOccupantsRef.current.map(o => ({
+            name: o.occupantName,
+            date: o.scheduledDate,
+            start: o.startTime,
+            end: o.endTime
+          })));
+          
+          if (currentKey !== prevKey) {
+            prevCurrentOccupantsRef.current = currentOccupants;
+            setCurrentOccupants(currentOccupants);
+          }
         } else {
-          setCurrentOccupants([]);
+          // Only update if we need to clear (i.e., if there were occupants before)
+          if (prevCurrentOccupantsRef.current.length > 0) {
+            prevCurrentOccupantsRef.current = [];
+            setCurrentOccupants([]);
+          }
         }
       } catch (error) {
         console.error("Error fetching regular room current occupancy:", error);
-        setCurrentOccupants([]);
+        // Only update if we need to clear (i.e., if there were occupants before)
+        if (prevCurrentOccupantsRef.current.length > 0) {
+          prevCurrentOccupantsRef.current = [];
+          setCurrentOccupants([]);
+        }
       }
     };
 
+    fetchRoomInfo();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [academicSessionStartDate, academicSessionEndDate, isActiveSession, room.roomId, room.hasSubroom, room.buildingId, acadmeicYear, acadmeicSession]);
+  
+  // Separate useEffect for maintenance check to prevent infinite loops
+  useEffect(() => {
     const checkActiveMaintenance = async () => {
       try {
         const response = await callApi<Maintenance[]>(process.env.NEXT_PUBLIC_GET_MAINTENANCE_DATA || URL_NOT_FOUND);
@@ -251,6 +291,8 @@ export default function RoomCard({ room, isExpanded = false, onClick }: RoomCard
           });
 
           setHasActiveMaintenance(activeMaintenance);
+        } else {
+          setHasActiveMaintenance(false);
         }
       } catch (error) {
         console.error("Error checking active maintenance:", error);
@@ -258,16 +300,47 @@ export default function RoomCard({ room, isExpanded = false, onClick }: RoomCard
       }
     };
 
-    fetchRoomInfo();
     checkActiveMaintenance();
-  }, [academicSessionStartDate, academicSessionEndDate, isActiveSession, room.roomId, room.hasSubroom, room.buildingId]);
+    // Only run when room changes, not on every render
+  }, [room.roomId, room.parentId]);
+  
+  // Update ref when onStatusChange changes
+  useEffect(() => {
+    onStatusChangeRef.current = onStatusChange;
+  }, [onStatusChange]);
+  
+  useEffect(() => {
+    if (!onStatusChangeRef.current) return;
+    
+    // Calculate status based on currentOccupants and hasSubroom
+    const isAvailable = currentOccupants.length === 0 && !room.hasSubroom;
+    const isOccupied = currentOccupants.length > 0;
+    
+    const currentStatus = {
+      isAvailable,
+      isOccupied,
+      occupancyPercent,
+    };
+    
+    // Only call onStatusChange if the status actually changed
+    const prevStatus = prevStatusRef.current;
+    if (
+      !prevStatus ||
+      prevStatus.isAvailable !== currentStatus.isAvailable ||
+      prevStatus.isOccupied !== currentStatus.isOccupied ||
+      Math.abs(prevStatus.occupancyPercent - currentStatus.occupancyPercent) > 0.01 // Allow small floating point differences
+    ) {
+      prevStatusRef.current = currentStatus;
+      onStatusChangeRef.current(room.roomId, currentStatus);
+    }
+  }, [currentOccupants, occupancyPercent, room.hasSubroom, room.roomId]);
 
   return (
     <div className="">
       <div
         onClick={() => onClick && onClick(room)}
         className={`hover:shadow-lg transition-shadow duration-300 rounded-lg border-t border-r border-b border-l-4 shadow-sm py-4 px-3 min-h-[140px] flex flex-col justify-between ${
-          currentOccupants.length > 0 ? "border-l-red-500" : "border-l-green-600"
+          currentOccupants.length > 0 ? "border-l-red-500" : room.hasSubroom ? "border-l-blue-300" : "border-l-green-600"
         } ${isExpanded ? "ring-2 ring-orange-500 " : "none"} ${room.hasSubroom ? "cursor-pointer hover:bg-gray-50" : ""} ${
           hasActiveMaintenance ? "bg-purple-100" : room.status === "1" ? "bg-purple-100" : "bg-[#FBE9DE]"
         }`}
@@ -275,7 +348,7 @@ export default function RoomCard({ room, isExpanded = false, onClick }: RoomCard
         <div className="flex w-full items-start justify-between">
           <div className="flex flex-col items-start text-left">
             <div className="flex items-center gap-2">
-              <p className="text-xl font-[640] text-gray-800 text-ellipsis">{room.roomName}</p>
+              <p className="text-xl font-[640] text-gray-800 text-ellipsis">{room.roomName.length > 30 ? `${room.roomName.substring(0, 30)}...` : room.roomName}</p>
             </div>
             <p className="text-[14px] text-gray-700 font-bold"> {room.buildingId}</p>
             <p className="text-[14px] text-gray-700">Capacity: {room.roomCapactiy}</p>

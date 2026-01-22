@@ -1,9 +1,9 @@
 "use client";
-import React, { JSX, useEffect, useState, useRef } from "react";
+import React, { JSX, useEffect, useState, useRef, useMemo, useCallback } from "react";
 import Image from "next/image";
 import { useParams, useRouter } from "next/navigation";
 import { useSelector, useDispatch } from "react-redux";
-import { Room } from "@/types";
+import { Room, TotalAvailableRoomsResponse, RoomInfo } from "@/types";
 import RoomCard from "@/components/RoomCard";
 import { Building } from "@/types";
 import { removeSpaces } from "@/utils";
@@ -12,6 +12,7 @@ import { URL_NOT_FOUND } from "@/constants";
 import { encrypt } from "@/utils/encryption";
 import { setSeletedRoomTypeId, setAppliedFilters } from "@/app/feature/dataSlice";
 import { RootState } from "@/app/store";
+import moment from "moment";
 export default function Buildings() {
   const router = useRouter();
   const dispatcher = useDispatch();
@@ -24,16 +25,25 @@ export default function Buildings() {
   const [allBuildingSubrooms, setAllBuildingSubrooms] = useState<Room[]>([]);
   const [isLoadingBuildings, setIsLoadingBuildings] = useState(false);
   const [isLoadingRooms, setIsLoadingRooms] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(16);
-  const [initialLoad] = useState(8);
+  const [roomsLoadingState, setRoomsLoadingState] = useState<Record<string, boolean>>({});
+  const [totalRoomsCount, setTotalRoomsCount] = useState<number>(0);
+  const [isFetchingRooms, setIsFetchingRooms] = useState(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const isFetchingRoomsRef = useRef<boolean>(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
   const appliedFilters = useSelector((state: RootState) => state.dataState.appliedFilters);
   const filterRef = useRef<HTMLDivElement>(null);
   const acadmeicYear = useSelector((state: RootState) => state.dataState.selectedAcademicYear);
   const acadmeicSession = useSelector((state: RootState) => state.dataState.selectedAcademicSession);
+  const academicSessionStartDate = useSelector((state: RootState) => state.dataState.selectedAcademicSessionStartDate);
+  const academicSessionEndDate = useSelector((state: RootState) => state.dataState.selectedAcademicSessionEndDate);
   const selectedRoomType = useSelector((state: RootState) => state.dataState.selectedRoomType);
+  const [availableRoomsCount, setAvailableRoomsCount] = useState<number>(0);
+  const [occupiedRoomsCount, setOccupiedRoomsCount] = useState<number>(0);
+  const [availableSitting, setAvailableSitting] = useState<TotalAvailableRoomsResponse | undefined>(undefined);
+  const [roomStatuses, setRoomStatuses] = useState<Record<string, { isAvailable: boolean; isOccupied: boolean; occupancyPercent: number }>>({});
+  const [averageOccupancy, setAverageOccupancy] = useState<number>(0);
 
   useEffect(() => {
     const fetchBuildings = async () => {
@@ -58,40 +68,229 @@ export default function Buildings() {
     fetchBuildings();
   }, [acadmeicSession, acadmeicYear]);
 
+  // Create a stable key from appliedFilters to prevent infinite loops
+  // This ensures the effect only runs when filter values actually change, not on every render
+  const appliedFiltersKey = useMemo(() => {
+    const buildingKey = appliedFilters.building.length > 0 
+      ? [...appliedFilters.building].sort().join('|') 
+      : "";
+    const floorKey = appliedFilters.floor.length > 0 
+      ? [...appliedFilters.floor].sort().join('|') 
+      : "";
+    return `${buildingKey}|${floorKey}`;
+  }, [appliedFilters.building, appliedFilters.floor]);
+
+  useEffect(() => {
+    const fetchAvailableSittingRooms = async () => {
+      if (!role) return; 
+      try{
+      // Get building IDs and floor IDs from appliedFilters, join with | separator
+      const buildingIds = appliedFilters.building.length > 0 
+        ? appliedFilters.building.join('|') 
+        : "";
+      const floorIds = appliedFilters.floor.length > 0 
+        ? appliedFilters.floor.join('|') 
+        : "";
+      
+      const requestBody = {
+        buildingNo: buildingIds,
+        floorId: floorIds,
+        roomTypes: selectedRoomType==="All Rooms" ? "" : selectedRoomType,
+        managedBy: role,
+      };
+      const response = await callApi<TotalAvailableRoomsResponse>(     
+         process.env.NEXT_PUBLIC_GET_TOTAL_AVAILABLE_ROOMS_SITTING || URL_NOT_FOUND, requestBody);
+
+      if (response.success && response.data) {
+        // Update availableSitting from API response
+        setAvailableSitting(response.data || 0);
+      } else {
+        console.error("Failed to fetch available rooms:", response.error);
+        setAvailableSitting(undefined);
+      }}catch(error){
+        console.error("Error fetching available rooms:", error);
+        setAvailableSitting(undefined);
+      }
+    };
+  
+    fetchAvailableSittingRooms();
+  }, [role, acadmeicSession, appliedFiltersKey,selectedRoomType]);
+  
+  const handleRoomStatusChange = useCallback((roomId: string, status: { isAvailable: boolean; isOccupied: boolean; occupancyPercent: number }) => {
+    setRoomStatuses((prev) => ({
+      ...prev,
+      [roomId]: status,
+    }));
+  }, []);
+  
   useEffect(() => {
     if (!buildings || buildings.length === 0) {
       setRoomsList([]);
+      setTotalRoomsCount(0);
       return;
     }
 
-    const fetchRooms = async () => {
+    // Prevent concurrent fetches
+    if (isFetchingRoomsRef.current) return;
+
+    const fetchRoomsSequentially = async () => {
+      isFetchingRoomsRef.current = true;
+      setIsFetchingRooms(true);
       setIsLoadingRooms(true);
-      if (!buildings || !role) return;
+
+      // Cancel any ongoing requests
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+
+      // Create new AbortController for this fetch session
+      abortControllerRef.current = new AbortController();
+      const signal = abortControllerRef.current.signal;
+
       try {
+        if (!buildings || !role) return;
+
         const now = new Date();
         const hours = now.getHours().toString().padStart(2, "0");
         const minutes = now.getMinutes().toString().padStart(2, "0");
         const time24h = `${hours}:${minutes}`;
-        const promises = buildings.map(async (b) => {
-          const response = await callApi<Room[]>(process.env.NEXT_PUBLIC_GET_ROOMS_LIST || URL_NOT_FOUND, {
-            buildingNo: String(b.id),
-            floorID: "",
-            curreentTime: `${time24h}`,
-          });
-          const filteredRooms = (response.data || []).filter((room) => room.managedBy === role);
-          return filteredRooms;
+
+        // First, get all rooms to know the total count
+        const allRoomsPromises = buildings.map(async (b) => {
+          const response = await callApi<Room[]>(
+            process.env.NEXT_PUBLIC_GET_ROOMS_LIST || URL_NOT_FOUND,
+            {
+              buildingNo: String(b.id),
+              floorID: "",
+              curreentTime: `${time24h}`,
+            },
+            false,
+            signal
+          );
+          return (response.data || []).filter((room) => room.managedBy === role);
         });
 
-        const roomLists = await Promise.all(promises);
-        setRoomsList(roomLists.flat().sort((a, b) => a.roomName.localeCompare(b.roomName)));
+        const allRoomsArrays = await Promise.all(allRoomsPromises);
+        const allRooms = allRoomsArrays.flat().sort((a, b) => a.roomName.localeCompare(b.roomName));
+
+        if (signal.aborted) return;
+
+        // Set total count and create placeholder rooms
+        setTotalRoomsCount(allRooms.length);
+        setRoomsList(allRooms);
+
+        // Initialize loading states for all rooms
+        const loadingStates: Record<string, boolean> = {};
+        allRooms.forEach((room) => {
+          loadingStates[`${room.buildingId}-${room.roomId}`] = true;
+        });
+        setRoomsLoadingState(loadingStates);
+
+        // Fetch room details 2 at a time sequentially
+        const fetchRoomDetails = async (room: Room) => {
+          if (signal.aborted) return;
+
+          try {
+            const requestBody = {
+              roomID: room.roomId,
+              subroomID: "",
+              academicYr: acadmeicYear,
+              acadSess: acadmeicSession,
+              startDate: academicSessionStartDate || moment().format("YYYY-MM-DD"),
+              endDate: academicSessionEndDate || moment().format("YYYY-MM-DD"),
+            };
+
+            const response = await callApi<RoomInfo>(
+              process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND,
+              requestBody,
+              undefined,
+              signal
+            );
+
+            if (signal.aborted) return;
+
+            if (response.success && response.data) {
+              // Update the specific room in the list only if data changed
+              setRoomsList((prev) => {
+                const updated = [...prev];
+                const roomIndex = updated.findIndex(
+                  (r) => r.roomId === room.roomId && r.buildingId === room.buildingId
+                );
+                if (roomIndex !== -1) {
+                  const currentRoom = updated[roomIndex];
+                  const newOccupied = response.data?.occupied || 0;
+                  const newOccupiedBy = response.data?.occupiedBy || "";
+                  const newStatus = response.data?.status || "";
+                  
+                  // Only update if data actually changed
+                  if (
+                    currentRoom.occupied !== newOccupied ||
+                    currentRoom.occupiedBy !== newOccupiedBy ||
+                    currentRoom.status !== newStatus
+                  ) {
+                    // Merge RoomInfo data into Room object
+                    updated[roomIndex] = {
+                      ...currentRoom,
+                      occupied: newOccupied,
+                      occupiedBy: newOccupiedBy,
+                      status: newStatus,
+                    };
+                    return updated;
+                  }
+                }
+                return prev; // Return previous state if no changes
+              });
+
+              // Mark this room as loaded
+              setRoomsLoadingState((prev) => ({
+                ...prev,
+                [`${room.buildingId}-${room.roomId}`]: false,
+              }));
+            }
+          } catch (error) {
+            if (signal.aborted) return;
+            console.error(`Error fetching room ${room.roomId}:`, error);
+
+            // Mark as loaded even on error to stop shimmer
+            setRoomsLoadingState((prev) => ({
+              ...prev,
+              [`${room.buildingId}-${room.roomId}`]: false,
+            }));
+          }
+        };
+
+        // Process rooms 2 at a time
+        for (let i = 0; i < allRooms.length; i += 2) {
+          if (signal.aborted) break;
+
+          const batch = allRooms.slice(i, i + 2);
+          await Promise.all(batch.map((room) => fetchRoomDetails(room)));
+        }
       } catch (error) {
+        if (signal.aborted) {
+          console.log("Room fetching cancelled");
+          return;
+        }
         console.error("Error fetching rooms:", error);
       } finally {
-        setIsLoadingRooms(false);
+        if (!signal.aborted) {
+          setIsFetchingRooms(false);
+          setIsLoadingRooms(false);
+        }
+        isFetchingRoomsRef.current = false;
       }
     };
 
-    fetchRooms();
+    if (role && buildings) {
+      fetchRoomsSequentially();
+    }
+
+    // Cleanup: abort requests when component unmounts or dependencies change
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
   }, [acadmeicSession, acadmeicYear, buildings, role]);
 
   // Fetch all subrooms for all buildings at once
@@ -120,27 +319,6 @@ export default function Buildings() {
     fetchAllBuildingSubrooms();
   }, [buildings, acadmeicSession, acadmeicYear]);
 
-  const kpiCards = [
-    {
-      title: "Total Rooms Managed",
-      value: roomsList.length,
-      iconSrc: "/images/house-door.svg",
-      alt: "Rooms icon",
-    },
-    {
-      title: "Available Rooms",
-      value: roomsList.filter((room) => room.occupied === 0).length,
-      iconSrc: "/images/floor-plan.svg",
-      alt: "Occupancy icon",
-    },
-    {
-      title: "Occupied Rooms",
-      value: roomsList.filter((room) => room.occupied > 0).length,
-      iconSrc: "/images/chart-areaspline-variant.svg",
-      alt: "Floor area icon",
-    },
-  ];
-
   const allRoomsCategories: string[] = [...new Set(roomsList.map((room) => room.roomType).filter((roomType) => roomType && roomType.trim() !== ""))];
   let roomCategories = ["All Rooms"];
   roomCategories = [...roomCategories, ...allRoomsCategories];
@@ -151,10 +329,7 @@ export default function Buildings() {
     }
   }, [roomCategories, isLoadingRooms, roomsList.length, selectedRoomType, dispatcher]);
 
-  // Reset pagination when filters change
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [selectedRoomType, searchQuery]);
+  // Reset when filters change (removed pagination logic)
 
   const filteredRooms: Room[] = roomsList.filter((room) => {
     if (selectedRoomType === "All Rooms") return true;
@@ -195,20 +370,28 @@ export default function Buildings() {
   };
 
   // Apply search filter and building/floor filters
-  const searchRooms = filteredRooms.filter((room) => {
-    // Search filter
-    const matchesSearch = room.roomName.toLowerCase().includes(searchQuery.toLowerCase()) || room.roomId.toLowerCase().includes(searchQuery.toLowerCase());
+  const searchRooms = useMemo(() => {
+    return filteredRooms.filter((room) => {
+      // Search filter
+      const matchesSearch = room.roomName.toLowerCase().includes(searchQuery.toLowerCase()) || room.roomId.toLowerCase().includes(searchQuery.toLowerCase());
+  
+      // Building filter
+      const matchesBuilding = appliedFilters.building.length === 0 || appliedFilters.building.includes(room.buildingId);
+  
+      // Floor filter
+      const matchesFloor = appliedFilters.floor.length === 0 || appliedFilters.floor.includes(room.floorId);
+  
+      return matchesSearch && matchesBuilding && matchesFloor;
+    });
+  }, [filteredRooms, searchQuery, appliedFilters]);
 
-    // Building filter
-    const matchesBuilding = appliedFilters.building.length === 0 || appliedFilters.building.includes(room.buildingId);
+  // Create a stable key from filtered room IDs to avoid infinite loops
+  const filteredRoomIdsKey = useMemo(() => {
+    const filteredRoomIds = new Set(searchRooms.map((room) => room.roomId));
+    return Array.from(filteredRoomIds).sort().join(',');
+  }, [searchRooms]);
 
-    // Floor filter
-    const matchesFloor = appliedFilters.floor.length === 0 || appliedFilters.floor.includes(room.floorId);
-
-    return matchesSearch && matchesBuilding && matchesFloor;
-  });
-
-  const visibleRooms = searchRooms.slice(0, currentPage === 1 ? initialLoad : initialLoad + (currentPage - 1) * itemsPerPage);
+  // Removed pagination - show all filtered rooms
   useEffect(() => {
     const fetchSubrooms = async () => {
       if (!selectedRoom) {
@@ -232,43 +415,98 @@ export default function Buildings() {
       } else router.push(`/space-portal/buildings/${encrypt(room.buildingId)}/${encrypt(room.roomId)}`);
     }
   };
-
+  const kpiCards = [
+    {
+      title: "Total Rooms Managed",
+      value: roomsList.length,
+      iconSrc: "/images/house-door.svg",
+      alt: "Rooms icon",
+    },
+    {
+      title: "Available Sitting",
+      value: availableSitting ? `${availableSitting?.availableRoom }/${availableSitting?.totalRoom}` : "0",
+      iconSrc: "/images/chart-areaspline-variant.svg",
+      alt: "Floor area icon",
+    },
+      {
+      title: "Available Rooms",
+      value: availableRoomsCount? `${availableRoomsCount}/${searchRooms?.length}` : "0",
+      iconSrc: "/images/floor-plan.svg",
+      alt: "Occupancy icon",
+    },
+    {
+      title: "Occupancy",
+      value: `${averageOccupancy.toFixed(1)}%`,
+      iconSrc: "/images/chart-areaspline-variant.svg",
+      alt: "Floor area icon",
+    },
+  
+  ];
   const renderRoomCards = () => {
-    if (!visibleRooms?.length) return;
+    // Use all filtered rooms, not just visible ones
+    if (!searchRooms?.length && !isFetchingRooms) return null;
+
     const items: JSX.Element[] = [];
     let expandedRowIndex: number | null = null;
     const cardsPerRow = 4;
-    for (let i = 0; i < visibleRooms.length; i++) {
-      if (selectedRoom && selectedRoom.roomId === visibleRooms[i].roomId && selectedRoom.buildingId === visibleRooms[i].buildingId) {
-        expandedRowIndex = Math.floor(i / cardsPerRow);
-        break;
-      }
-    }
 
-    if (visibleRooms?.length > 0) {
-      visibleRooms?.forEach((room, index) => {
+    // Show shimmer for all rooms or actual cards
+    const roomsToRender = isFetchingRooms && roomsList.length === 0
+      ? Array.from({ length: totalRoomsCount || 8 }, (_, i) => ({
+          roomId: `placeholder-${i}`,
+          buildingId: `placeholder-${i}`,
+          roomName: "",
+          roomType: "",
+          occupied: 0,
+          occupiedBy: "",
+          status: "",
+          hasSubroom: false,
+          isSitting: false,
+          roomCapactiy: 0,
+          floorId: "",
+          roomArea: "",
+        }))
+      : searchRooms;
+
+    for (let i = 0; i < roomsToRender.length; i++) {
+      const room = roomsToRender[i];
+      const roomKey = `${room.buildingId}-${room.roomId}`;
+      const isLoading = roomsLoadingState[roomKey] || false;
+
+      if (isLoading || room.roomId.startsWith("placeholder")) {
+        // Shimmer loading card
+        items.push(
+          <div key={roomKey} className="bg-white rounded-lg shadow-sm p-4 animate-pulse">
+            <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+            <div className="h-3 bg-gray-200 rounded w-1/2 mb-4"></div>
+            <div className="h-3 bg-gray-200 rounded w-1/3"></div>
+          </div>
+        );
+      } else {
+        // Actual room card
+        if (selectedRoom && selectedRoom.roomId === room.roomId && selectedRoom.buildingId === room.buildingId) {
+          expandedRowIndex = Math.floor(i / cardsPerRow);
+        }
+
         items.push(
           <RoomCard
             room={room}
-            key={`${room.buildingId}-${room.roomId}`}
+            key={roomKey}
             isExpanded={selectedRoom ? selectedRoom.roomId === room.roomId && selectedRoom.buildingId === room.buildingId : false}
             onClick={(room) => handleRoomClick(room)}
-          />
+            onStatusChange={handleRoomStatusChange}
+            />
         );
-        const currentRowIndex = Math.floor(index / cardsPerRow);
-        const isLastCardInRow = (index + 1) % cardsPerRow === 0;
-        const isLastCardOverall = index === visibleRooms.length - 1;
+
+        const currentRowIndex = Math.floor(i / cardsPerRow);
+        const isLastCardInRow = (i + 1) % cardsPerRow === 0;
+        const isLastCardOverall = i === roomsToRender.length - 1;
 
         if (selectedRoom !== null && currentRowIndex === expandedRowIndex && (isLastCardInRow || isLastCardOverall)) {
           items.push(
             <div
               key={`details-${selectedRoom?.buildingId}-${selectedRoom?.roomId}`}
-              className="
-                col-span-full bg-gray-50 p-8 rounded-xl shadow-inner
-                border border-gray-200
-                transition-all duration-500 ease-in-out transform
-                opacity-100 translate-y-0
-              "
+              className="col-span-full bg-gray-50 p-8 rounded-xl shadow-inner border border-gray-200 transition-all duration-500 ease-in-out transform opacity-100 translate-y-0"
               style={{
                 gridColumn: "1 / -1",
                 animation: "fadeInSlideUp 0.5s ease-out forwards",
@@ -286,23 +524,68 @@ export default function Buildings() {
               <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3">
                 {subRooms &&
                   subRooms.map((room) => (
-                    <RoomCard key={`${room.buildingId}-${room.roomId}`} onClick={handleRoomClick} room={room} />
+                    <RoomCard key={`${room.buildingId}-${room.roomId}`} onClick={handleRoomClick} room={room} 
+                    onStatusChange={handleRoomStatusChange}
+/>
                   ))}
               </div>
             </div>
           );
         }
-      });
-    } else {
+      }
+    }
+
+    if (items.length === 0) {
       items.push(
         <div key={"No Room Found"} className="text-gray-600">
-          No rooms found{" "}
+          No rooms found
         </div>
       );
     }
 
     return items;
   };
+  useEffect(() => {
+    // Only calculate for filtered rooms (searchRooms)
+    const filteredRoomIds = new Set(searchRooms.map((room) => room.roomId));
+    // Create a map for quick lookup of room.isSitting
+    const roomIsSittingMap = new Map(searchRooms.map((room) => [room.roomId, room.isSitting]));
+    
+    let available = 0;
+    let occupied = 0;
+    let totalOccupancySum = 0; // Sum of all occupancy percentages (excluding isSitting)
+    let totalRoomsCount = 0; // Total count of filtered rooms (excluding isSitting)
+  
+    Object.entries(roomStatuses).forEach(([roomId, status]) => {
+      if (filteredRoomIds.has(roomId)) {
+        const isSitting = roomIsSittingMap.get(roomId) || false;
+        
+        // Exclude isSitting rooms from all calculations
+        if (!isSitting) {
+          totalRoomsCount++; // Count all filtered rooms (excluding isSitting)
+          totalOccupancySum += status.occupancyPercent; // Sum all occupancy percentages
+          
+          if (status.isAvailable) {
+            available++;
+          }
+          if (status.isOccupied) {
+            occupied++;
+          }
+        }
+      }
+    });
+  
+    setAvailableRoomsCount(available);
+    setOccupiedRoomsCount(occupied);
+    
+    // Calculate average occupancy: sum of all occupancy percentages / total rooms count
+    let avgOccupancy = totalRoomsCount > 0 ? totalOccupancySum / totalRoomsCount : 0;
+     // Check if role is CENTRAL FACILITY (dynamic check, not hardcoded)
+     if (role && role.toUpperCase().trim() === "CENTRAL FACILITY") {
+      avgOccupancy = availableSitting? (availableSitting.totalRoom - availableSitting.availableRoom) / availableSitting.totalRoom * 100 : 0;
+    }
+    setAverageOccupancy(avgOccupancy);
+  }, [roomStatuses, filteredRoomIdsKey, searchRooms]);
 
   return (
     <div>
@@ -411,7 +694,7 @@ export default function Buildings() {
             <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
               {isLoadingBuildings || isLoadingRooms
                 ? // Loading skeleton for KPI cards
-                  Array.from({ length: 3 }).map((_, index) => (
+                  Array.from({ length: 4 }).map((_, index) => (
                     <div key={index} className="rounded-lg bg-white p-4 pl-6 shadow-sm animate-pulse">
                       <div className="h-6 w-6 bg-gray-200 rounded mb-2"></div>
                       <div className="h-3 bg-gray-200 rounded w-20 mb-2"></div>
@@ -453,29 +736,8 @@ export default function Buildings() {
             )}
 
             <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {isLoadingRooms
-                ? // Loading skeleton for room cards
-                  Array.from({ length: 8 }).map((_, index) => (
-                    <div key={index} className="bg-white rounded-lg shadow-sm p-4 animate-pulse">
-                      <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
-                      <div className="h-3 bg-gray-200 rounded w-1/2 mb-4"></div>
-                      <div className="h-3 bg-gray-200 rounded w-1/3"></div>
-                    </div>
-                  ))
-                : renderRoomCards()}
+              {renderRoomCards()}
             </div>
-
-            {/* Load More Button */}
-            {!isLoadingRooms && searchRooms.length > 0 && visibleRooms.length < searchRooms.length && (
-              <div className="mt-6 flex justify-center">
-                <button
-                  onClick={() => setCurrentPage((prev) => prev + 1)}
-                  className="px-6 py-2 bg-[#F26722] text-white rounded-lg hover:bg-[#E55A1A] transition-colors duration-300 font-medium"
-                >
-                  Load More ({searchRooms.length - visibleRooms.length} more rooms)
-                </button>
-              </div>
-            )}
           </div>
         </div>
       </section>
