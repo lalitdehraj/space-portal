@@ -89,7 +89,7 @@ export function getVacantSlotsByWeekday(
   }
 
   // Generate vacant slots for each date in range
-  let current = dateRangeStart.clone();
+  const current = dateRangeStart.clone();
   while (current.isSameOrBefore(dateRangeEnd)) {
     const currentDate = current.format("YYYY-MM-DD");
     const weekday = current.format("dddd") as keyof WeekVacantSlots;

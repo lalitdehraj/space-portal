@@ -580,8 +580,8 @@ function GenerateReportForm({ onClosePressed, setJobId, setReady, setPolling }: 
 
     try {
       // Determine start & end date based on time period
-      let startDate = customStartDate;
-      let endDate = customEndDate;
+      const startDate = customStartDate;
+      const endDate = customEndDate;
 
       let fileName = "";
       if (reportType === "room") {

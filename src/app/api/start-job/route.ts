@@ -346,7 +346,7 @@ async function createBigXLS(filePath: string, jsonObject: Record<string, unknown
         return counts;
       }
 
-      let current = start.clone();
+      const current = start.clone();
       while (current.isSameOrBefore(end)) {
         const weekday = current.format("dddd");
         counts[weekday]++;
