@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useState, useMemo } from "react";
 import moment from "moment";
-import { Building, Room, Maintenance, RoomInfo, Occupant } from "@/types";
+import { Building, Room, Maintenance, RoomInfo, Occupant, Employee } from "@/types";
 import { callApi } from "@/utils/apiIntercepter";
 import { URL_NOT_FOUND } from "@/constants";
 import { useSelector } from "react-redux";
@@ -26,6 +26,7 @@ export function AdvancedSearch({ onClose }: { onClose: () => void }) {
   const [clickedRoom, setClickedRoom] = useState<Room | null>(null);
   const [clickedRoomSubrooms, setClickedRoomSubrooms] = useState<Room[]>([]);
   const [loadingSubrooms, setLoadingSubrooms] = useState(false);
+  const [employeesList, setEmployeesList] = useState<Employee[]>([]);
 
   // Filters
   const [selectedBuilding, setSelectedBuilding] = useState<string>("");
@@ -111,7 +112,15 @@ export function AdvancedSearch({ onClose }: { onClose: () => void }) {
 
     fetchRoomsForBuilding();
   }, [selectedBuilding, acadSession, academicYear]);
-
+  useEffect(() => {
+    const fetchEmployees = async () => {
+      const { data: employees } = await callApi<Employee[]>(process.env.NEXT_PUBLIC_GET_EMPLOYEES || URL_NOT_FOUND, {
+        employeeCode: "",
+      });
+      if (employees) setEmployeesList(employees);
+    };
+    fetchEmployees();
+  }, []);
   /**
    * Memoized maintenance room IDs for current search parameters
    */
@@ -446,6 +455,7 @@ export function AdvancedSearch({ onClose }: { onClose: () => void }) {
       });
 
       if (response.success && response.data) {
+        console.log("response.data", response.data);
         const allocations = response.data;
 
         // Check if allocations are currently active
@@ -493,7 +503,7 @@ export function AdvancedSearch({ onClose }: { onClose: () => void }) {
           };
           return {
             occupantId: alloc.allocatedSubRoomNo || alloc.allocatedRoomId,
-            occupantName: occupantSearchName || "Unknown", // Use search name if provided
+            occupantName: employeesList.find((employee) => employee.employeeCode.toLowerCase() === occupantSearchEmployeeId.toLowerCase())?.employeeName || "Unknown", // Use search name if provided
             type: "Sitting",
             isExtendable: false,
             Id: occupantSearchEmployeeId,

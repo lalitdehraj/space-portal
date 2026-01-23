@@ -579,13 +579,14 @@ export default function Buildings() {
     setOccupiedRoomsCount(occupied);
     
     // Calculate average occupancy: sum of all occupancy percentages / total rooms count
-    let avgOccupancy = totalRoomsCount > 0 ? totalOccupancySum / totalRoomsCount : 0;
-     // Check if role is CENTRAL FACILITY (dynamic check, not hardcoded)
-     if (role && role.toUpperCase().trim() === "CENTRAL FACILITY") {
-      avgOccupancy = availableSitting? (availableSitting.totalRoom - availableSitting.availableRoom) / availableSitting.totalRoom * 100 : 0;
-    }
-    setAverageOccupancy(avgOccupancy);
-  }, [roomStatuses, filteredRoomIdsKey, searchRooms]);
+    if(availableSitting)
+      {
+        totalOccupancySum= totalOccupancySum +  (100*(availableSitting?.totalRoom - availableSitting?.availableRoom));
+        totalRoomsCount= totalRoomsCount + availableSitting?.totalRoom
+      }
+      const avgOccupancy = totalRoomsCount > 0 ? totalOccupancySum / totalRoomsCount : 0;
+      setAverageOccupancy(avgOccupancy);
+  }, [roomStatuses, filteredRoomIdsKey, searchRooms, availableSitting]);
 
   return (
     <div>

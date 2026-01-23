@@ -91,7 +91,9 @@ export default function AddAssignmentForm({
   const [allocationSlotsList, setAllocationSlotsList] = useState<Slot[]>([]);
   const [existingBookedSlots, setExistingBookedSlots] = useState<Slot[]>([]);
   const [isValidationVisible, setIsValidationVisible] = useState(false);
-  const [slotGroups, setSlotGroups] = useState<{ resolved: Slot[]; unresolved: Slot[] }>({
+  const [employeeSearchQuery, setEmployeeSearchQuery] = useState("");
+  const [isEmployeeDropdownOpen, setIsEmployeeDropdownOpen] = useState(false);
+const [slotGroups, setSlotGroups] = useState<{ resolved: Slot[]; unresolved: Slot[] }>({
     resolved: [],
     unresolved: [],
   });
@@ -104,6 +106,38 @@ export default function AddAssignmentForm({
       if (employees) setEmployeesList(employees);
     };
     fetchEmployees();
+  }, []);
+
+  useEffect(() => {
+    const fetchEmployees = async () => {
+      const { data: employees } = await callApi<Employee[]>(process.env.NEXT_PUBLIC_GET_EMPLOYEES || URL_NOT_FOUND, {
+        employeeCode: "",
+      });
+      if (employees) setEmployeesList(employees);
+    };
+    fetchEmployees();
+  }, []);
+
+  // Filter employees based on search query
+  const filteredEmployees = employeesList.filter((employee) => {
+    const searchLower = employeeSearchQuery.toLowerCase();
+    return (
+      employee.employeeName.toLowerCase().includes(searchLower) ||
+      employee.employeeCode.toLowerCase().includes(searchLower)
+    );
+  });
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest('.employee-autocomplete-container')) {
+        setIsEmployeeDropdownOpen(false);
+      }
+    };
+    
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   useEffect(() => {
@@ -392,25 +426,56 @@ export default function AddAssignmentForm({
             {/* Department or Faculty */}
             <div className="flex flex-row gap-4">
               <div className="flex-1">
-                <label htmlFor="dept-faculty" className="block text-xs font-medium text-gray-700">
-                  Select Employee
-                </label>
-                <select
-                  id="dept-faculty"
-                  name="dept-faculty"
-                  className="mt-1 block text-sm w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
-                  value={employeeId}
-                  onChange={(e) => {
-                    setEmployeeId(e.target.value);
-                  }}
-                >
-                  <option value="" disabled>
-                    Select an option
-                  </option>
-                  {employeesList.map((e: Employee) => (
-                    <option value={e.employeeCode} key={e.employeeCode}>{`${e.employeeName} (${e.employeeCode})`}</option>
-                  ))}
-                </select>
+                <div className="relative employee-autocomplete-container">
+                  <label htmlFor="dept-faculty" className="block text-xs font-medium text-gray-700">
+                    Select Employee
+                  </label>
+                  
+                  {/* Input Field */}
+                  <input
+                    id="dept-faculty"
+                    type="text"
+                    className="mt-1 block text-sm w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-orange-500"
+                    placeholder="Type to search employee..."
+                    value={employeeSearchQuery}
+                    onChange={(e) => {
+                      setEmployeeSearchQuery(e.target.value);
+                      setIsEmployeeDropdownOpen(true);
+                      // Clear selection if user modifies input
+                      if (employeeId) {
+                        setEmployeeId("");
+                      }
+                    }}
+                    onFocus={() => setIsEmployeeDropdownOpen(true)}
+                    autoComplete="off"
+                  />
+                  
+                  {/* Dropdown List */}
+                  {isEmployeeDropdownOpen && employeeSearchQuery && (
+                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                      {filteredEmployees.length > 0 ? (
+                        filteredEmployees.map((employee: Employee) => (
+                          <div
+                            key={employee.employeeCode}
+                            className="px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm"
+                            onClick={() => {
+                              setEmployeeId(employee.employeeCode);
+                              setEmployeeSearchQuery(employee.employeeName);
+                              setIsEmployeeDropdownOpen(false);
+                            }}
+                          >
+                            <div className="font-medium text-gray-900">{employee.employeeName}</div>
+                            <div className="text-xs text-gray-500">{employee.employeeCode}</div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="px-3 py-2 text-sm text-gray-500">
+                          No employees found
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
             {/* Date Selection */}
