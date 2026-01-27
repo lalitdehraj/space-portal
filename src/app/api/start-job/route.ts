@@ -458,7 +458,7 @@ async function createBigXLS(filePath: string, jsonObject: Record<string, unknown
 
       const roomsMap: Record<string, RoomInfo> = {};
 
-      if (jsonObject.reportType === "building") {
+      if (jsonObject.reportType === "building" || jsonObject.reportType === "room") {
         roomData.forEach((r: RoomInfo) => {
           r?.occupants?.forEach((o: Occupant) => {
             if (o.occupantId === emp.employeeCode) {
@@ -499,7 +499,7 @@ async function createBigXLS(filePath: string, jsonObject: Record<string, unknown
           programCode: String(emp.programCode ?? ""),
           programName: program ? program.description : "",
           academicBlock: String(room?.building ?? ""),
-          facultyBlock: String(room?.hasSubtype ? room?.parentId : room?.id ?? ""),
+          facultyBlock: String(room?.hasSubtype ? room?.parentId : (room?.id ?? "")),
           workStation: String(room?.roomType.replace(" ", "").toLowerCase() === "workstation" ? room?.id : ""),
           cabinNo: String(room?.roomType.toLowerCase() === "cubical" ? room?.id : ""),
           keyNo: String(room?.occupants?.find((o: Occupant) => o.occupantId === emp.employeeCode)?.keyNo ?? ""),
@@ -541,9 +541,7 @@ async function createBigXLS(filePath: string, jsonObject: Record<string, unknown
     };
 
     if (jsonObject.reportType === "room") {
-      await dataManupulation(jsonObject);
-
-      // Add faculty seating logic for room reports if it's a faculty room
+      // Fetch room info first
       const reqBody = {
         roomID: jsonObject.roomID,
         subroomID: "",
@@ -555,18 +553,182 @@ async function createBigXLS(filePath: string, jsonObject: Record<string, unknown
 
       const roomInfoResponse = await serverCallApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, reqBody);
 
-      if (roomInfoResponse.success && roomInfoResponse.data?.isSitting) {
-        // Process faculty room - occupants already contain subroom data
-        const roomOccupants = roomInfoResponse.data?.occupants || [];
-        const employeeIds = roomOccupants.map((o) => o.occupantId).filter((id) => id);
+      if (roomInfoResponse.success && roomInfoResponse.data) {
+        const roomInfo = roomInfoResponse.data;
 
-        const filteredEmployees =
-          employees?.filter((e) => {
-            return employeeIds.includes(e.employeeCode);
-          }) || [];
+        // Check if room is sitting
+        if (roomInfo.isSitting) {
+          // Room is sitting - handle faculty seating
+          // Check if room has subrooms
+          if (roomInfo.hasSubtype) {
+            // Fetch subrooms list for this room
+            const subroomsResponse = await serverCallApi<Room[]>(process.env.NEXT_PUBLIC_GET_SUBROOMS_LIST || URL_NOT_FOUND, {
+              roomID: jsonObject.roomID,
+              buildingNo: roomInfo.building || "",
+              acadSess: jsonObject.acadSess,
+              acadYr: jsonObject.academicYr,
+            });
 
-        for (const emp of filteredEmployees) {
-          await handleFacultySeating(emp, [roomInfoResponse.data]);
+            if (subroomsResponse.success && subroomsResponse.data && subroomsResponse.data.length > 0) {
+              const subrooms = subroomsResponse.data;
+
+              // Fetch RoomInfo for each subroom in parallel
+              const subroomInfoPromises = subrooms.map(async (subroom) => {
+                const subroomReqBody = {
+                  roomID: jsonObject.roomID,
+                  subroomID: subroom.roomId,
+                  academicYr: jsonObject.academicYr,
+                  acadSess: jsonObject.acadSess,
+                  startDate: jsonObject.startDate,
+                  endDate: jsonObject.endDate,
+                };
+
+                const subroomInfoResponse = await serverCallApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, subroomReqBody);
+
+                if (subroomInfoResponse.success && subroomInfoResponse.data) {
+                  return {
+                    subroom: subroom,
+                    roomInfo: subroomInfoResponse.data,
+                  };
+                }
+                return null;
+              });
+
+              // Wait for all subroom RoomInfo to be fetched
+              const subroomInfoResults = await Promise.all(subroomInfoPromises);
+
+              // Filter out null results
+              const validSubroomInfos = subroomInfoResults.filter((result) => result !== null) as Array<{
+                subroom: Room;
+                roomInfo: RoomInfo;
+              }>;
+
+              // Process each subroom for faculty seating
+              for (const { subroom, roomInfo: subroomRoomInfo } of validSubroomInfos) {
+                if (subroomRoomInfo.occupants && subroomRoomInfo.occupants.length > 0) {
+                  const subroomOccupants = subroomRoomInfo.occupants || [];
+                  const employeeIds = subroomOccupants.map((o) => o.occupantId).filter((id) => id);
+
+                  const filteredEmployees =
+                    employees?.filter((e) => {
+                      return employeeIds.includes(e.employeeCode);
+                    }) || [];
+
+                  // Process each employee for this subroom
+                  for (const emp of filteredEmployees) {
+                    await handleFacultySeating(emp, [subroomRoomInfo]);
+                  }
+                }
+              }
+            } else {
+              // Room is sitting but no subrooms found - process as regular sitting room
+              const roomOccupants = roomInfo.occupants || [];
+              const employeeIds = roomOccupants.map((o) => o.occupantId).filter((id) => id);
+
+              const filteredEmployees =
+                employees?.filter((e) => {
+                  return employeeIds.includes(e.employeeCode);
+                }) || [];
+
+              for (const emp of filteredEmployees) {
+                await handleFacultySeating(emp, [roomInfo]);
+              }
+            }
+          } else {
+            // Room is sitting but has no subrooms - process as regular sitting room
+            const roomOccupants = roomInfo.occupants || [];
+            const employeeIds = roomOccupants.map((o) => o.occupantId).filter((id) => id);
+
+            const filteredEmployees =
+              employees?.filter((e) => {
+                return employeeIds.includes(e.employeeCode);
+              }) || [];
+
+            for (const emp of filteredEmployees) {
+              await handleFacultySeating(emp, [roomInfo]);
+            }
+          }
+        } else {
+          // Room is NOT sitting
+          // Check if room has subrooms
+          if (roomInfo.hasSubtype) {
+            // Fetch subrooms list for this room
+            const subroomsResponse = await serverCallApi<Room[]>(process.env.NEXT_PUBLIC_GET_SUBROOMS_LIST || URL_NOT_FOUND, {
+              roomID: jsonObject.roomID,
+              buildingNo: roomInfo.building || "",
+              acadSess: jsonObject.acadSess,
+              acadYr: jsonObject.academicYr,
+            });
+
+            if (subroomsResponse.success && subroomsResponse.data && subroomsResponse.data.length > 0) {
+              const subrooms = subroomsResponse.data;
+
+              // Fetch RoomInfo for each subroom in parallel
+              const subroomInfoPromises = subrooms.map(async (subroom) => {
+                const subroomReqBody = {
+                  roomID: jsonObject.roomID,
+                  subroomID: subroom.roomId,
+                  academicYr: jsonObject.academicYr,
+                  acadSess: jsonObject.acadSess,
+                  startDate: jsonObject.startDate,
+                  endDate: jsonObject.endDate,
+                };
+
+                const subroomInfoResponse = await serverCallApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, subroomReqBody);
+
+                if (subroomInfoResponse.success && subroomInfoResponse.data) {
+                  return {
+                    subroom: subroom,
+                    roomInfo: subroomInfoResponse.data,
+                  };
+                }
+                return null;
+              });
+
+              // Wait for all subroom RoomInfo to be fetched
+              const subroomInfoResults = await Promise.all(subroomInfoPromises);
+
+              // Filter out null results
+              const validSubroomInfos = subroomInfoResults.filter((result) => result !== null) as Array<{
+                subroom: Room;
+                roomInfo: RoomInfo;
+              }>;
+
+              // Process each subroom - check if sitting for each
+              for (const { subroom, roomInfo: subroomRoomInfo } of validSubroomInfos) {
+                if (subroomRoomInfo.isSitting) {
+                  // Subroom is sitting - handle faculty seating
+                  if (subroomRoomInfo.occupants && subroomRoomInfo.occupants.length > 0) {
+                    const subroomOccupants = subroomRoomInfo.occupants || [];
+                    const employeeIds = subroomOccupants.map((o) => o.occupantId).filter((id) => id);
+
+                    const filteredEmployees =
+                      employees?.filter((e) => {
+                        return employeeIds.includes(e.employeeCode);
+                      }) || [];
+
+                    // Process each employee for this sitting subroom
+                    for (const emp of filteredEmployees) {
+                      await handleFacultySeating(emp, [subroomRoomInfo]);
+                    }
+                  }
+                } else {
+                  // Subroom is NOT sitting - call dataManupulation for this subroom
+                  await dataManupulation({
+                    ...jsonObject,
+                    roomID: jsonObject.roomID,
+                    subroomID: subroom.roomId,
+                  });
+                }
+              }
+            } else {
+              // Room is NOT sitting and has no subrooms - call dataManupulation
+              await dataManupulation(jsonObject);
+            }
+          } else {
+            // Room is NOT sitting and has no subrooms - call dataManupulation
+            await dataManupulation(jsonObject);
+          }
         }
       }
 
@@ -586,53 +748,207 @@ async function createBigXLS(filePath: string, jsonObject: Record<string, unknown
         buildings = buildings?.filter((b) => b.id === jsonObject.buildingId);
       }
 
+      // Process each building
       for (const b of buildings || []) {
         const { data: roomsList } = await serverCallApi<Room[]>(process.env.NEXT_PUBLIC_GET_ROOMS_LIST || URL_NOT_FOUND, {
           buildingNo: b.id,
           floorID: ``,
           curreentTime: moment().format("HH:mm"),
         });
+
+        // Process each room in the building
         for (const room of roomsList || []) {
-          await dataManupulation({ ...jsonObject, roomID: room.roomId });
+          // Fetch room info first
+          const reqBody = {
+            roomID: room.roomId,
+            subroomID: "",
+            academicYr: jsonObject.academicYr,
+            acadSess: jsonObject.acadSess,
+            startDate: jsonObject.startDate,
+            endDate: jsonObject.endDate,
+          };
+
+          const roomInfoResponse = await serverCallApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, reqBody);
+
+          if (roomInfoResponse.success && roomInfoResponse.data) {
+            const roomInfo = roomInfoResponse.data;
+
+            // Check if room is sitting
+            if (roomInfo.isSitting) {
+              // Room is sitting - handle faculty seating
+              // Check if room has subrooms
+              if (roomInfo.hasSubtype) {
+                // Fetch subrooms list for this room
+                const subroomsResponse = await serverCallApi<Room[]>(process.env.NEXT_PUBLIC_GET_SUBROOMS_LIST || URL_NOT_FOUND, {
+                  roomID: room.roomId,
+                  buildingNo: b.id,
+                  acadSess: jsonObject.acadSess,
+                  acadYr: jsonObject.academicYr,
+                });
+
+                if (subroomsResponse.success && subroomsResponse.data && subroomsResponse.data.length > 0) {
+                  const subrooms = subroomsResponse.data;
+
+                  // Fetch RoomInfo for each subroom in parallel
+                  const subroomInfoPromises = subrooms.map(async (subroom) => {
+                    const subroomReqBody = {
+                      roomID: room.roomId,
+                      subroomID: subroom.roomId,
+                      academicYr: jsonObject.academicYr,
+                      acadSess: jsonObject.acadSess,
+                      startDate: jsonObject.startDate,
+                      endDate: jsonObject.endDate,
+                    };
+
+                    const subroomInfoResponse = await serverCallApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, subroomReqBody);
+
+                    if (subroomInfoResponse.success && subroomInfoResponse.data) {
+                      return {
+                        subroom: subroom,
+                        roomInfo: subroomInfoResponse.data,
+                      };
+                    }
+                    return null;
+                  });
+
+                  // Wait for all subroom RoomInfo to be fetched
+                  const subroomInfoResults = await Promise.all(subroomInfoPromises);
+
+                  // Filter out null results
+                  const validSubroomInfos = subroomInfoResults.filter((result) => result !== null) as Array<{
+                    subroom: Room;
+                    roomInfo: RoomInfo;
+                  }>;
+
+                  // Process each subroom for faculty seating
+                  for (const { subroom, roomInfo: subroomRoomInfo } of validSubroomInfos) {
+                    if (subroomRoomInfo.occupants && subroomRoomInfo.occupants.length > 0) {
+                      const subroomOccupants = subroomRoomInfo.occupants || [];
+                      const employeeIds = subroomOccupants.map((o) => o.occupantId).filter((id) => id);
+
+                      const filteredEmployees =
+                        employees?.filter((e) => {
+                          return employeeIds.includes(e.employeeCode);
+                        }) || [];
+
+                      // Process each employee for this subroom
+                      for (const emp of filteredEmployees) {
+                        await handleFacultySeating(emp, [subroomRoomInfo]);
+                      }
+                    }
+                  }
+                } else {
+                  // Room is sitting but no subrooms found - process as regular sitting room
+                  const roomOccupants = roomInfo.occupants || [];
+                  const employeeIds = roomOccupants.map((o) => o.occupantId).filter((id) => id);
+
+                  const filteredEmployees =
+                    employees?.filter((e) => {
+                      return employeeIds.includes(e.employeeCode);
+                    }) || [];
+
+                  for (const emp of filteredEmployees) {
+                    await handleFacultySeating(emp, [roomInfo]);
+                  }
+                }
+              } else {
+                // Room is sitting but has no subrooms - process as regular sitting room
+                const roomOccupants = roomInfo.occupants || [];
+                const employeeIds = roomOccupants.map((o) => o.occupantId).filter((id) => id);
+
+                const filteredEmployees =
+                  employees?.filter((e) => {
+                    return employeeIds.includes(e.employeeCode);
+                  }) || [];
+
+                for (const emp of filteredEmployees) {
+                  await handleFacultySeating(emp, [roomInfo]);
+                }
+              }
+            } else {
+              // Room is NOT sitting
+              // Check if room has subrooms
+              if (roomInfo.hasSubtype) {
+                // Fetch subrooms list for this room
+                const subroomsResponse = await serverCallApi<Room[]>(process.env.NEXT_PUBLIC_GET_SUBROOMS_LIST || URL_NOT_FOUND, {
+                  roomID: room.roomId,
+                  buildingNo: b.id,
+                  acadSess: jsonObject.acadSess,
+                  acadYr: jsonObject.academicYr,
+                });
+
+                if (subroomsResponse.success && subroomsResponse.data && subroomsResponse.data.length > 0) {
+                  const subrooms = subroomsResponse.data;
+
+                  // Fetch RoomInfo for each subroom in parallel
+                  const subroomInfoPromises = subrooms.map(async (subroom) => {
+                    const subroomReqBody = {
+                      roomID: room.roomId,
+                      subroomID: subroom.roomId,
+                      academicYr: jsonObject.academicYr,
+                      acadSess: jsonObject.acadSess,
+                      startDate: jsonObject.startDate,
+                      endDate: jsonObject.endDate,
+                    };
+
+                    const subroomInfoResponse = await serverCallApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, subroomReqBody);
+
+                    if (subroomInfoResponse.success && subroomInfoResponse.data) {
+                      return {
+                        subroom: subroom,
+                        roomInfo: subroomInfoResponse.data,
+                      };
+                    }
+                    return null;
+                  });
+
+                  // Wait for all subroom RoomInfo to be fetched
+                  const subroomInfoResults = await Promise.all(subroomInfoPromises);
+
+                  // Filter out null results
+                  const validSubroomInfos = subroomInfoResults.filter((result) => result !== null) as Array<{
+                    subroom: Room;
+                    roomInfo: RoomInfo;
+                  }>;
+
+                  // Process each subroom - check if sitting for each
+                  for (const { subroom, roomInfo: subroomRoomInfo } of validSubroomInfos) {
+                    if (subroomRoomInfo.isSitting) {
+                      // Subroom is sitting - handle faculty seating
+                      if (subroomRoomInfo.occupants && subroomRoomInfo.occupants.length > 0) {
+                        const subroomOccupants = subroomRoomInfo.occupants || [];
+                        const employeeIds = subroomOccupants.map((o) => o.occupantId).filter((id) => id);
+
+                        const filteredEmployees =
+                          employees?.filter((e) => {
+                            return employeeIds.includes(e.employeeCode);
+                          }) || [];
+
+                        // Process each employee for this sitting subroom
+                        for (const emp of filteredEmployees) {
+                          await handleFacultySeating(emp, [subroomRoomInfo]);
+                        }
+                      }
+                    } else {
+                      // Subroom is NOT sitting - call dataManupulation for this subroom
+                      await dataManupulation({
+                        ...jsonObject,
+                        roomID: room.roomId,
+                        subroomID: subroom.roomId,
+                      });
+                    }
+                  }
+                } else {
+                  // Room is NOT sitting and has no subrooms - call dataManupulation
+                  await dataManupulation({ ...jsonObject, roomID: room.roomId });
+                }
+              } else {
+                // Room is NOT sitting and has no subrooms - call dataManupulation
+                await dataManupulation({ ...jsonObject, roomID: room.roomId });
+              }
+            }
+          }
         }
-      }
-
-      // this is used to insert data into second Sheet
-      const allRooms: Room[] = (
-        await Promise.all(
-          buildings?.map(async (b) => {
-            const { data: roomsList } = await serverCallApi<Room[]>(process.env.NEXT_PUBLIC_GET_ROOMS_LIST || URL_NOT_FOUND, {
-              buildingNo: b.id,
-              floorID: ``,
-              curreentTime: moment().format("HH:mm"),
-            });
-            return roomsList ?? [];
-          }) ?? []
-        )
-      ).flat();
-
-      // Process all rooms - fetch room info to check if they are sitting rooms
-      const roomInfoPromises = allRooms.map(async (room) => {
-        const reqBody = {
-          roomID: room.roomId,
-          subroomID: "",
-          academicYr: jsonObject.academicYr,
-          acadSess: jsonObject.acadSess,
-          startDate: jsonObject.startDate,
-          endDate: jsonObject.endDate,
-        };
-
-        return serverCallApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, reqBody).then((res) => ({
-          ...res.data,
-          isRoom: true,
-        }));
-      });
-
-      // Run everything in parallel, flatten, and filter for sitting rooms with occupants
-      const roomInfoResponses = (await Promise.all(roomInfoPromises)).flat().filter((r) => r && r.isSitting && (r.occupants?.length || 0) > 0) as RoomInfo[];
-
-      for (const emp of employees || []) {
-        await handleFacultySeating(emp, roomInfoResponses);
       }
 
       await workbook.xlsx.writeFile(filePath);
@@ -651,58 +967,211 @@ async function createBigXLS(filePath: string, jsonObject: Record<string, unknown
         buildings = buildings?.filter((b) => b.id === jsonObject.buildingId);
       }
 
+      // Process each building
       for (const b of buildings || []) {
         const { data: roomsList } = await serverCallApi<Room[]>(process.env.NEXT_PUBLIC_GET_ROOMS_LIST || URL_NOT_FOUND, {
           buildingNo: b.id,
           floorID: ``,
           curreentTime: moment().format("HH:mm"),
         });
+
+        // Process each room in the building
         for (const room of roomsList || []) {
-          await dataManupulation({ ...jsonObject, roomID: room.roomId });
+          // Fetch room info first
+          const reqBody = {
+            roomID: room.roomId,
+            subroomID: "",
+            academicYr: jsonObject.academicYr,
+            acadSess: jsonObject.acadSess,
+            startDate: jsonObject.startDate,
+            endDate: jsonObject.endDate,
+          };
+
+          const roomInfoResponse = await serverCallApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, reqBody);
+
+          if (roomInfoResponse.success && roomInfoResponse.data) {
+            const roomInfo = roomInfoResponse.data;
+
+            // Check if room is sitting
+            if (roomInfo.isSitting) {
+              // Room is sitting - handle faculty seating
+              // Check if room has subrooms
+              if (roomInfo.hasSubtype) {
+                // Fetch subrooms list for this room
+                const subroomsResponse = await serverCallApi<Room[]>(process.env.NEXT_PUBLIC_GET_SUBROOMS_LIST || URL_NOT_FOUND, {
+                  roomID: room.roomId,
+                  buildingNo: b.id,
+                  acadSess: jsonObject.acadSess,
+                  acadYr: jsonObject.academicYr,
+                });
+
+                if (subroomsResponse.success && subroomsResponse.data && subroomsResponse.data.length > 0) {
+                  const subrooms = subroomsResponse.data;
+
+                  // Fetch RoomInfo for each subroom in parallel
+                  const subroomInfoPromises = subrooms.map(async (subroom) => {
+                    const subroomReqBody = {
+                      roomID: room.roomId,
+                      subroomID: subroom.roomId,
+                      academicYr: jsonObject.academicYr,
+                      acadSess: jsonObject.acadSess,
+                      startDate: jsonObject.startDate,
+                      endDate: jsonObject.endDate,
+                    };
+
+                    const subroomInfoResponse = await serverCallApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, subroomReqBody);
+
+                    if (subroomInfoResponse.success && subroomInfoResponse.data) {
+                      return {
+                        subroom: subroom,
+                        roomInfo: subroomInfoResponse.data,
+                      };
+                    }
+                    return null;
+                  });
+
+                  // Wait for all subroom RoomInfo to be fetched
+                  const subroomInfoResults = await Promise.all(subroomInfoPromises);
+
+                  // Filter out null results
+                  const validSubroomInfos = subroomInfoResults.filter((result) => result !== null) as Array<{
+                    subroom: Room;
+                    roomInfo: RoomInfo;
+                  }>;
+
+                  // Process each subroom for faculty seating
+                  for (const { subroom, roomInfo: subroomRoomInfo } of validSubroomInfos) {
+                    if (subroomRoomInfo.occupants && subroomRoomInfo.occupants.length > 0) {
+                      const subroomOccupants = subroomRoomInfo.occupants || [];
+                      const employeeIds = subroomOccupants.map((o) => o.occupantId).filter((id) => id);
+
+                      // Filter employees by department code
+                      const filteredEmployees =
+                        employees?.filter((e) => {
+                          return e.departmentCode === jsonObject.departmentId && employeeIds.includes(e.employeeCode);
+                        }) || [];
+
+                      // Process each employee for this subroom
+                      for (const emp of filteredEmployees) {
+                        await handleFacultySeating(emp, [subroomRoomInfo]);
+                      }
+                    }
+                  }
+                } else {
+                  // Room is sitting but no subrooms found - process as regular sitting room
+                  const roomOccupants = roomInfo.occupants || [];
+                  const employeeIds = roomOccupants.map((o) => o.occupantId).filter((id) => id);
+
+                  // Filter employees by department code
+                  const filteredEmployees =
+                    employees?.filter((e) => {
+                      return e.departmentCode === jsonObject.departmentId && employeeIds.includes(e.employeeCode);
+                    }) || [];
+
+                  for (const emp of filteredEmployees) {
+                    await handleFacultySeating(emp, [roomInfo]);
+                  }
+                }
+              } else {
+                // Room is sitting but has no subrooms - process as regular sitting room
+                const roomOccupants = roomInfo.occupants || [];
+                const employeeIds = roomOccupants.map((o) => o.occupantId).filter((id) => id);
+
+                // Filter employees by department code
+                const filteredEmployees =
+                  employees?.filter((e) => {
+                    return e.departmentCode === jsonObject.departmentId && employeeIds.includes(e.employeeCode);
+                  }) || [];
+
+                for (const emp of filteredEmployees) {
+                  await handleFacultySeating(emp, [roomInfo]);
+                }
+              }
+            } else {
+              // Room is NOT sitting
+              // Check if room has subrooms
+              if (roomInfo.hasSubtype) {
+                // Fetch subrooms list for this room
+                const subroomsResponse = await serverCallApi<Room[]>(process.env.NEXT_PUBLIC_GET_SUBROOMS_LIST || URL_NOT_FOUND, {
+                  roomID: room.roomId,
+                  buildingNo: b.id,
+                  acadSess: jsonObject.acadSess,
+                  acadYr: jsonObject.academicYr,
+                });
+
+                if (subroomsResponse.success && subroomsResponse.data && subroomsResponse.data.length > 0) {
+                  const subrooms = subroomsResponse.data;
+
+                  // Fetch RoomInfo for each subroom in parallel
+                  const subroomInfoPromises = subrooms.map(async (subroom) => {
+                    const subroomReqBody = {
+                      roomID: room.roomId,
+                      subroomID: subroom.roomId,
+                      academicYr: jsonObject.academicYr,
+                      acadSess: jsonObject.acadSess,
+                      startDate: jsonObject.startDate,
+                      endDate: jsonObject.endDate,
+                    };
+
+                    const subroomInfoResponse = await serverCallApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, subroomReqBody);
+
+                    if (subroomInfoResponse.success && subroomInfoResponse.data) {
+                      return {
+                        subroom: subroom,
+                        roomInfo: subroomInfoResponse.data,
+                      };
+                    }
+                    return null;
+                  });
+
+                  // Wait for all subroom RoomInfo to be fetched
+                  const subroomInfoResults = await Promise.all(subroomInfoPromises);
+
+                  // Filter out null results
+                  const validSubroomInfos = subroomInfoResults.filter((result) => result !== null) as Array<{
+                    subroom: Room;
+                    roomInfo: RoomInfo;
+                  }>;
+
+                  // Process each subroom - check if sitting for each
+                  for (const { subroom, roomInfo: subroomRoomInfo } of validSubroomInfos) {
+                    if (subroomRoomInfo.isSitting) {
+                      // Subroom is sitting - handle faculty seating
+                      if (subroomRoomInfo.occupants && subroomRoomInfo.occupants.length > 0) {
+                        const subroomOccupants = subroomRoomInfo.occupants || [];
+                        const employeeIds = subroomOccupants.map((o) => o.occupantId).filter((id) => id);
+
+                        // Filter employees by department code
+                        const filteredEmployees =
+                          employees?.filter((e) => {
+                            return e.departmentCode === jsonObject.departmentId && employeeIds.includes(e.employeeCode);
+                          }) || [];
+
+                        // Process each employee for this sitting subroom
+                        for (const emp of filteredEmployees) {
+                          await handleFacultySeating(emp, [subroomRoomInfo]);
+                        }
+                      }
+                    } else {
+                      // Subroom is NOT sitting - call dataManupulation for this subroom
+                      await dataManupulation({
+                        ...jsonObject,
+                        roomID: room.roomId,
+                        subroomID: subroom.roomId,
+                      });
+                    }
+                  }
+                } else {
+                  // Room is NOT sitting and has no subrooms - call dataManupulation
+                  await dataManupulation({ ...jsonObject, roomID: room.roomId });
+                }
+              } else {
+                // Room is NOT sitting and has no subrooms - call dataManupulation
+                await dataManupulation({ ...jsonObject, roomID: room.roomId });
+              }
+            }
+          }
         }
-      }
-
-      // this is used to insert data into second Sheet
-      const allRooms: Room[] = (
-        await Promise.all(
-          buildings?.map(async (b) => {
-            const { data: roomsList } = await serverCallApi<Room[]>(process.env.NEXT_PUBLIC_GET_ROOMS_LIST || URL_NOT_FOUND, {
-              buildingNo: b.id,
-              floorID: ``,
-              curreentTime: moment().format("HH:mm"),
-            });
-            return roomsList ?? [];
-          }) ?? []
-        )
-      ).flat();
-
-      // Process all rooms - occupants already contain subroom data
-      const roomInfoPromises = allRooms.map(async (room) => {
-        const reqBody = {
-          roomID: room.roomId,
-          subroomID: "",
-          academicYr: jsonObject.academicYr,
-          acadSess: jsonObject.acadSess,
-          startDate: jsonObject.startDate,
-          endDate: jsonObject.endDate,
-        };
-
-        return serverCallApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, reqBody).then((res) => ({
-          ...res.data,
-          isRoom: true,
-        }));
-      });
-
-      // Run everything in parallel and flatten
-      const roomInfoResponses = (await Promise.all(roomInfoPromises)).flat().filter((r) => r && (r.occupants?.length || 0) > 0) as RoomInfo[];
-
-      const filteredEmployees =
-        employees?.filter((e) => {
-          return e.departmentCode === jsonObject.departmentId;
-        }) || [];
-
-      for (const emp of filteredEmployees) {
-        await handleFacultySeating(emp, roomInfoResponses);
       }
 
       await workbook.xlsx.writeFile(filePath);
@@ -721,59 +1190,211 @@ async function createBigXLS(filePath: string, jsonObject: Record<string, unknown
         buildings = buildings?.filter((b) => b.id === jsonObject.buildingId);
       }
 
+      // Process each building
       for (const b of buildings || []) {
         const { data: roomsList } = await serverCallApi<Room[]>(process.env.NEXT_PUBLIC_GET_ROOMS_LIST || URL_NOT_FOUND, {
           buildingNo: b.id,
           floorID: ``,
           curreentTime: moment().format("HH:mm"),
         });
+
+        // Process each room in the building
         for (const room of roomsList || []) {
-          await dataManupulation({ ...jsonObject, roomID: room.roomId });
+          // Fetch room info first
+          const reqBody = {
+            roomID: room.roomId,
+            subroomID: "",
+            academicYr: jsonObject.academicYr,
+            acadSess: jsonObject.acadSess,
+            startDate: jsonObject.startDate,
+            endDate: jsonObject.endDate,
+          };
+
+          const roomInfoResponse = await serverCallApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, reqBody);
+
+          if (roomInfoResponse.success && roomInfoResponse.data) {
+            const roomInfo = roomInfoResponse.data;
+
+            // Check if room is sitting
+            if (roomInfo.isSitting) {
+              // Room is sitting - handle faculty seating
+              // Check if room has subrooms
+              if (roomInfo.hasSubtype) {
+                // Fetch subrooms list for this room
+                const subroomsResponse = await serverCallApi<Room[]>(process.env.NEXT_PUBLIC_GET_SUBROOMS_LIST || URL_NOT_FOUND, {
+                  roomID: room.roomId,
+                  buildingNo: b.id,
+                  acadSess: jsonObject.acadSess,
+                  acadYr: jsonObject.academicYr,
+                });
+
+                if (subroomsResponse.success && subroomsResponse.data && subroomsResponse.data.length > 0) {
+                  const subrooms = subroomsResponse.data;
+
+                  // Fetch RoomInfo for each subroom in parallel
+                  const subroomInfoPromises = subrooms.map(async (subroom) => {
+                    const subroomReqBody = {
+                      roomID: room.roomId,
+                      subroomID: subroom.roomId,
+                      academicYr: jsonObject.academicYr,
+                      acadSess: jsonObject.acadSess,
+                      startDate: jsonObject.startDate,
+                      endDate: jsonObject.endDate,
+                    };
+
+                    const subroomInfoResponse = await serverCallApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, subroomReqBody);
+
+                    if (subroomInfoResponse.success && subroomInfoResponse.data) {
+                      return {
+                        subroom: subroom,
+                        roomInfo: subroomInfoResponse.data,
+                      };
+                    }
+                    return null;
+                  });
+
+                  // Wait for all subroom RoomInfo to be fetched
+                  const subroomInfoResults = await Promise.all(subroomInfoPromises);
+
+                  // Filter out null results
+                  const validSubroomInfos = subroomInfoResults.filter((result) => result !== null) as Array<{
+                    subroom: Room;
+                    roomInfo: RoomInfo;
+                  }>;
+                  console.log("validSubroomInfos", validSubroomInfos.length);
+                  // Process each subroom for faculty seating
+                  for (const { subroom, roomInfo: subroomRoomInfo } of validSubroomInfos) {
+                    if (subroomRoomInfo.occupants && subroomRoomInfo.occupants.length > 0) {
+                      const subroomOccupants = subroomRoomInfo.occupants || [];
+                      const employeeIds = subroomOccupants.map((o) => o.occupantId).filter((id) => id);
+
+                      // Filter employees by faculty code
+                      const filteredEmployees =
+                        employees?.filter((e) => {
+                          return e.facultyCode === jsonObject.facultyId && employeeIds.includes(e.employeeCode);
+                        }) || [];
+
+                      // Process each employee for this subroom
+                      for (const emp of filteredEmployees) {
+                        await handleFacultySeating(emp, [subroomRoomInfo]);
+                      }
+                    }
+                  }
+                } else {
+                  // Room is sitting but no subrooms found - process as regular sitting room
+                  const roomOccupants = roomInfo.occupants || [];
+                  const employeeIds = roomOccupants.map((o) => o.occupantId).filter((id) => id);
+
+                  // Filter employees by faculty code
+                  const filteredEmployees =
+                    employees?.filter((e) => {
+                      return e.facultyCode === jsonObject.facultyId && employeeIds.includes(e.employeeCode);
+                    }) || [];
+
+                  for (const emp of filteredEmployees) {
+                    await handleFacultySeating(emp, [roomInfo]);
+                  }
+                }
+              } else {
+                // Room is sitting but has no subrooms - process as regular sitting room
+                const roomOccupants = roomInfo.occupants || [];
+                const employeeIds = roomOccupants.map((o) => o.occupantId).filter((id) => id);
+
+                // Filter employees by faculty code
+                const filteredEmployees =
+                  employees?.filter((e) => {
+                    return e.facultyCode === jsonObject.facultyId && employeeIds.includes(e.employeeCode);
+                  }) || [];
+
+                for (const emp of filteredEmployees) {
+                  await handleFacultySeating(emp, [roomInfo]);
+                }
+              }
+            } else {
+              // Room is NOT sitting
+              // Check if room has subrooms
+              if (roomInfo.hasSubtype) {
+                // Fetch subrooms list for this room
+                const subroomsResponse = await serverCallApi<Room[]>(process.env.NEXT_PUBLIC_GET_SUBROOMS_LIST || URL_NOT_FOUND, {
+                  roomID: room.roomId,
+                  buildingNo: b.id,
+                  acadSess: jsonObject.acadSess,
+                  acadYr: jsonObject.academicYr,
+                });
+
+                if (subroomsResponse.success && subroomsResponse.data && subroomsResponse.data.length > 0) {
+                  const subrooms = subroomsResponse.data;
+
+                  // Fetch RoomInfo for each subroom in parallel
+                  const subroomInfoPromises = subrooms.map(async (subroom) => {
+                    const subroomReqBody = {
+                      roomID: room.roomId,
+                      subroomID: subroom.roomId,
+                      academicYr: jsonObject.academicYr,
+                      acadSess: jsonObject.acadSess,
+                      startDate: jsonObject.startDate,
+                      endDate: jsonObject.endDate,
+                    };
+
+                    const subroomInfoResponse = await serverCallApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, subroomReqBody);
+
+                    if (subroomInfoResponse.success && subroomInfoResponse.data) {
+                      return {
+                        subroom: subroom,
+                        roomInfo: subroomInfoResponse.data,
+                      };
+                    }
+                    return null;
+                  });
+
+                  // Wait for all subroom RoomInfo to be fetched
+                  const subroomInfoResults = await Promise.all(subroomInfoPromises);
+
+                  // Filter out null results
+                  const validSubroomInfos = subroomInfoResults.filter((result) => result !== null) as Array<{
+                    subroom: Room;
+                    roomInfo: RoomInfo;
+                  }>;
+
+                  // Process each subroom - check if sitting for each
+                  for (const { subroom, roomInfo: subroomRoomInfo } of validSubroomInfos) {
+                    if (subroomRoomInfo.isSitting) {
+                      // Subroom is sitting - handle faculty seating
+                      if (subroomRoomInfo.occupants && subroomRoomInfo.occupants.length > 0) {
+                        const subroomOccupants = subroomRoomInfo.occupants || [];
+                        const employeeIds = subroomOccupants.map((o) => o.occupantId).filter((id) => id);
+
+                        // Filter employees by faculty code
+                        const filteredEmployees =
+                          employees?.filter((e) => {
+                            return e.facultyCode === jsonObject.facultyId && employeeIds.includes(e.employeeCode);
+                          }) || [];
+
+                        // Process each employee for this sitting subroom
+                        for (const emp of filteredEmployees) {
+                          await handleFacultySeating(emp, [subroomRoomInfo]);
+                        }
+                      }
+                    } else {
+                      // Subroom is NOT sitting - call dataManupulation for this subroom
+                      await dataManupulation({
+                        ...jsonObject,
+                        roomID: room.roomId,
+                        subroomID: subroom.roomId,
+                      });
+                    }
+                  }
+                } else {
+                  // Room is NOT sitting and has no subrooms - call dataManupulation
+                  await dataManupulation({ ...jsonObject, roomID: room.roomId });
+                }
+              } else {
+                // Room is NOT sitting and has no subrooms - call dataManupulation
+                await dataManupulation({ ...jsonObject, roomID: room.roomId });
+              }
+            }
+          }
         }
-      }
-
-      // this is used to insert data into second Sheet
-      const allRooms: Room[] = (
-        await Promise.all(
-          buildings?.map(async (b) => {
-            const { data: roomsList } = await serverCallApi<Room[]>(process.env.NEXT_PUBLIC_GET_ROOMS_LIST || URL_NOT_FOUND, {
-              buildingNo: b.id,
-              floorID: ``,
-              curreentTime: moment().format("HH:mm"),
-            });
-            return roomsList ?? [];
-          }) ?? []
-        )
-      ).flat();
-
-      // Process all rooms - occupants already contain subroom data
-      const roomInfoPromises = allRooms.map(async (room) => {
-        const reqBody = {
-          roomID: room.roomId,
-          subroomID: "",
-          academicYr: jsonObject.academicYr,
-          acadSess: jsonObject.acadSess,
-          startDate: jsonObject.startDate,
-          endDate: jsonObject.endDate,
-        };
-
-        return serverCallApi<RoomInfo>(process.env.NEXT_PUBLIC_GET_ROOM_INFO || URL_NOT_FOUND, reqBody).then((res) => ({
-          ...res.data,
-          isRoom: true,
-        }));
-      });
-
-      // Run everything in parallel and flatten
-      const roomInfoResponses = (await Promise.all(roomInfoPromises)).flat().filter((r) => r && (r.occupants?.length || 0) > 0) as RoomInfo[];
-
-      const filteredEmployees =
-        employees?.filter((e) => {
-          return e.facultyCode === jsonObject.facultyId;
-        }) || [];
-
-      for (const emp of filteredEmployees) {
-        // await handleFacultySeating(employees?.[1473]!, roomInfoResponses);
-        await handleFacultySeating(emp, roomInfoResponses);
       }
 
       await workbook.xlsx.writeFile(filePath);
