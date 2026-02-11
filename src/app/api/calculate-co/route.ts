@@ -256,7 +256,7 @@ export async function POST(req: NextRequest) {
 // Server-side API call helper
 async function serverCallApi<T>(
   endpoint: string,
-  requestBody?: any,
+  requestBody?: unknown,
 ): Promise<{ success: boolean; data?: T; error?: string }> {
   try {
     const baseURL = process.env.NEXT_PUBLIC_BASE_URL;
@@ -310,12 +310,12 @@ async function serverCallApi<T>(
 type ExamMethod = {
   "Exam Method"?: string;
   "Exam Method Code"?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 };
 
 type ExamMethodResponse =
   | ExamMethod[]
-  | { value?: ExamMethod[]; [key: string]: any };
+  | { value?: ExamMethod[]; [key: string]: unknown };
 
 type StudentListMark = {
   questionCode: string;
@@ -405,11 +405,11 @@ async function processCalculation(
       // Try to find any array property
       const arrayKey = Object.keys(responseData).find(
         (key) =>
-          Array.isArray((responseData as any)[key]) &&
-          (responseData as any)[key].length > 0,
+          Array.isArray((responseData as Record<string, unknown>)[key]) &&
+          ((responseData as Record<string, unknown>)[key] as unknown[]).length > 0,
       );
       if (arrayKey) {
-        examMethodsData = (responseData as any)[arrayKey];
+        examMethodsData = (responseData as Record<string, unknown>)[arrayKey] as ExamMethod[];
       }
     }
 
@@ -421,7 +421,7 @@ async function processCalculation(
         method["Exam Method Code"] ||
         method["examMethod"] ||
         method["examMethodCode"];
-      if (examMethod) {
+      if (examMethod && typeof examMethod === "string") {
         uniqueExamMethods.add(examMethod);
       }
     });
@@ -587,7 +587,7 @@ async function processCalculation(
       process.env.NEXT_PUBLIC_GET_COURSE_WISE_MULTI_QUESTION ||
       "/MUJOBE/MUJAPIOBE/v2.0/companies(480ceadc-3108-f011-8e30-7c1e520f486f)/MUJOBE(00000000-0000-0000-0000-000000000000)/Microsoft.NAV.GetCourseWiseMultiQuestion";
 
-    const coMappingResponse = await serverCallApi<any>(coMappingEndpoint, {
+    const coMappingResponse = await serverCallApi<Record<string, unknown>>(coMappingEndpoint, {
       acadSess: data.academicSession,
       acadYear: data.academicYear,
       courseCode: data.courseCode,
@@ -602,14 +602,14 @@ async function processCalculation(
 
     // Parse the CO mapping response (it's a JSON string inside value property)
     // Response format: { "@odata.context": "...", "value": "{\"value\": [...]}" }
-    let coMappingData: any[] = [];
+    let coMappingData: unknown[] = [];
     const mappingResponseData = coMappingResponse.data;
 
     console.log(
       `[Job ${jobId}] CO mapping response type:`,
       typeof mappingResponseData,
       "has value:",
-      !!(mappingResponseData as any)?.value,
+      !!(mappingResponseData as Record<string, unknown>)?.value,
     );
 
     if (typeof mappingResponseData === "string") {
@@ -618,8 +618,9 @@ async function processCalculation(
       coMappingData = parsed.value || parsed || [];
     } else if (mappingResponseData && typeof mappingResponseData === "object") {
       // Check for value property
-      if ((mappingResponseData as any).value) {
-        const valueData = (mappingResponseData as any).value;
+      const mappingData = mappingResponseData as Record<string, unknown>;
+      if (mappingData.value) {
+        const valueData = mappingData.value;
         if (typeof valueData === "string") {
           // Nested JSON string (as shown in user's example)
           const parsed = JSON.parse(valueData);
@@ -643,7 +644,8 @@ async function processCalculation(
     const questionToCOMatrix: Record<string, Record<string, string[]>> = {};
 
     for (const item of coMappingData) {
-      for (const [examMethod, questions] of Object.entries(item)) {
+      if (!item || typeof item !== "object" || Array.isArray(item)) continue;
+      for (const [examMethod, questions] of Object.entries(item as Record<string, unknown>)) {
         if (!questionToCOMatrix[examMethod]) {
           questionToCOMatrix[examMethod] = {};
         }
@@ -691,7 +693,7 @@ async function processCalculation(
     );
 
     // Calculate normalized marks and threshold crossings for each exam method
-    const thresholdAnalysis: Record<string, any> = {};
+    const thresholdAnalysis: Record<string, unknown> = {};
 
     for (const examMethod of examMethodsList) {
       const students = allStudentData[examMethod] || [];
@@ -809,12 +811,24 @@ async function processCalculation(
     jobStore.update(jobId, { progress: 90 });
     console.log(`[Job ${jobId}] Calculating CO-wise student counts...`);
 
-    const coAnalysis: Record<string, any> = {};
+    const coAnalysis: Record<string, unknown> = {};
+
+    const getQuestionAnalysis = (examMethod: string) => {
+      const entry = thresholdAnalysis[examMethod] as {
+        questions?: Array<{
+          questionCode: string;
+          studentsCrossedThreshold: number;
+          totalStudents: number;
+          normalizedMarks: Array<{ studentNo: string; crossedThreshold: boolean }>;
+        }>;
+      } | undefined;
+      return entry?.questions || [];
+    };
 
     for (const examMethod of examMethodsList) {
       const questionToCO = questionToCOMatrix[examMethod] || {};
       const students = allStudentData[examMethod] || [];
-      const questionAnalysis = thresholdAnalysis[examMethod]?.questions || [];
+      const questionAnalysis = getQuestionAnalysis(examMethod);
 
       // Create CO-wise tracking
       // Structure: { co: { studentsCrossed: Set<studentNo>, totalStudents: Set<studentNo>, questions: [] } }
@@ -967,7 +981,7 @@ async function processCalculation(
     // We need to reconstruct student sets from question data
     for (const examMethod of internalExams) {
       const questionToCO = questionToCOMatrix[examMethod] || {};
-      const questionAnalysis = thresholdAnalysis[examMethod]?.questions || [];
+      const questionAnalysis = getQuestionAnalysis(examMethod);
 
       // Process each question to aggregate per CO (one question can map to multiple COs)
       for (const question of questionAnalysis) {
@@ -1020,7 +1034,8 @@ async function processCalculation(
     console.log(`[Job ${jobId}] Getting external (ETE) attainment per CO...`);
 
     const externalAttainment: Record<string, number> = {};
-    const eteCoBreakdown = coAnalysis[externalExam]?.coBreakdown || [];
+    const eteEntry = coAnalysis[externalExam] as { coBreakdown?: Array<{ co: string; attainmentValue: string }> } | undefined;
+    const eteCoBreakdown = eteEntry?.coBreakdown || [];
 
     for (const coData of eteCoBreakdown) {
       externalAttainment[coData.co] = parseFloat(coData.attainmentValue);

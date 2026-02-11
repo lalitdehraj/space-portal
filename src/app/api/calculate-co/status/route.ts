@@ -5,7 +5,7 @@ export type JobStatusResponse = {
   success: boolean;
   status?: "pending" | "processing" | "completed" | "failed" | "cancelled";
   progress?: number;
-  result?: any;
+  result?: unknown;
   error?: string;
   message?: string;
 };

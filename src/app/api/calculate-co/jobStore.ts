@@ -4,7 +4,7 @@ interface JobStatus {
   id: string;
   status: "pending" | "processing" | "completed" | "failed" | "cancelled";
   progress?: number; // 0-100
-  result?: any;
+  result?: unknown;
   error?: string;
   createdAt: number;
   updatedAt: number;

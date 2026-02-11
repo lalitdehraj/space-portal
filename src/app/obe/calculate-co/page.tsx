@@ -27,7 +27,7 @@ export type Course = {
 
 export type CourseListResponse =
   | Course[]
-  | { value?: Course[]; [key: string]: any };
+  | { value?: Course[]; [key: string]: unknown };
 
 export type CourseOutcome = {
   Sno: number;
@@ -40,7 +40,7 @@ export type CourseOutcomeResponse =
   | {
       "Course Outcome"?: CourseOutcome[];
       value?: CourseOutcome[];
-      [key: string]: any;
+      [key: string]: unknown;
     };
 export type ProgramCodeItem = {
   code: string;
@@ -142,7 +142,15 @@ function OBEFormPage() {
   >({});
   const [threshold, setThreshold] = useState<number>(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [calculationResult, setCalculationResult] = useState<any>(null);
+  const [calculationResult, setCalculationResult] = useState<{
+    calculatedData?: {
+      internalAttainment?: Record<string, unknown>;
+      externalAttainment?: Record<string, unknown>;
+      exactAttainment?: Record<string, unknown>;
+      studentData?: Record<string, unknown>;
+      [key: string]: unknown;
+    };
+  } | null>(null);
   const [calculationProgress, setCalculationProgress] = useState<number>(0);
   const [currentJobId, setCurrentJobId] = useState<string | null>(null);
   const [isCancelled, setIsCancelled] = useState<boolean>(false);
@@ -1301,9 +1309,9 @@ function OBEFormPage() {
                         const allStudentNumbers = new Set<string>();
                         if (calculatedData.studentData) {
                           Object.values(calculatedData.studentData).forEach(
-                            (students: any) => {
+                            (students: unknown) => {
                               if (Array.isArray(students)) {
-                                students.forEach((student: any) => {
+                                students.forEach((student: { studentNo?: string }) => {
                                   if (student.studentNo) {
                                     allStudentNumbers.add(student.studentNo);
                                   }
