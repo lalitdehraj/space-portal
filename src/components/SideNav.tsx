@@ -4,7 +4,7 @@
 import React, { FC, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { X } from "lucide-react";
+import { ChevronDown, ChevronRight, X } from "lucide-react";
 import { useDispatch } from "react-redux";
 import { setHeaderTextId } from "@/app/feature/dataSlice";
 import { useRouter } from "next/navigation";
@@ -67,9 +67,40 @@ const reportsLinks: NavLink[] = [
   },
 ];
 
+// OBE menu items (from obe module SideNav)
+const obeLinks: NavLink[] = [
+  {
+    title: "Calculate CO",
+    href: "/obe/calculate-co",
+    iconSrc: "/images/element-4.svg",
+    alt: "Calculate CO icon",
+  },
+];
+
 interface SideNavProps {
   onClose: () => void;
 }
+
+interface CollapsibleSectionProps {
+  title: string;
+  isOpen: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}
+
+const CollapsibleSection: FC<CollapsibleSectionProps> = ({ title, isOpen, onToggle, children }) => (
+  <div className="flex flex-col border-t border-[#F26722]">
+    <button
+      type="button"
+      onClick={onToggle}
+      className="flex w-full items-center justify-between px-6 py-3 text-left text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100"
+    >
+      <span>{title}</span>
+      {isOpen ? <ChevronDown size={18} className="shrink-0" /> : <ChevronRight size={18} className="shrink-0" />}
+    </button>
+    {isOpen && <div className="pb-2">{children}</div>}
+  </div>
+);
 
 const NavItem: FC<NavLink & { onClose: () => void }> = ({ href, iconSrc, alt, title, onClose }) => {
   const pathname = usePathname();
@@ -94,6 +125,8 @@ const NavItem: FC<NavLink & { onClose: () => void }> = ({ href, iconSrc, alt, ti
 const SideNav: FC<SideNavProps> = ({ onClose }) => {
   const router = useRouter();
   const [userRoles, setUserRoles] = useState<string[]>([]);
+  const [openSection, setOpenSection] = useState<"space" | "obe" | null>("space");
+
   useEffect(() => {
     const fetchUserRoles = async () => {
       const response = await callApi<UserProfile[]>(process.env.NEXT_PUBLIC_GET_USER || URL_NOT_FOUND);
@@ -123,16 +156,17 @@ const SideNav: FC<SideNavProps> = ({ onClose }) => {
         </button>
       </div>
 
-      <nav className="flex-grow overflow-y-auto">
-        <div className="flex flex-col border-t border-[#F26722] py-4">
-          {navLinks.map((link) => (
-            <NavItem key={link.href} {...link} onClose={onClose} />
-          ))}
-        </div>
-
-        <div className="flex flex-col border-t border-[#F26722] py-4">
-          <div className="px-8 pb-2 text-xs text-gray-500">Space Management</div>
-          <div className="space-y-0.5">
+      <nav className="grow overflow-y-auto">
+        <CollapsibleSection
+          title="Space Portal"
+          isOpen={openSection === "space"}
+          onToggle={() => setOpenSection((prev) => (prev === "space" ? null : "space"))}
+        >
+          <div className="flex flex-col space-y-0.5 py-2">
+            {navLinks.map((link) => (
+              <NavItem key={link.href} {...link} onClose={onClose} />
+            ))}
+            <div className="px-8 pb-1 pt-2 text-xs text-gray-500">Space Management</div>
             {spaceManagementLinks.map((link) => (
               <NavItem key={link.href} {...link} onClose={onClose} />
             ))}
@@ -150,22 +184,24 @@ const SideNav: FC<SideNavProps> = ({ onClose }) => {
                     />
                   )
               )}
+            <div className="px-8 pb-1 pt-2 text-xs text-gray-500">Maintenance</div>
+            {maintenanceLinks.map((link) => (
+              <NavItem key={link.href} {...link} onClose={onClose} />
+            ))}
+            <div className="px-8 pb-1 pt-2 text-xs text-gray-500">Reports</div>
+            {reportsLinks.map((link) => (
+              <NavItem key={link.href} {...link} onClose={onClose} />
+            ))}
           </div>
-        </div>
+        </CollapsibleSection>
 
-        <div className="flex flex-col border-t border-[#F26722] py-4">
-          <div className="px-8 pb-2 text-xs text-gray-500">Maintenance</div>
-          {maintenanceLinks.map((link) => (
-            <NavItem key={link.href} {...link} onClose={onClose} />
-          ))}
-        </div>
-
-        <div className="flex flex-col border-t border-[#F26722] py-4">
-          <div className="px-8 pb-2 text-xs text-gray-500">Reports</div>
-          {reportsLinks.map((link) => (
-            <NavItem key={link.href} {...link} onClose={onClose} />
-          ))}
-        </div>
+        <CollapsibleSection title="OBE" isOpen={openSection === "obe"} onToggle={() => setOpenSection((prev) => (prev === "obe" ? null : "obe"))}>
+          <div className="flex flex-col space-y-0.5 py-2">
+            {obeLinks.map((link) => (
+              <NavItem key={link.href} {...link} onClose={onClose} />
+            ))}
+          </div>
+        </CollapsibleSection>
       </nav>
     </aside>
   );
