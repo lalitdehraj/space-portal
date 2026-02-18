@@ -1,11 +1,11 @@
 "use client";
 
-import React from "react";
+import React, { Suspense } from "react";
 import Image from "next/image";
 import { signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 
-export default function LoginPage() {
+function LoginForm() {
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") || "/space-portal/dashboard";
 
@@ -44,5 +44,25 @@ export default function LoginPage() {
         </button>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div
+          className="flex min-h-screen items-center justify-center bg-cover bg-center font-sans"
+          style={{ backgroundImage: `url("/images/manipal-building.png")` }}
+        >
+          <div className="absolute inset-0 bg-black opacity-10" />
+          <div className="relative z-10 flex items-center justify-center">
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-gray-300 border-t-orange-500" />
+          </div>
+        </div>
+      }
+    >
+      <LoginForm />
+    </Suspense>
   );
 }
