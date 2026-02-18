@@ -110,9 +110,7 @@ export default function Header() {
             dispatcher(setUser(user[0]));
             if(user[0].activeYear) dispatcher(setAcademicYearId(user[0].activeYear));
             if(user[0].activeSession) dispatcher(setAcademicSessionId(user[0].activeSession));
-          } else {
-            router.push("/login");
-          }
+          } 
         }
       } catch (err) {
         console.error("fetchUserRoles error:", err);

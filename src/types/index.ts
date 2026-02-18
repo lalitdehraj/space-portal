@@ -246,3 +246,16 @@ export interface TotalAvailableRoomsResponse {
   consumedRoom: number;
   availableRoom: number;
 }
+
+/** GetCourseCoOrdinator API row (Microsoft.NAV.GetCourseCoOrdinator response item) */
+export interface CourseCoordinatorRow {
+  "Course Code": string;
+  "Course ID": string;
+  "Program Code": string;
+  "Semester Code": string;
+}
+
+/** GetCourseCoOrdinator API response body: { values: CourseCoordinatorRow[] } */
+export interface GetCourseCoordinatorResponse {
+  values: CourseCoordinatorRow[];
+}

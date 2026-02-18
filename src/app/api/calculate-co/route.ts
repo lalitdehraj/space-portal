@@ -9,16 +9,14 @@ export type CalculateCORequest = {
   courseId: string;
   academicYear: string;
   academicSession: string;
+  semester: string;
   courseOutcomes: Array<{
     Sno: number;
     "Sno Description": string;
     Description: string;
   }>;
   outcomeValues: Record<number, number>; // index -> value mapping
-  threshold: number; // threshold value for normalized marks (0-10)
-  /** Batch year for PO mapping (e.g. "23-24"). Optional; when provided with programCode, PO mapping list is fetched. */
-  batchYear?: string;
-  /** Programme code for PO mapping (e.g. "BTECH-007"). Optional; when provided with batchYear, PO mapping list is fetched. */
+  /** Programme code for PO mapping and threshold (e.g. "BTECH-007"). When provided, GetProgramOutcomeAndMappingValue is called first to get threshold. */
   programCode?: string;
 };
 
@@ -30,8 +28,9 @@ type POMappingItem = {
   coRelationValue: string;
 };
 type GetProgramOutcomeAndMappingResponse = {
-  POs: POItem[];
-  POMappingList: POMappingItem[];
+  threesHold?: string; // API returns threshold (typo in API)
+  POs?: POItem[];
+  POMappingList?: POMappingItem[];
 };
 
 export type CalculateCOResponse = {
@@ -119,6 +118,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    if (!body.semester) {
+      return NextResponse.json(
+        { success: false, error: "Semester is required" },
+        { status: 400 },
+      );
+    }
+
     if (!body.courseOutcomes || !Array.isArray(body.courseOutcomes)) {
       return NextResponse.json(
         { success: false, error: "Course Outcomes array is required" },
@@ -133,27 +139,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (
-      body.threshold === undefined ||
-      body.threshold === null ||
-      body.threshold < 0 ||
-      body.threshold > 10
-    ) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Threshold value is required and must be between 0 and 10",
-        },
-        { status: 400 },
-      );
-    }
-
     // Log received data for debugging
     console.log("Calculate CO Request received:", {
       courseCode: body.courseCode,
       courseId: body.courseId,
       academicYear: body.academicYear,
       academicSession: body.academicSession,
+      semester: body.semester,
       outcomesCount: body.courseOutcomes.length,
       valuesCount: Object.keys(body.outcomeValues).length,
     });
@@ -367,6 +359,58 @@ async function processCalculation(
     if (checkCancelled(jobId)) {
       console.log(`[Job ${jobId}] Calculation cancelled after initial setup`);
       return;
+    }
+
+    // Step 1.5: Fetch threshold (and PO mapping) from GetProgramOutcomeAndMappingValue so we have threshold before student/threshold calculations
+    let thresholdValue = 0;
+    let poList: POItem[] = [];
+    let poMappingList: POMappingItem[] = [];
+    if (data.programCode) {
+      jobStore.update(jobId, { progress: 6 });
+      console.log(
+        `[Job ${jobId}] Fetching threshold and PO mapping (programCode: ${data.programCode})...`,
+      );
+      const poMappingEndpoint =
+        process.env.NEXT_PUBLIC_GET_PROGRAM_OUTCOME_AND_MAPPING_VALUE ||
+        "/MUJOBE/MUJAPIOBE/v2.0/companies(480ceadc-3108-f011-8e30-7c1e520f486f)/MUJOBE(00000000-0000-0000-0000-000000000000)/Microsoft.NAV.GetProgramOutcomeAndMappingValue";
+      const poMappingResponse =
+        await serverCallApi<GetProgramOutcomeAndMappingResponse>(
+          poMappingEndpoint,
+          {
+            acadSess: data.academicSession,
+            acadYear: data.academicYear,
+            courseID: data.courseId,
+            programCode: data.programCode,
+            semester: data.semester,
+          },
+        );
+      if (checkCancelled(jobId)) return;
+      if (poMappingResponse.success && poMappingResponse.data) {
+        const raw = poMappingResponse.data as GetProgramOutcomeAndMappingResponse & {
+          value?: GetProgramOutcomeAndMappingResponse;
+        };
+        const unwrapped: GetProgramOutcomeAndMappingResponse = raw.POs
+          ? raw
+          : raw.value ?? { POs: [], POMappingList: [] };
+        const threshStr = (raw.threesHold ?? unwrapped.threesHold ?? "0").toString().trim();
+        thresholdValue = Math.max(0, Math.min(10, parseFloat(threshStr) || 0));
+        poList = Array.isArray(unwrapped.POs) ? unwrapped.POs : [];
+        poMappingList = Array.isArray(unwrapped.POMappingList)
+          ? unwrapped.POMappingList
+          : [];
+        console.log(
+          `[Job ${jobId}] Threshold from API: ${thresholdValue}, POs: ${poList.length}, POMappingList: ${poMappingList.length}`,
+        );
+      } else {
+        console.warn(
+          `[Job ${jobId}] GetProgramOutcomeAndMappingValue failed or empty, using threshold 0:`,
+          poMappingResponse.error,
+        );
+      }
+    } else {
+      console.log(
+        `[Job ${jobId}] No programCode provided, using default threshold 0`,
+      );
     }
 
     // Step 2: Fetch Exam Methods
@@ -732,8 +776,8 @@ async function processCalculation(
           // Calculate normalized mark: ROUND(10 * MarksObtained / MaxMarksOfThatQuestion, 0)
           const normalizedMark = Math.round((10 * markObtained) / maximumMark);
 
-          // Check if crossed threshold
-          const crossedThreshold = normalizedMark >= data.threshold;
+          // Check if crossed threshold (threshold from GetProgramOutcomeAndMappingValue API)
+          const crossedThreshold = normalizedMark >= thresholdValue;
 
           // Initialize question analysis if not exists
           if (!questionAnalysis[questionCode]) {
@@ -1121,53 +1165,7 @@ async function processCalculation(
       };
     }
 
-    // Step 13: Fetch PO mapping list (for PO calculations) when batchYear and programCode are provided
-    let poList: POItem[] = [];
-    let poMappingList: POMappingItem[] = [];
-    if (data.batchYear && data.programCode) {
-      jobStore.update(jobId, { progress: 96 });
-      console.log(
-        `[Job ${jobId}] Fetching PO mapping list (batchYear: ${data.batchYear}, programCode: ${data.programCode})...`,
-      );
-      const poMappingEndpoint =
-        process.env.NEXT_PUBLIC_GET_PROGRAM_OUTCOME_AND_MAPPING_VALUE ||
-        "/MUJOBE/MUJAPIOBE/v2.0/companies(480ceadc-3108-f011-8e30-7c1e520f486f)/MUJOBE(00000000-0000-0000-0000-000000000000)/Microsoft.NAV.GetProgramOutcomeAndMappingValue";
-      const poMappingResponse =
-        await serverCallApi<GetProgramOutcomeAndMappingResponse>(
-          poMappingEndpoint,
-          {
-            acadSess: data.academicSession,
-            acadYear: data.academicYear,
-            courseID: data.courseId,
-            programCode: data.programCode,
-            batchYear: data.batchYear,
-          },
-        );
-      if (poMappingResponse.success && poMappingResponse.data) {
-        const raw = poMappingResponse.data as GetProgramOutcomeAndMappingResponse & {
-          value?: GetProgramOutcomeAndMappingResponse;
-        };
-        const unwrapped: GetProgramOutcomeAndMappingResponse = raw.POs
-          ? raw
-          : raw.value ?? { POs: [], POMappingList: [] };
-        poList = Array.isArray(unwrapped.POs) ? unwrapped.POs : [];
-        poMappingList = Array.isArray(unwrapped.POMappingList)
-          ? unwrapped.POMappingList
-          : [];
-        console.log(
-          `[Job ${jobId}] PO mapping: ${poList.length} POs, ${poMappingList.length} mapping entries`,
-        );
-      } else {
-        console.warn(
-          `[Job ${jobId}] PO mapping fetch failed or empty:`,
-          poMappingResponse.error,
-        );
-      }
-    } else {
-      console.log(
-        `[Job ${jobId}] Skipping PO mapping fetch (batchYear or programCode not provided)`,
-      );
-    }
+    // Step 13: PO mapping list already fetched in Step 1.5 (poList, poMappingList). Proceed to PO to CO map calculation.
 
     // Step 14: PO to CO map calculation (coRelationValue * valueOfCOAttainmentLevel / SumOfTheCorealtionsOfThatPO)
     // Keys are string IDs (e.g. "CCE2101.1" for CO, "PO-1" for PO)
@@ -1271,8 +1269,8 @@ async function processCalculation(
         courseId: data.courseId,
         academicYear: data.academicYear,
         academicSession: data.academicSession,
-        threshold: data.threshold,
-        batchYear: data.batchYear,
+        semester: data.semester,
+        threshold: thresholdValue,
         programCode: data.programCode,
         examMethods: examMethodsList,
         examMethodsCount: examMethodsList.length,

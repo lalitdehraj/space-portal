@@ -3,8 +3,12 @@
 import React from "react";
 import Image from "next/image";
 import { signIn } from "next-auth/react";
+import { useSearchParams } from "next/navigation";
 
 export default function LoginPage() {
+  const searchParams = useSearchParams();
+  const callbackUrl = searchParams.get("callbackUrl") || "/space-portal/dashboard";
+
   return (
     <div
       className="flex min-h-screen items-center justify-center bg-cover bg-center font-sans"
@@ -32,9 +36,7 @@ export default function LoginPage() {
           type="button"
           className="flex w-full items-center justify-center rounded-md border border-gray-300 bg-white py-3 px-6 text-base font-semibold text-gray-700 transition duration-300 ease-in-out hover:bg-gray-100"
           onClick={async () => {
-            await signIn("azure-ad", {
-              callbackUrl: "/space-portal/dashboard",
-            });
+            await signIn("azure-ad", { callbackUrl });
           }}
         >
           <Image height={20} width={20} src="/images/microsoft-logo.png" alt="Microsoft logo" className="h-5 w-5 mr-4" />

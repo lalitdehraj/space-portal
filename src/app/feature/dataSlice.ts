@@ -1,6 +1,14 @@
 import { UserProfile } from "@/types";
 import { createSlice } from "@reduxjs/toolkit";
 
+/** Profile info for OBE users, stored in slice for menu and OBE pages. */
+export interface OBEPublicProfile {
+  email: string;
+  employeeNo: string;
+  activeSession: string;
+  activeYear: string;
+}
+
 export interface DataState {
   selectedAcademicYear: string;
   selectedAcademicSession: string;
@@ -17,6 +25,9 @@ export interface DataState {
   appliedFilters: { building: string[]; floor: string[] };
   bearerToken: string | null;
   bearerTokenExpiry: number;
+  isSpaceAdmin: boolean;
+  isOBEUser: boolean;
+  obeProfile: OBEPublicProfile | null;
 }
 const initialState: DataState = {
   selectedAcademicYear: "",
@@ -34,6 +45,9 @@ const initialState: DataState = {
   user: null,
   bearerToken: null,
   bearerTokenExpiry: 0,
+  isSpaceAdmin: false,
+  isOBEUser: false,
+  obeProfile: null,
 };
 
 export const dataSlice = createSlice({
@@ -83,6 +97,15 @@ export const dataSlice = createSlice({
     setAppliedFilters: (state, action) => {
       state.appliedFilters = action.payload;
     },
+    setIsSpaceAdmin: (state, action) => {
+      state.isSpaceAdmin = action.payload;
+    },
+    setIsOBEUser: (state, action) => {
+      state.isOBEUser = action.payload;
+    },
+    setOBEProfile: (state, action: { payload: OBEPublicProfile | null }) => {
+      state.obeProfile = action.payload;
+    },
   },
 });
 
@@ -101,6 +124,9 @@ export const {
   setUser,
   setBearerToken,
   setAppliedFilters,
+  setIsSpaceAdmin,
+  setIsOBEUser,
+  setOBEProfile,
 } = dataSlice.actions;
 
 export default dataSlice.reducer;

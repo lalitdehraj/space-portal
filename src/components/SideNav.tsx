@@ -5,11 +5,12 @@ import React, { FC, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ChevronDown, ChevronRight, X } from "lucide-react";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { setHeaderTextId } from "@/app/feature/dataSlice";
+import { RootState } from "@/app/store";
 import { useRouter } from "next/navigation";
 import { callApi } from "@/utils/apiIntercepter";
-import { URL_NOT_FOUND } from "@/constants";
+import { URL_NOT_FOUND, DISABLE_MENU_VISIBILITY_LOGIC } from "@/constants";
 import { UserProfile } from "@/types";
 
 type NavLink = {
@@ -124,10 +125,23 @@ const NavItem: FC<NavLink & { onClose: () => void }> = ({ href, iconSrc, alt, ti
 
 const SideNav: FC<SideNavProps> = ({ onClose }) => {
   const router = useRouter();
+  const pathname = usePathname();
+  const isSpaceAdmin = useSelector((state: RootState) => state.dataState.isSpaceAdmin);
+  const isOBEUser = useSelector((state: RootState) => state.dataState.isOBEUser);
   const [userRoles, setUserRoles] = useState<string[]>([]);
   const [openSection, setOpenSection] = useState<"space" | "obe" | null>("space");
 
+  // Keep the section that contains the current page expanded
   useEffect(() => {
+    if (pathname.startsWith("/obe")) {
+      setOpenSection("obe");
+    } else if (pathname.startsWith("/space-portal")) {
+      setOpenSection("space");
+    }
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!DISABLE_MENU_VISIBILITY_LOGIC && !isSpaceAdmin) return;
     const fetchUserRoles = async () => {
       const response = await callApi<UserProfile[]>(process.env.NEXT_PUBLIC_GET_USER || URL_NOT_FOUND);
       if (response.success) {
@@ -138,7 +152,7 @@ const SideNav: FC<SideNavProps> = ({ onClose }) => {
       }
     };
     fetchUserRoles();
-  }, []);
+  }, [isSpaceAdmin]);
   return (
     <aside className="flex h-full w-full md:w-64 flex-col bg-gray-50/90 shadow-lg ">
       <div className="flex items-center justify-between p-4 md:justify-center ">
@@ -157,51 +171,61 @@ const SideNav: FC<SideNavProps> = ({ onClose }) => {
       </div>
 
       <nav className="grow overflow-y-auto">
-        <CollapsibleSection
-          title="Space Portal"
-          isOpen={openSection === "space"}
-          onToggle={() => setOpenSection((prev) => (prev === "space" ? null : "space"))}
-        >
-          <div className="flex flex-col space-y-0.5 py-2">
-            {navLinks.map((link) => (
-              <NavItem key={link.href} {...link} onClose={onClose} />
-            ))}
-            <div className="px-8 pb-1 pt-2 text-xs text-gray-500">Space Management</div>
-            {spaceManagementLinks.map((link) => (
-              <NavItem key={link.href} {...link} onClose={onClose} />
-            ))}
-            {userRoles.length > 0 &&
-              userRoles.map(
-                (role) =>
-                  role && (
-                    <NavItem
-                      key={`space-portal/role/${role}`}
-                      alt={role}
-                      href={`/space-portal/role/${role}`}
-                      title={`${role}`}
-                      iconSrc="/images/menu-board.svg"
-                      onClose={onClose}
-                    />
-                  )
-              )}
-            <div className="px-8 pb-1 pt-2 text-xs text-gray-500">Maintenance</div>
-            {maintenanceLinks.map((link) => (
-              <NavItem key={link.href} {...link} onClose={onClose} />
-            ))}
-            <div className="px-8 pb-1 pt-2 text-xs text-gray-500">Reports</div>
-            {reportsLinks.map((link) => (
-              <NavItem key={link.href} {...link} onClose={onClose} />
-            ))}
-          </div>
-        </CollapsibleSection>
+        {(DISABLE_MENU_VISIBILITY_LOGIC || isSpaceAdmin) && (
+          <CollapsibleSection
+            title="Space Portal"
+            isOpen={openSection === "space"}
+            onToggle={() => setOpenSection((prev) => (prev === "space" ? null : "space"))}
+          >
+            <div className="flex flex-col space-y-0.5 py-2">
+              {navLinks.map((link) => (
+                <NavItem key={link.href} {...link} onClose={onClose} />
+              ))}
+              <div className="px-8 pb-1 pt-2 text-xs text-gray-500">Space Management</div>
+              {spaceManagementLinks.map((link) => (
+                <NavItem key={link.href} {...link} onClose={onClose} />
+              ))}
+              {userRoles.length > 0 &&
+                userRoles.map(
+                  (role) =>
+                    role && (
+                      <NavItem
+                        key={`space-portal/role/${role}`}
+                        alt={role}
+                        href={`/space-portal/role/${role}`}
+                        title={`${role}`}
+                        iconSrc="/images/menu-board.svg"
+                        onClose={onClose}
+                      />
+                    )
+                )}
+              <div className="px-8 pb-1 pt-2 text-xs text-gray-500">Maintenance</div>
+              {maintenanceLinks.map((link) => (
+                <NavItem key={link.href} {...link} onClose={onClose} />
+              ))}
+              <div className="px-8 pb-1 pt-2 text-xs text-gray-500">Reports</div>
+              {reportsLinks.map((link) => (
+                <NavItem key={link.href} {...link} onClose={onClose} />
+              ))}
+            </div>
+          </CollapsibleSection>
+        )}
 
-        <CollapsibleSection title="OBE" isOpen={openSection === "obe"} onToggle={() => setOpenSection((prev) => (prev === "obe" ? null : "obe"))}>
-          <div className="flex flex-col space-y-0.5 py-2">
-            {obeLinks.map((link) => (
-              <NavItem key={link.href} {...link} onClose={onClose} />
-            ))}
+        {(DISABLE_MENU_VISIBILITY_LOGIC || isOBEUser) && (
+          <CollapsibleSection title="OBE" isOpen={openSection === "obe"} onToggle={() => setOpenSection((prev) => (prev === "obe" ? null : "obe"))}>
+            <div className="flex flex-col space-y-0.5 py-2">
+              {obeLinks.map((link) => (
+                <NavItem key={link.href} {...link} onClose={onClose} />
+              ))}
+            </div>
+          </CollapsibleSection>
+        )}
+
+        {!DISABLE_MENU_VISIBILITY_LOGIC && !isSpaceAdmin && !isOBEUser && (
+          <div className="border-t border-[#F26722] px-6 py-6 text-center text-sm text-gray-600">
+            You don&apos;t have access to any of the page/section.
           </div>
-        </CollapsibleSection>
+        )}
       </nav>
     </aside>
   );

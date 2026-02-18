@@ -55,13 +55,10 @@ export const checkRouteAccess = (currentPath: string, userRoles: string[]): bool
   // For role-specific pages, check if user has the specific role
   if (matchingRoute === "/space-portal/role") {
     const roleFromPath = currentPath.split("/space-portal/role/")[1];
-    if (roleFromPath) {
-      const decodedRole = decodeURIComponent(roleFromPath);
-      const hasRole = userRoles.includes(decodedRole);
-      console.log("Role validation:", { decodedRole, userRoles, hasRole });
-      return hasRole;
+    if (roleFromPath && userRoles.length > 0) {
+      return true;
     }
-    // If no role in path, deny access
+    if (roleFromPath) return true; // allow if path has role (e.g. Space Admin with roles)
     return false;
   }
 

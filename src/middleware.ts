@@ -1,46 +1,46 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { NextRequest } from "next/server";
-import { callApi } from "./utils/apiIntercepter";
-import { UserProfile } from "./types";
-import { URL_NOT_FOUND } from "./constants";
-// import { authOptions } from './app/api/auth/[...nextauth]/authOptions';
+import type { NextRequest } from "next/server";
+import { getToken } from "next-auth/jwt";
 
-const PUBLIC_PATHS = ["/api/auth", "/login"];
+const PUBLIC_PATHS = ["/login", "/api/auth"];
+// OBE routes: allow through without token check; AuthGuard will enforce session on the client and redirect to login if needed.
+// This avoids redirect loop when getToken() returns null for /obe in Edge (e.g. cookie/secret timing).
+const OBE_PATHS = ["/obe"];
 const PUBLIC_FILE = /\.(.*)$/;
 
 export async function middleware(req: NextRequest) {
-  // const { pathname } = req.nextUrl;
-  // const userRoles = new Set<string>();
-  // // const session = await getServerSession(authOptions);
-  // const fetchUser = async (email: string | null) => {
-  //   if (!email) return;
-  //   try {
-  //     const response = await callApi<UserProfile[]>(process.env.NEXT_PUBLIC_GET_USER || URL_NOT_FOUND);
-  //     if (response.success) {
-  //       response.data?.forEach((user) => {
-  //         if (!userRoles.has(user.userRole)) userRoles.add(user.userRole.replace(" ", "%20"));
-  //       });
-  //     }
-  //     console.log("response::", response);
-  //   } catch (error) {
-  //     console.error("Error fetching user profile:", error);
-  //   }
-  // };
-  // if (PUBLIC_PATHS.some((path) => pathname.startsWith(path)) || PUBLIC_FILE.test(pathname)) {
-  //   return NextResponse.next();
-  // }
-  // // If there's no session, redirect to the login page
-  // if (!session) {
-  //   const url = req.nextUrl.clone();
-  //   url.pathname = "/login";
-  //   return NextResponse.redirect(url);
-  // }
-  // fetchUser(null);
-  // const hasAccess = Array.from(userRoles).some((role) => pathname.includes(role));
-  // console.log("hasAccess::", hasAccess);
-  // if (hasAccess) return NextResponse.next();
+  const { pathname } = req.nextUrl;
+
+  // Allow static files and images
+  if (PUBLIC_FILE.test(pathname)) {
+    return NextResponse.next();
+  }
+
+  // Allow public paths (login page and NextAuth API routes)
+  if (PUBLIC_PATHS.some((path) => pathname.startsWith(path))) {
+    return NextResponse.next();
+  }
+
+  // Allow OBE routes through; client-side AuthGuard handles session and redirects to login if unauthenticated
+  if (OBE_PATHS.some((path) => pathname.startsWith(path))) {
+    return NextResponse.next();
+  }
+
+  // For all other routes, require authentication
+  const token = await getToken({
+    req,
+    secret: process.env.NEXTAUTH_SECRET,
+  });
+
+  if (!token) {
+    const loginUrl = new URL("/login", req.url);
+    loginUrl.searchParams.set("callbackUrl", pathname);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  return NextResponse.next();
 }
+
 export const config = {
   matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
 };

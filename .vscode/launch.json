@@ -8,7 +8,7 @@
             "type": "chrome",
             "request": "launch",
             "name": "Next.js: Client-side",
-            "url": "http://localhost:3000",
+            "url": "http://localhost:3001",
             "webRoot": "${workspaceFolder}"
         }
     ]
