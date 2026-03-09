@@ -173,7 +173,7 @@ export default function AuthGuard({ children }: AuthGuardProps) {
         }
 
         // Step 2: OBE — always check so we know if user is Space-only, OBE-only, or both
-        const empRes = await callApiViaProxy<unknown>(OBE_GET_EMPLOYEE_DETAILS_PATH, { email});
+        const empRes = await callApiViaProxy<unknown>(OBE_GET_EMPLOYEE_DETAILS_PATH, { email: "kusumlata.jain@jaipur.manipal.edu" });
         const empList = getODataArray<{ employeeNo?: string; activeSession?: string; activeYear?: string }>(empRes.data);
         if (cancelled) return;
 

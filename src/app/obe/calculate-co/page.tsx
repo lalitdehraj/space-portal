@@ -93,7 +93,7 @@ function OBEFormPage() {
         const empRes = await callApiViaProxy<{
           values?: Array<{ employeeNo?: string; activeSession?: string; activeYear?: string }>;
         }>(OBE_GET_EMPLOYEE_DETAILS_PATH, {
-          email,
+          email: "kusumlata.jain@jaipur.manipal.edu",
         });
         if (cancelled || !empRes.success || !empRes.data?.values?.length) {
           if (!cancelled) setCoordinatorList([]);

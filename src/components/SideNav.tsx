@@ -76,6 +76,12 @@ const obeLinks: NavLink[] = [
     iconSrc: "/images/element-4.svg",
     alt: "Calculate CO icon",
   },
+  {
+    title: "Course File",
+    href: "/obe/course-file",
+    iconSrc: "/images/menu-board.svg",
+    alt: "Course File icon",
+  },
 ];
 
 interface SideNavProps {
