@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import SideNav from "@/components/SideNav";
 import Header from "@/components/Header";
 import useSideNavState from "@/hooks/useSideNavState";
-import { Menu, GripVertical, Eye, Trash2, ChevronUp, ChevronDown, ZoomIn, ZoomOut, X } from "lucide-react";
+import { Menu, GripVertical, Eye, Trash2, ChevronUp, ChevronDown, X } from "lucide-react";
 import { useSelector } from "react-redux";
 import { RootState } from "@/app/store";
 import { callApiViaProxy } from "@/utils/proxyApiIntercepter";
@@ -107,65 +107,16 @@ type PdfViewerDialogProps = {
 };
 
 function PdfViewerDialog({ blobUrl, fileName, onClose }: PdfViewerDialogProps) {
-  const [zoom, setZoom] = useState(100);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const minZoom = 50;
-  const maxZoom = 200;
-  const step = 10;
-
-  const handleZoomIn = useCallback(() => setZoom((z) => Math.min(maxZoom, z + step)), []);
-  const handleZoomOut = useCallback(() => setZoom((z) => Math.max(minZoom, z - step)), []);
-
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-black/90" role="dialog" aria-modal="true" aria-label="PDF viewer">
       <div className="flex shrink-0 items-center justify-between border-b border-gray-700 bg-gray-900 px-4 py-2">
         <span className="truncate text-sm font-medium text-white">{fileName}</span>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={handleZoomOut}
-            disabled={zoom <= minZoom}
-            className="rounded p-2 text-white hover:bg-gray-700 disabled:opacity-50"
-            aria-label="Zoom out"
-          >
-            <ZoomOut size={20} />
-          </button>
-          <span className="min-w-16 text-center text-sm text-gray-300">{zoom}%</span>
-          <button
-            type="button"
-            onClick={handleZoomIn}
-            disabled={zoom >= maxZoom}
-            className="rounded p-2 text-white hover:bg-gray-700 disabled:opacity-50"
-            aria-label="Zoom in"
-          >
-            <ZoomIn size={20} />
-          </button>
-          <button
-            type="button"
-            onClick={onClose}
-            className="ml-2 rounded p-2 text-white hover:bg-gray-700"
-            aria-label="Close"
-          >
-            <X size={20} />
-          </button>
-        </div>
+        <button type="button" onClick={onClose} className="rounded p-2 text-white hover:bg-gray-700" aria-label="Close">
+          <X size={20} />
+        </button>
       </div>
-      <div ref={containerRef} className="flex-1 overflow-auto p-4">
-        <div
-          className="origin-top-left"
-          style={{
-            transform: `scale(${zoom / 100})`,
-            transformOrigin: "top left",
-            width: `${zoom}%`,
-            minHeight: `${zoom * 0.8}vh`,
-          }}
-        >
-          <iframe
-            title={fileName}
-            src={blobUrl}
-            className="h-[80vh] min-h-[500px] w-full border-0 bg-white"
-          />
-        </div>
+      <div className="flex-1 overflow-auto p-4">
+        <iframe title={fileName} src={blobUrl} className="h-[80vh] min-h-[500px] w-full border-0 bg-white" />
       </div>
     </div>
   );
@@ -193,7 +144,10 @@ function PdfUploadSection({ sectionNum, files, onFilesChange, onViewPdf }: PdfUp
   };
 
   const remove = (id: string) => {
-    onFilesChange(sectionNum, files.filter((f) => f.id !== id));
+    onFilesChange(
+      sectionNum,
+      files.filter((f) => f.id !== id)
+    );
   };
 
   const move = (index: number, direction: "up" | "down") => {
@@ -209,8 +163,14 @@ function PdfUploadSection({ sectionNum, files, onFilesChange, onViewPdf }: PdfUp
       <p className="mb-3 text-sm text-gray-600">Upload PDF(s). View, reorder, and remove documents here.</p>
       <div
         className="mb-4 rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 p-6 text-center transition-colors hover:border-orange-400 hover:bg-gray-100"
-        onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add("border-orange-500", "bg-orange-50"); }}
-        onDragLeave={(e) => { e.preventDefault(); e.currentTarget.classList.remove("border-orange-500", "bg-orange-50"); }}
+        onDragOver={(e) => {
+          e.preventDefault();
+          e.currentTarget.classList.add("border-orange-500", "bg-orange-50");
+        }}
+        onDragLeave={(e) => {
+          e.preventDefault();
+          e.currentTarget.classList.remove("border-orange-500", "bg-orange-50");
+        }}
         onDrop={(e) => {
           e.preventDefault();
           e.currentTarget.classList.remove("border-orange-500", "bg-orange-50");
@@ -223,7 +183,10 @@ function PdfUploadSection({ sectionNum, files, onFilesChange, onViewPdf }: PdfUp
           accept=".pdf,application/pdf"
           multiple
           className="hidden"
-          onChange={(e) => { addFiles(e.target.files); e.target.value = ""; }}
+          onChange={(e) => {
+            addFiles(e.target.files);
+            e.target.value = "";
+          }}
         />
         <button
           type="button"
@@ -236,12 +199,11 @@ function PdfUploadSection({ sectionNum, files, onFilesChange, onViewPdf }: PdfUp
       {files.length > 0 && (
         <ul className="space-y-2">
           {files.map((item, index) => (
-            <li
-              key={item.id}
-              className="flex items-center gap-2 rounded-md border border-gray-200 bg-white py-2 pl-2 pr-3 shadow-sm"
-            >
+            <li key={item.id} className="flex items-center gap-2 rounded-md border border-gray-200 bg-white py-2 pl-2 pr-3 shadow-sm">
               <GripVertical size={18} className="shrink-0 text-gray-400" aria-hidden />
-              <span className="min-w-0 flex-1 truncate text-sm text-gray-800" title={item.name}>{item.name}</span>
+              <span className="min-w-0 flex-1 truncate text-sm text-gray-800" title={item.name}>
+                {item.name}
+              </span>
               <button
                 type="button"
                 onClick={() => onViewPdf(item.file, item.name)}
@@ -268,12 +230,7 @@ function PdfUploadSection({ sectionNum, files, onFilesChange, onViewPdf }: PdfUp
               >
                 <ChevronDown size={18} />
               </button>
-              <button
-                type="button"
-                onClick={() => remove(item.id)}
-                className="shrink-0 rounded p-1.5 text-red-600 hover:bg-red-50"
-                title="Remove"
-              >
+              <button type="button" onClick={() => remove(item.id)} className="shrink-0 rounded p-1.5 text-red-600 hover:bg-red-50" title="Remove">
                 <Trash2 size={18} />
               </button>
             </li>
@@ -287,8 +244,10 @@ function PdfUploadSection({ sectionNum, files, onFilesChange, onViewPdf }: PdfUp
 function CourseFilePage() {
   const { isSideNavOpen, toggleSideNav } = useSideNavState();
 
-  const headerAcademicYear = useSelector((state: RootState) => state.dataState.selectedAcademicYear);
-  const headerAcademicSession = useSelector((state: RootState) => state.dataState.selectedAcademicSession);
+  // const headerAcademicYear = useSelector((state: RootState) => state.dataState.selectedAcademicYear);
+  const headerAcademicYear = "2025";
+  // const headerAcademicSession = useSelector((state: RootState) => state.dataState.selectedAcademicSession);
+  const headerAcademicSession = "JAN-MAY 2025";
 
   const [sectionData, setSectionData] = useState<Record<number, SectionState>>({});
   const [uploadedFilesBySection, setUploadedFilesBySection] = useState<Record<number, UploadedFileItem[]>>({});
@@ -323,7 +282,7 @@ function CourseFilePage() {
             ...prev,
             [section]: {
               loading: false,
-              error: res.success ? null : (res.error || `Failed to load ${label}`),
+              error: res.success ? null : res.error || `Failed to load ${label}`,
               data: res.success ? res.data : null,
             },
           }));
@@ -341,12 +300,59 @@ function CourseFilePage() {
     });
   }, [headerAcademicYear, headerAcademicSession]);
 
+  const [facultyList, setFacultyList] = useState<any[]>([{
+    facultyCode: "MUJ0928",
+    facultyName: "John Doe",
+    facultyEmail: "john.doe@example.com",
+  }]);
+  const [facultyListLoading, setFacultyListLoading] = useState(false);
+  const [facultyListError, setFacultyListError] = useState<string | null>(null);
+  const selectedCourseId = "BAECOI17001";
+
+  // useEffect(() => {
+  //   // NOTE: Ensure you have headerAcademicYear, headerAcademicSession, and selectedCourseId defined in your component
+  //   if (!headerAcademicYear || !headerAcademicSession || !selectedCourseId) {
+  //     setFacultyList([]);
+  //     setFacultyListError(null);
+  //     return;
+  //   }
+
+  //   const url = process.env.NEXT_PUBLIC_COURSE_FILE_FACULTY_FOR_COURSE || "";
+
+  //   const body = {
+  //     acadYear: headerAcademicYear,
+  //     acadSess: headerAcademicSession,
+  //     courseId: selectedCourseId,
+  //   };
+
+  //   setFacultyListLoading(true);
+  //   setFacultyListError(null);
+
+  //   callApiViaProxy<any>(url, body)
+  //     .then((res) => {
+  //       if (res && res.success && Array.isArray(res.data)) {
+  //         setFacultyList(res.data);
+  //         setFacultyListError(null);
+  //       } else {
+  //         setFacultyList([]);
+  //         setFacultyListError(res.error || "Failed to fetch faculty list");
+  //       }
+  //     })
+  //     .catch((err) => {
+  //       setFacultyList([]);
+  //       setFacultyListError((err as Error)?.message || "Failed to fetch faculty list");
+  //     })
+  //     .finally(() => {
+  //       setFacultyListLoading(false);
+  //     });
+  // }, [headerAcademicYear, headerAcademicSession, selectedCourseId]);
+  
   const renderFetchedOrDataSection = (sectionNum: number) => {
     const state = sectionData[sectionNum];
     const isFile = FETCHED_SECTIONS.has(sectionNum);
     const desc = isFile
-      ? "File fetched from backend. You can read, download, and zoom."
-      : "Data fetched from backend; document will be generated and shown here.";
+      ? "File fetched. Please click on the view button to verify the file."
+      : "Data fetched and document is generated. Please click on the view button to verify the document.";
     return (
       <>
         <p className="mb-3 text-sm text-gray-600">{desc}</p>
@@ -354,12 +360,12 @@ function CourseFilePage() {
         {state?.error && <p className="text-sm text-red-600">{state.error}</p>}
         {state && !state.loading && !state.error && state.data !== null && (
           <div className="rounded border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
-            {isFile ? "File received. PDF viewer (zoom / download) will be wired when backend returns PDF URL or blob." : "Data received. Document will be rendered here."}
+            {isFile
+              ? "File received. Please click on the view button to verify the file."
+              : "Data received and document is generated. Please click on the view button to verify the document."}
           </div>
         )}
-        {(!headerAcademicYear || !headerAcademicSession) && (
-          <p className="text-sm text-amber-700">Select academic year and session in the header to load.</p>
-        )}
+        {(!headerAcademicYear || !headerAcademicSession) && <p className="text-sm text-amber-700">Select academic year and session in the header to load.</p>}
       </>
     );
   };
@@ -402,13 +408,7 @@ function CourseFilePage() {
         <SideNav onClose={toggleSideNav} />
       </div>
 
-      {isSideNavOpen && (
-        <div
-          className="fixed inset-0 z-40 bg-black bg-opacity-50 md:hidden"
-          onClick={toggleSideNav}
-          aria-hidden
-        />
-      )}
+      {isSideNavOpen && <div className="fixed inset-0 z-40 bg-black bg-opacity-50 md:hidden" onClick={toggleSideNav} aria-hidden />}
 
       <div className="flex flex-1 flex-col bg-white">
         <div className="sticky top-0 z-30 flex w-full items-center justify-between border-b p-4 shadow-sm md:hidden bg-white">
@@ -437,13 +437,7 @@ function CourseFilePage() {
         </main>
       </div>
 
-      {viewerPdf && (
-        <PdfViewerDialog
-          blobUrl={viewerPdf.url}
-          fileName={viewerPdf.fileName}
-          onClose={handleCloseViewer}
-        />
-      )}
+      {viewerPdf && <PdfViewerDialog blobUrl={viewerPdf.url} fileName={viewerPdf.fileName} onClose={handleCloseViewer} />}
     </div>
   );
 }
