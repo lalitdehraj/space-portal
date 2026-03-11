@@ -300,53 +300,17 @@ function CourseFilePage() {
     });
   }, [headerAcademicYear, headerAcademicSession]);
 
-  const [facultyList, setFacultyList] = useState<any[]>([{
-    facultyCode: "MUJ0928",
-    facultyName: "John Doe",
-    facultyEmail: "john.doe@example.com",
-  }]);
+  const [facultyList, setFacultyList] = useState<any[]>([
+    {
+      facultyCode: "MUJ0928",
+      facultyName: "John Doe",
+      facultyEmail: "john.doe@example.com",
+    },
+  ]);
   const [facultyListLoading, setFacultyListLoading] = useState(false);
   const [facultyListError, setFacultyListError] = useState<string | null>(null);
-  const selectedCourseId = "BAECOI17001";
+  const selectedCourseId = "BTCCEVI21003";
 
-  // useEffect(() => {
-  //   // NOTE: Ensure you have headerAcademicYear, headerAcademicSession, and selectedCourseId defined in your component
-  //   if (!headerAcademicYear || !headerAcademicSession || !selectedCourseId) {
-  //     setFacultyList([]);
-  //     setFacultyListError(null);
-  //     return;
-  //   }
-
-  //   const url = process.env.NEXT_PUBLIC_COURSE_FILE_FACULTY_FOR_COURSE || "";
-
-  //   const body = {
-  //     acadYear: headerAcademicYear,
-  //     acadSess: headerAcademicSession,
-  //     courseId: selectedCourseId,
-  //   };
-
-  //   setFacultyListLoading(true);
-  //   setFacultyListError(null);
-
-  //   callApiViaProxy<any>(url, body)
-  //     .then((res) => {
-  //       if (res && res.success && Array.isArray(res.data)) {
-  //         setFacultyList(res.data);
-  //         setFacultyListError(null);
-  //       } else {
-  //         setFacultyList([]);
-  //         setFacultyListError(res.error || "Failed to fetch faculty list");
-  //       }
-  //     })
-  //     .catch((err) => {
-  //       setFacultyList([]);
-  //       setFacultyListError((err as Error)?.message || "Failed to fetch faculty list");
-  //     })
-  //     .finally(() => {
-  //       setFacultyListLoading(false);
-  //     });
-  // }, [headerAcademicYear, headerAcademicSession, selectedCourseId]);
-  
   const renderFetchedOrDataSection = (sectionNum: number) => {
     const state = sectionData[sectionNum];
     const isFile = FETCHED_SECTIONS.has(sectionNum);
