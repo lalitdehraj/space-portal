@@ -3,32 +3,33 @@ import { credentials } from "@/constants";
 
 export async function POST(req: NextRequest) {
   try {
-    let body: { endpoint?: string; requestBody?: unknown };
+    let body: { endpoint?: string; requestBody?: unknown; method?: string };
     try {
       const raw = await req.text();
       body = raw?.trim() ? JSON.parse(raw) : {};
     } catch {
-      return NextResponse.json(
-        { success: false, error: "Invalid JSON body" },
-        { status: 400 }
-      );
+      return NextResponse.json({ success: false, error: "Invalid JSON body" }, { status: 400 });
     }
     const { endpoint, requestBody } = body;
+    const method = String(body.method ?? "POST").toUpperCase();
+    if (method !== "POST" && method !== "GET") {
+      return NextResponse.json({ success: false, error: "Unsupported HTTP method" }, { status: 400 });
+    }
 
     if (!endpoint) {
       return NextResponse.json({ success: false, error: "Endpoint is required" }, { status: 400 });
     }
 
+    const isAbsoluteEndpoint = /^https?:\/\//i.test(endpoint);
     const baseURL = process.env.NEXT_PUBLIC_BASE_URL;
-    if (!baseURL) {
+    if (!isAbsoluteEndpoint && !baseURL) {
       return NextResponse.json({ success: false, error: "Base URL not configured" }, { status: 500 });
     }
 
-    // Construct the full URL
+    // Construct the full URL; allow absolute endpoint for temporary environment overrides.
     const normalizedEndpoint = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
-    const fullUrl = `${baseURL}${normalizedEndpoint}`;
+    const fullUrl = isAbsoluteEndpoint ? endpoint : `${baseURL}${normalizedEndpoint}`;
 
-    // All APIs are Action bound, so always use POST
     // Send empty object {} if no requestBody is provided
     const requestPayload = requestBody !== undefined && requestBody !== null ? requestBody : {};
 
@@ -36,17 +37,17 @@ export async function POST(req: NextRequest) {
       endpoint,
       fullUrl,
       hasBody: requestBody !== undefined && requestBody !== null,
-      method: "POST",
+      method,
     });
 
-    // Forward the request to the external API - always use POST for Action bound APIs
+    // Forward the request to the external API.
     const response = await fetch(fullUrl, {
-      method: "POST",
+      method,
       headers: {
         "Content-Type": "application/json",
         Authorization: `Basic ${credentials}`,
       },
-      body: JSON.stringify(requestPayload),
+      ...(method === "POST" ? { body: JSON.stringify(requestPayload) } : {}),
     });
 
     // Get response text first to handle both JSON and text responses

@@ -8,7 +8,16 @@ import { Menu } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { useSelector } from "react-redux";
 import { RootState } from "@/app/store";
+import { CoAttainmentResultView } from "@/components/CoAttainmentResultView";
 import { callApiViaProxy } from "@/utils/proxyApiIntercepter";
+import { buildCourseExitFeedbackGetUrl, COURSE_EXIT_FEEDBACK_POST_URL } from "@/utils/courseExitFeedbackApi";
+import {
+  COPO_BLOB_GET_URL_TEST,
+  COPO_BLOB_SAVE_URL_TEST,
+  base64Utf8ToJson,
+  extractBase64FromCOPOApiResponse,
+  jsonToBase64Utf8,
+} from "@/utils/coPoAttainmentBlobApi";
 import { URL_NOT_FOUND, OBE_GET_EMPLOYEE_DETAILS_PATH, OBE_GET_COURSE_COORDINATOR_PATH } from "@/constants";
 import { CourseCoordinatorRow, GetCourseCoordinatorResponse } from "@/types";
 
@@ -44,6 +53,31 @@ export interface GetProgramOutcomeAndMappingResponse {
   POMappingList: POMappingItem[];
 }
 
+type CourseExitFeedbackItem = {
+  coNo?: string;
+  feedbackValue?: number | string;
+};
+
+function normalizeCourseExitCoNo(value: unknown): string {
+  return String(value ?? "")
+    .trim()
+    .replace(/\s+/g, "")
+    .toUpperCase();
+}
+
+function normalizeOutcomeValuesForSubmission(outcomeValues: Record<number, number | undefined>): Record<string, number> {
+  const entries = Object.entries(outcomeValues);
+  const values = entries.map(([, v]) => Number(v));
+  const allInZeroToThree = values.length > 0 && values.every((v) => v >= 0 && v <= 3);
+  return Object.fromEntries(
+    entries.map(([k, v]) => {
+      const num = Number(v);
+      const sent = allInZeroToThree ? num : (num * 3) / 100;
+      return [k, Math.round(sent * 100) / 100];
+    })
+  );
+}
+
 function OBEFormPage() {
   const { data: session } = useSession();
   const { isSideNavOpen, toggleSideNav } = useSideNavState();
@@ -63,6 +97,8 @@ function OBEFormPage() {
   const [selectedProgramCode, setSelectedProgramCode] = useState<string>("");
   const [selectedSemester, setSelectedSemester] = useState<string>("");
   const [outcomeValues, setOutcomeValues] = useState<Record<number, number | undefined>>({});
+  const [lockedFeedbackIndexes, setLockedFeedbackIndexes] = useState<Record<number, boolean>>({});
+  const [loadingFeedbackValues, setLoadingFeedbackValues] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [calculationResult, setCalculationResult] = useState<{
     calculatedData?: {
@@ -181,6 +217,7 @@ function OBEFormPage() {
     if (!selectedCourseId || !headerAcademicYear || !headerAcademicSession) {
       setCourseOutcomes([]);
       setOutcomeValues({});
+      setLockedFeedbackIndexes({});
       setLoadingOutcomes(false);
       return;
     }
@@ -221,6 +258,100 @@ function OBEFormPage() {
     };
     fetchCourseOutcomes();
   }, [selectedCourseId, headerAcademicYear, headerAcademicSession]);
+
+  useEffect(() => {
+    if (!selectedProgramCode || !selectedCourseCode || !headerAcademicYear || !headerAcademicSession || courseOutcomes.length === 0) {
+      setLockedFeedbackIndexes({});
+      if (courseOutcomes.length === 0) setOutcomeValues({});
+      setLoadingFeedbackValues(false);
+      return;
+    }
+    let cancelled = false;
+    const fetchExistingFeedback = async () => {
+      setLoadingFeedbackValues(true);
+      try {
+        const endpoint = buildCourseExitFeedbackGetUrl({
+          acadYear: headerAcademicYear,
+          acadSession: headerAcademicSession,
+          courseId: selectedCourseCode,
+          programCode: selectedProgramCode,
+        });
+        const res = await callApiViaProxy<unknown>(endpoint, undefined, undefined, "GET");
+        if (cancelled) return;
+        const rows = Array.isArray(res.data) ? (res.data as CourseExitFeedbackItem[]) : [];
+        const byCo = new Map<string, number>();
+        rows.forEach((r) => {
+          const key = normalizeCourseExitCoNo(r.coNo);
+          const v = Number(r.feedbackValue);
+          if (key && Number.isFinite(v)) byCo.set(key, v);
+        });
+        const prefilled: Record<number, number | undefined> = {};
+        const locked: Record<number, boolean> = {};
+        courseOutcomes.forEach((co, index) => {
+          const key = normalizeCourseExitCoNo(co["Sno Description"]);
+          const existing = byCo.get(key);
+          if (existing !== undefined) {
+            prefilled[index] = existing;
+            locked[index] = true;
+          }
+        });
+        setOutcomeValues((prev) => {
+          const next: Record<number, number | undefined> = {};
+          courseOutcomes.forEach((_, index) => {
+            if (locked[index]) next[index] = prefilled[index];
+            else if (prev[index] !== undefined) next[index] = prev[index];
+          });
+          return next;
+        });
+        setLockedFeedbackIndexes(locked);
+      } catch (err) {
+        if (!cancelled) {
+          console.error("fetchExistingFeedback error:", err);
+          setLockedFeedbackIndexes({});
+        }
+      } finally {
+        if (!cancelled) setLoadingFeedbackValues(false);
+      }
+    };
+    fetchExistingFeedback();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedProgramCode, selectedCourseCode, headerAcademicYear, headerAcademicSession, courseOutcomes]);
+
+  useEffect(() => {
+    if (!selectedProgramCode || !selectedCourseId || !headerAcademicYear || !headerAcademicSession) return;
+    if (isSubmitting) return;
+    let cancelled = false;
+    const loadSavedAttainment = async () => {
+      try {
+        const res = await callApiViaProxy<unknown>(
+          COPO_BLOB_GET_URL_TEST,
+          {
+            academicYear: headerAcademicYear,
+            academicSession: headerAcademicSession,
+            courseId: selectedCourseId,
+            programCode: selectedProgramCode,
+          },
+          undefined,
+          "POST"
+        );
+        if (cancelled || !res.success || res.data == null) return;
+        const b64 = extractBase64FromCOPOApiResponse(res.data);
+        if (!b64) return;
+        if (cancelled) return;
+        const parsed = base64Utf8ToJson<{ calculatedData?: Record<string, unknown>; message?: string }>(b64);
+        if (cancelled) return;
+        setCalculationResult((prev) => prev ?? parsed);
+      } catch {
+        /* ignore missing blob */
+      }
+    };
+    loadSavedAttainment();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedProgramCode, selectedCourseId, headerAcademicYear, headerAcademicSession, isSubmitting]);
 
   // Cleanup polling on unmount
   useEffect(() => {
@@ -272,18 +403,7 @@ function OBEFormPage() {
           academicSession: headerAcademicSession,
           semester: selectedSemester,
           courseOutcomes: courseOutcomes,
-          outcomeValues: (() => {
-            const entries = Object.entries(outcomeValues);
-            const values = entries.map(([, v]) => Number(v));
-            const allInZeroToThree = values.length > 0 && values.every((v) => v >= 0 && v <= 3);
-            return Object.fromEntries(
-              entries.map(([k, v]) => {
-                const num = Number(v);
-                const sent = allInZeroToThree ? num : (num * 3) / 100;
-                return [k, Math.round(sent * 100) / 100];
-              })
-            );
-          })(),
+          outcomeValues: normalizeOutcomeValuesForSubmission(outcomeValues),
           programCode: selectedProgramCode || undefined,
         }),
       });
@@ -399,6 +519,63 @@ function OBEFormPage() {
           if (statusData.status === "completed") {
             // Stop polling immediately
             stopPolling();
+
+            const completedResult = statusData.result as { calculatedData?: Record<string, unknown>; message?: string } | undefined;
+            if (completedResult) {
+              try {
+                const base64Value = jsonToBase64Utf8(completedResult);
+                const safeName = `COPO_${selectedCourseCode}_${headerAcademicYear}`.replace(/[^a-zA-Z0-9_-]/g, "_");
+                const blobSave = await callApiViaProxy<unknown>(
+                  COPO_BLOB_SAVE_URL_TEST,
+                  {
+                    academicYear: headerAcademicYear,
+                    academicSession: headerAcademicSession,
+                    courseId: selectedCourseId,
+                    programCode: selectedProgramCode,
+                    base64Value,
+                    fileName: safeName || "COPO",
+                    fileExtension: ".json",
+                  },
+                  undefined,
+                  "POST"
+                );
+                if (!blobSave.success) {
+                  console.error("Save COPO attainment blob failed:", blobSave.error);
+                }
+              } catch (err) {
+                console.error("Save COPO attainment blob error:", err);
+              }
+            }
+
+            const normalizedOutcomeValues = normalizeOutcomeValuesForSubmission(outcomeValues);
+            const savePayloads = courseOutcomes
+              .map((co, index) => ({ co, index }))
+              .filter(({ index }) => !lockedFeedbackIndexes[index] && normalizedOutcomeValues[String(index)] !== undefined)
+              .map(({ co, index }) => ({
+                acadYear: headerAcademicYear,
+                acadSession: headerAcademicSession,
+                courseId: selectedCourseCode,
+                programCode: selectedProgramCode,
+                coNo: String(co["Sno Description"] ?? "").trim(),
+                feedbackValue: normalizedOutcomeValues[String(index)],
+              }))
+              .filter((x) => x.coNo);
+            if (savePayloads.length > 0) {
+              const saveResults = await Promise.all(
+                savePayloads.map((payload) => callApiViaProxy<unknown>(COURSE_EXIT_FEEDBACK_POST_URL, payload, undefined, "POST"))
+              );
+              const failed = saveResults.filter((r) => !r.success);
+              if (failed.length > 0) {
+                console.error("Some feedback values could not be saved:", failed.map((f) => f.error));
+                alert("Calculation completed, but some feedback values could not be saved.");
+              } else {
+                const nextLocked = { ...lockedFeedbackIndexes };
+                courseOutcomes.forEach((_, index) => {
+                  if (normalizedOutcomeValues[String(index)] !== undefined) nextLocked[index] = true;
+                });
+                setLockedFeedbackIndexes(nextLocked);
+              }
+            }
 
             // Update UI with result
             setCalculationResult(statusData.result);
@@ -555,6 +732,7 @@ function OBEFormPage() {
     setSelectedCourseId("");
     setCourseOutcomes([]);
     setOutcomeValues({});
+    setLockedFeedbackIndexes({});
     setCalculationResult(null);
     setCalculationProgress(0);
     setCurrentJobId(null);
@@ -705,6 +883,15 @@ function OBEFormPage() {
                                 </div>
                               </td>
                             </tr>
+                          ) : loadingFeedbackValues ? (
+                            <tr>
+                              <td colSpan={3} className="text-center py-8">
+                                <div className="flex items-center justify-center space-x-2">
+                                  <div className="w-5 h-5 border-2 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
+                                  <span className="text-gray-600">Loading existing feedback values...</span>
+                                </div>
+                              </td>
+                            </tr>
                           ) : courseOutcomes.length === 0 ? (
                             <tr>
                               <td colSpan={3} className="text-center py-4">
@@ -723,6 +910,7 @@ function OBEFormPage() {
                                     max="100"
                                     step="0.01"
                                     value={outcomeValues[index] ?? ""}
+                                    disabled={Boolean(lockedFeedbackIndexes[index])}
                                     onChange={(e) => {
                                       const value = parseFloat(e.target.value);
                                       if ((value >= 0 && value <= 100) || e.target.value === "") {
@@ -737,7 +925,7 @@ function OBEFormPage() {
                                         });
                                       }
                                     }}
-                                    className="w-full px-3 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500"
+                                    className="w-full px-3 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 disabled:bg-gray-100 disabled:text-gray-500"
                                     placeholder="0"
                                   />
                                 </td>
@@ -786,216 +974,13 @@ function OBEFormPage() {
                   <div id="calculation-results-print" className="mt-8">
                     <h3 className="text-lg font-semibold text-gray-800 mb-4">Calculation Results</h3>
                     <div className="bg-white rounded-lg p-6 border border-gray-200">
-                      {(() => {
-                        const calculatedData = calculationResult?.calculatedData;
-                        if (!calculatedData) return null;
-
-                        // Calculate total unique students across all exam methods
-                        const allStudentNumbers = new Set<string>();
-                        if (calculatedData.studentData) {
-                          Object.values(calculatedData.studentData).forEach((students: unknown) => {
-                            if (Array.isArray(students)) {
-                              students.forEach((student: { studentNo?: string }) => {
-                                if (student.studentNo) {
-                                  allStudentNumbers.add(student.studentNo);
-                                }
-                              });
-                            }
-                          });
-                        }
-                        const totalStudents = allStudentNumbers.size;
-
-                        // Get all COs from courseOutcomes (all 5 COs)
-                        // Use courseOutcomes from the component state to get all COs
-                        const allCOsFromOutcomes = courseOutcomes.map((outcome) => outcome["Sno Description"]);
-
-                        // Helper function to convert decimal to percentage
-                        const toPercentage = (value: number | undefined, showDash: boolean = false): string => {
-                          if (value === undefined || value === null) {
-                            return showDash ? "-" : "0.00";
-                          }
-                          return (value * 100).toFixed(2);
-                        };
-
-                        // Helper function to format coAttainmentLevel (levels: 1, 2, or 3)
-                        const formatAttainmentLevel = (value: number | undefined): string => {
-                          if (value === undefined || value === null || value === 0) return "0";
-                          return Math.round(value).toString();
-                        };
-
-                        // Helper function to check if a CO has calculated values
-                        const hasCalculatedValues = (co: string): boolean => {
-                          return (
-                            calculatedData.internalAttainment?.[co] !== undefined ||
-                            calculatedData.externalAttainment?.[co] !== undefined ||
-                            calculatedData.exactAttainment?.[co] !== undefined
-                          );
-                        };
-
-                        const sortedCOs = allCOsFromOutcomes.sort();
-
-                        // All POs sorted by name (left to right); prefer full list from API, else fallback to mapped POs
-                        const poListFromApi = (calculatedData.POs || []) as POItem[];
-                        const mappedPOIds = Object.keys(calculatedData.poSumPerPO || {});
-                        const allPOIdsSorted = (poListFromApi.length > 0 ? poListFromApi.map((p) => p.id) : mappedPOIds).sort((a, b) =>
-                          a.localeCompare(b, undefined, { numeric: true })
-                        );
-
-                        return (
-                          <div className="space-y-6">
-                            {/* Program code, Course code, Academic session, Batch year, Total students — one gray section */}
-                            <div className="bg-gray-50 rounded-lg p-4 border border-gray-200 space-y-0">
-                              <div className="flex items-center justify-between py-2 first:pt-0">
-                                <span className="text-sm font-medium text-gray-700">Program code:</span>
-                                <span className="text-lg font-bold text-gray-900">{selectedProgramCode || "—"}</span>
-                              </div>
-                              <div className="border-t border-gray-200" />
-                              <div className="flex items-center justify-between py-2">
-                                <span className="text-sm font-medium text-gray-700">Course code:</span>
-                                <span className="text-lg font-bold text-gray-900">{selectedCourseCode || "—"}</span>
-                              </div>
-                              <div className="border-t border-gray-200" />
-                              <div className="flex items-center justify-between py-2">
-                                <span className="text-sm font-medium text-gray-700">Academic session:</span>
-                                <span className="text-lg font-bold text-gray-900">{headerAcademicSession || "—"}</span>
-                              </div>
-                              <div className="border-t border-gray-200" />
-                              <div className="flex items-center justify-between py-2">
-                                <span className="text-sm font-medium text-gray-700">Semester:</span>
-                                <span className="text-lg font-bold text-gray-900">{selectedSemester || "—"}</span>
-                              </div>
-                              <div className="border-t border-gray-200" />
-                              <div className="flex items-center justify-between py-2 last:pb-0">
-                                <span className="text-sm font-medium text-gray-700">Total Students:</span>
-                                <span className="text-lg font-bold text-gray-900">{totalStudents}</span>
-                              </div>
-                            </div>
-
-                            {/* CO Attainment Table (same style as PO tables: green header/first column, orange data cells) */}
-                            <div className="bg-white rounded-lg p-2 border border-gray-200 w-full overflow-x-auto">
-                              <table className="min-w-full text-sm text-gray-800 border-collapse">
-                                <thead>
-                                  <tr className="bg-green-200 border border-green-300">
-                                    <th className="px-3 py-2 text-left font-semibold border border-green-300 min-w-16">CO.No.</th>
-                                    <th className="px-3 py-2 text-center font-semibold border border-green-300">Internal Attainment (%)</th>
-                                    <th className="px-3 py-2 text-center font-semibold border border-green-300">External Attainment (%)</th>
-                                    <th className="px-3 py-2 text-center font-semibold border border-green-300">Exact Attainment (%)</th>
-                                    <th className="px-3 py-2 text-center font-semibold border border-green-300">CO Attainment Level</th>
-                                  </tr>
-                                </thead>
-                                <tbody className="text-[13px]">
-                                  {sortedCOs.length === 0 ? (
-                                    <tr>
-                                      <td colSpan={5} className="text-center py-8 text-gray-500 border border-orange-200 bg-orange-50">
-                                        No course outcomes available
-                                      </td>
-                                    </tr>
-                                  ) : (
-                                    sortedCOs.map((co) => {
-                                      const hasValues = hasCalculatedValues(co);
-                                      const internal = calculatedData.internalAttainment?.[co];
-                                      const external = calculatedData.externalAttainment?.[co];
-                                      const exact = calculatedData.exactAttainment?.[co];
-                                      const attainmentLevel = calculatedData.coAttainmentLevel?.[co];
-
-                                      return (
-                                        <tr key={co}>
-                                          <td className="px-3 py-2 font-medium bg-green-200 border border-green-300">{co}</td>
-                                          <td className="px-3 py-2 text-center border border-orange-200 bg-orange-50">
-                                            {hasValues ? `${toPercentage(internal)}%` : "-"}
-                                          </td>
-                                          <td className="px-3 py-2 text-center border border-orange-200 bg-orange-50">
-                                            {hasValues ? `${toPercentage(external)}%` : "-"}
-                                          </td>
-                                          <td className="px-3 py-2 text-center border border-orange-200 bg-orange-50">
-                                            {hasValues ? `${toPercentage(exact)}%` : "-"}
-                                          </td>
-                                          <td className="px-3 py-2 text-center border border-orange-200 bg-orange-50">
-                                            {hasValues ? formatAttainmentLevel(attainmentLevel) : "-"}
-                                          </td>
-                                        </tr>
-                                      );
-                                    })
-                                  )}
-                                </tbody>
-                              </table>
-                            </div>
-
-                            {/* PO to CO Map Table (green header, orange data cells - Excel style); all POs sorted by name */}
-                            {calculatedData.poToCoMap && Object.keys(calculatedData.poToCoMap).length > 0 && allPOIdsSorted.length > 0 && (
-                              <div className="bg-white rounded-lg p-2 border border-gray-200 w-full overflow-x-auto">
-                                <table className="min-w-full text-sm text-gray-800 border-collapse">
-                                  <thead>
-                                    <tr className="bg-green-200 border border-green-300">
-                                      <th className="px-3 py-2 text-left font-semibold border border-green-300 min-w-16">CO</th>
-                                      {allPOIdsSorted.map((poId) => (
-                                        <th key={poId} className="px-3 py-2 text-center font-semibold border border-green-300 whitespace-nowrap">
-                                          {poId}
-                                        </th>
-                                      ))}
-                                    </tr>
-                                  </thead>
-                                  <tbody className="text-[13px]">
-                                    {Object.entries(calculatedData.poToCoMap).map(([coId, row]) => {
-                                      const poRow = row as Record<string, number | "--">;
-                                      return (
-                                        <tr key={coId}>
-                                          <td className="px-3 py-2 font-medium bg-green-200 border border-green-300">{coId}</td>
-                                          {allPOIdsSorted.map((poId) => {
-                                            const val = poRow[poId];
-                                            return (
-                                              <td key={poId} className="px-3 py-2 text-center border border-orange-200 bg-orange-50">
-                                                {typeof val === "number" ? val.toFixed(2) : val === "--" ? "--" : "—"}
-                                              </td>
-                                            );
-                                          })}
-                                        </tr>
-                                      );
-                                    })}
-                                  </tbody>
-                                </table>
-                              </div>
-                            )}
-
-                            {/* PO Sum and Average table (Excel style); all POs sorted by name */}
-                            {allPOIdsSorted.length > 0 && (
-                              <div className="bg-white rounded-lg p-2 border border-gray-200 w-full overflow-x-auto">
-                                <table className="min-w-full text-sm text-gray-700 border-collapse">
-                                  <thead>
-                                    <tr className="bg-green-200 border border-green-300">
-                                      <th className="px-4 py-2 font-semibold text-left border border-green-300 w-24"> </th>
-                                      {allPOIdsSorted.map((poId) => (
-                                        <th key={poId} className="px-2 py-2 text-center font-semibold border border-green-300">
-                                          {poId}
-                                        </th>
-                                      ))}
-                                    </tr>
-                                  </thead>
-                                  <tbody className="text-[13px]">
-                                    <tr className="bg-gray-50 border border-gray-200">
-                                      <td className="px-4 py-2 font-medium text-gray-700 border border-gray-200">PO Sum</td>
-                                      {allPOIdsSorted.map((poId) => {
-                                        const sum = (calculatedData.poSumPerPO as Record<string, number> | undefined)?.[poId];
-                                        return (
-                                          <td key={poId} className="px-4 py-2 text-center font-medium text-gray-900 border border-gray-200">
-                                            {typeof sum === "number" ? sum.toFixed(2) : "—"}
-                                          </td>
-                                        );
-                                      })}
-                                    </tr>
-                                    <tr className="bg-gray-100 border border-gray-200">
-                                      <td className="px-4 py-2 font-medium text-gray-700 border border-gray-200">Average</td>
-                                      <td colSpan={allPOIdsSorted.length} className="px-4 py-2 text-center font-medium text-gray-900 border border-gray-200">
-                                        {typeof calculatedData.poAverageValue === "number" ? calculatedData.poAverageValue.toFixed(2) : "—"}
-                                      </td>
-                                    </tr>
-                                  </tbody>
-                                </table>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })()}
+                      <CoAttainmentResultView
+                        result={calculationResult}
+                        programCode={selectedProgramCode}
+                        courseCode={selectedCourseCode}
+                        academicSession={headerAcademicSession || ""}
+                        semester={selectedSemester}
+                      />
                     </div>
                   </div>
                 )}

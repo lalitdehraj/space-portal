@@ -4,11 +4,18 @@ export type ApiResponse<T> = {
   error?: string;
 };
 
+export type ProxyHttpMethod = "POST" | "GET";
+
 /**
  * OBE-specific API helper. Uses /api/proxy to avoid CORS when calling
  * OBE/MUJWEB APIs from the browser.
  */
-export const callApiViaProxy = async <T>(url: string, requestBody?: unknown, abortSignal?: AbortSignal): Promise<ApiResponse<T>> => {
+export const callApiViaProxy = async <T>(
+  url: string,
+  requestBody?: unknown,
+  abortSignal?: AbortSignal,
+  method: ProxyHttpMethod = "POST"
+): Promise<ApiResponse<T>> => {
   try {
     const response = await fetch("/api/proxy", {
       method: "POST",
@@ -17,6 +24,7 @@ export const callApiViaProxy = async <T>(url: string, requestBody?: unknown, abo
       },
       body: JSON.stringify({
         endpoint: url,
+        method,
         requestBody: requestBody !== undefined && requestBody !== null ? requestBody : {},
       }),
       signal: abortSignal,
